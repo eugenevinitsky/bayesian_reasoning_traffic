@@ -1,5 +1,6 @@
 """Utility methods used for determining what is in a vehicle's field of view."""
 import math
+import matplotlib.pyplot as plt
 
 def observed(position, orientation, target_position, fov=90, looking_distance=50):
     """Check if a single vehicle/pedestrian can see another vehicle/pedestrian.
@@ -119,31 +120,13 @@ def get_blocked_segments(position, target_position, target_orientation, target_l
         Each element is another length 2 tuple of the x and y positions of the line segment
         that blocks the observation vehicle's field of view
     """
-    target_orientation = orientation_unit_circle(target_orientation)
     corner_angle = math.degrees(math.atan(target_width / target_length))
-    corner_dist = euclidian_distance(target_length, target_width)
+    corner_dist = euclidian_distance(target_length / 2, target_width / 2)
 
-    corners = []
+    corners = get_corners(target_position[0], target_position[1], target_orientation, \
+            corner_angle, corner_dist)
+
     angles = []
-
-    t_angle = math.radians(target_orientation + corner_angle)
-    corners.append((target_position[0] + math.cos(t_angle) * corner_dist, \
-            target_position[1] + math.sin(t_angle) * corner_dist))
-
-    t_angle = math.radians(target_orientation + (180 - corner_angle))
-    corners.append((target_position[0] + math.cos(t_angle) * corner_dist, \
-            target_position[1] + math.sin(t_angle) * corner_dist))
-
-
-    t_angle = math.radians(target_orientation + (180 + corner_angle))
-    corners.append((target_position[0] + math.cos(t_angle) * corner_dist, \
-            target_position[1] + math.sin(t_angle) * corner_dist))
-
-
-    t_angle = math.radians(target_orientation + (360 - corner_angle))
-    corners.append((target_position[0] + math.cos(t_angle) * corner_dist, \
-            target_position[1] + math.sin(t_angle) * corner_dist))
-
     for i, c in enumerate(corners):
         angles.append((i, get_angle(position[0] - c[0], position[1] - c[1])))
 
@@ -151,6 +134,30 @@ def get_blocked_segments(position, target_position, target_orientation, target_l
     min_angle = corners[min(angles, key=lambda x: x[1])[0]]
 
     return(max_angle, min_angle)
+
+def get_corners(x, y, orientation, corner_angle, corner_dist, center_offset=1.5):
+    corners = []
+
+    adjusted_x = x - center_offset * math.cos(math.radians(orientation))
+    adjusted_y = y - center_offset * math.sin(math.radians(orientation))
+
+    t_angle = math.radians((orientation + corner_angle) % 360)
+    corners.append((adjusted_x + math.cos(t_angle) * corner_dist, \
+            adjusted_y + math.sin(t_angle) * corner_dist))
+
+    t_angle = math.radians((orientation + 180 - corner_angle) % 360)
+    corners.append((adjusted_x + math.cos(t_angle) * corner_dist, \
+            adjusted_y + math.sin(t_angle) * corner_dist))
+
+    t_angle = math.radians((orientation + 180 + corner_angle) % 360)
+    corners.append((adjusted_x + math.cos(t_angle) * corner_dist, \
+            adjusted_y + math.sin(t_angle) * corner_dist))
+
+    t_angle = math.radians((orientation - corner_angle) % 360)
+    corners.append((adjusted_x + math.cos(t_angle) * corner_dist, \
+            adjusted_y + math.sin(t_angle) * corner_dist))
+
+    return corners
 
 def check_blocked(position, target_position, blocked, vehicle_id):
     """Check if a target vehicle is blocked by another vehicle or object.
@@ -204,3 +211,52 @@ def lines_intersect(line1, line2):
 
     a, b, c, d = line1[0], line1[1], line2[0], line2[1]
     return ccw(a, c, d) != ccw(b, c, d) and ccw(a, b, c) != ccw(a, b, d)
+
+def visualize_vision(observation_vehicle, block_lines, viewed_veh, viewed_ped):
+
+    plt.axes()
+    plt.clf()
+
+    for v_id in viewed_veh:
+        x, y = viewed_veh[v_id]['xy']
+        yaw = viewed_veh[v_id]['yaw']
+        width = viewed_veh[v_id]['width']
+        length = viewed_veh[v_id]['length']
+        if viewed_veh[v_id]['viewed']:
+            color = 'y'
+        else:
+            color = 'r'
+
+        corner_angle = math.degrees(math.atan(width / length))
+        corner_dist = euclidian_distance(length / 2, width / 2)
+        corners = get_corners(x, y, yaw, corner_angle, corner_dist)
+
+        # plot vehicle perimeter
+        for i in range(4):
+            a, b = corners[i], corners[(i + 1) % 4]
+            x_values = [a[0], b[0]]
+            y_values = [a[1], b[1]]
+            plt.plot(x_values, y_values, color)
+
+        # plot vehicle position (SUMO defines position to be center of hood)
+        plt.scatter(x, y, marker='s', s=2)
+
+    for ped_id in viewed_ped:
+        x, y = viewed_ped[ped_id]['xy']
+        plt.scatter(x, y, marker='*', c='b')
+
+    # plot blocking lines
+    for line in block_lines.values():
+        a, b = line[0], line[1]
+        x_values = [a[0], b[0]]
+        y_values = [a[1], b[1]]
+        plt.plot(x_values, y_values, 'k')
+
+    plt.axis('equal')
+    axes = plt.gca()
+    x, y = observation_vehicle['xy']
+    axes.set_xlim([x - 50, x + 50])
+    axes.set_ylim([y - 50, y + 50])
+
+    plt.draw()
+    plt.pause(0.001)

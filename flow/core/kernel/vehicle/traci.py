@@ -423,7 +423,7 @@ class TraCIVehicle(KernelVehicle):
         """Return the initial speed of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["initial_speed"]
 
-    def get_viewable_objects(self, veh_id, pedestrians=None, radius=50):
+    def get_viewable_objects(self, veh_id, pedestrians=None, radius=50, visualize=False):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.
 
         Return two lists of all vehicles and pedestrians that are within the viewing radius
@@ -467,8 +467,35 @@ class TraCIVehicle(KernelVehicle):
 
         if pedestrians:
             for ped_id in pedestrians.get_ids():
-                if util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked):
+                if util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id):
                     viewable_pedestrians.append(ped_id)
+
+        # visualization
+        if visualize:
+
+            viewed_veh = {}
+            for v_id in observed_vehicles:
+                attributes = {}
+                attributes['xy'] = self.get_orientation(v_id)[:2]
+                attributes['yaw'] = self.get_yaw(v_id)
+                attributes['length'] = self.get_length(v_id)
+                attributes['width'] = self.get_width(v_id)
+                attributes['viewed'] = v_id in viewable_vehicles
+                viewed_veh[v_id] = attributes
+
+            viewed_ped = {}
+            for ped_id in viewable_pedestrians:
+                attributes = {}
+                attributes['xy'] = pedestrians.get_position(ped_id)
+                viewed_ped[ped_id] = attributes
+
+            observation_vehicle = {}
+            observation_vehicle['xy'] = self.get_orientation(veh_id)[:2]
+            observation_vehicle['yaw'] = self.get_yaw(veh_id)
+            observation_vehicle['length'] = self.get_length(veh_id)
+            observation_vehicle['width'] = self.get_width(veh_id)
+
+            util.visualize_vision(observation_vehicle, blocked, viewed_veh, viewed_ped)
 
         return viewable_vehicles, viewable_pedestrians
 
