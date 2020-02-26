@@ -118,6 +118,9 @@ class Experiment:
             state = self.env.reset()
             for j in range(num_steps):
 
+                print(self.env.k.vehicle.get_viewable_objects('human_1', \
+                        pedestrians=self.env.k.pedestrian, visualize=True))
+
                 state, reward, done, _ = self.env.step(rl_actions(state))
                 vel[j] = np.mean(
                     self.env.k.vehicle.get_speed(self.env.k.vehicle.get_ids()))     # TODO(KL) Check w Eugene what the point of that the mean is?

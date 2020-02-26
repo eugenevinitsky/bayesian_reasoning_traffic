@@ -82,7 +82,7 @@ def get_non_flow_params(enter_speed, add_net_params, pedestrians=False):
         spacing='custom', additional_params=additional_init_params)
     if pedestrians:
         initial = InitialConfig(
-            spacing='custom', sidewalks=True, lanes_distribution=float('inf'), shuffle=True)
+            spacing='custom', sidewalks=True, lanes_distribution=float('inf'))
     net = NetParams(additional_params=add_net_params)
 
     return initial, net
@@ -142,12 +142,12 @@ def bayesian_1_example(render=None, pedestrians=False):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-        # pedestrian_params.add(
-        #      ped_id='ped_0',
-        #      depart_time='0.00',
-        #      start='(1.2)--(1.1)',
-        #      end='(1.1)--(1.0)',
-        #      depart_pos='60')
+        pedestrian_params.add(
+            ped_id='ped_0',
+            depart_time='0.00',
+            start='(1.0)--(1.1)',
+            end='(1.1)--(1.2)',
+            depart_pos='30')
 
     vehicles = VehicleParams()
     vehicles.add(
