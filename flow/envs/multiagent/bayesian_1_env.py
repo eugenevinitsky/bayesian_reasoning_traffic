@@ -89,39 +89,40 @@ class Bayesian1Env(MultiEnv):
         
         obs = {}
         for rl_id in self.k.vehicle.get_rl_ids():
-            # TODO add get x y as something that we store from TraCI
-            # TODO(@nliu)
+            # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+
             num_obs = len(self.observation_names)
-            print(num_obs)
-            print(self.observation_space)
+
             observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
-            import ipdb; ipdb.set_trace()
-            visible_ids = self.find_visible_objects(rl_id, self.search_radius)
-            print(self.search_radius)
-            print(visible_ids)
+            #TODO(@nliu): currently not using pedestrians
 
-            veh_x, veh_y, _ = self.k.vehicle.get_orientation(rl_id)
+            visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
 
-            for index, obj_id in enumerate(visible_ids):
-                x, y, _ = self.k.vehicle.get_orientation(obj_id)
-                rel_x = veh_x - x
-                rel_y = veh_y - y
-                # TODO(@nliu)
-                # TODO add a check for whether an object is a pedestrian
-                # This check is currently not needed as find_visible_objects is only
-                # returning pedestrians. 
-                is_ped = self.k.pedestrian.is_pedestrian(obj_id)
-                if is_ped:
-                    speed = self.k.pedestrian.get_speed(obj_id)
-                    yaw = self.k.pedestrian.get_yaw(obj_id) # TOD0(KL) check what get_angle actually returns, else done
-                else:
-                    speed = self.k.vehicle.get_speed(obj_id)
-                    yaw = self.k.vehicle.get_yaw(obj_id)
-                print(speed, yaw)
-                observation[index * num_obs: (index + 1) * num_obs] = [rel_x, rel_y, speed, is_ped, yaw]
+            veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
+            yaw = self.k.vehicle.get_yaw(rl_id)
+            speed = self.k.vehicle.get_speed(rl_id)
+            edge = self.k.vehicle.get_edge(rl_id)
+            edge_hash = abs(hash(edge)) % 100 #TODO(@nliu) find a better way to map edges to ints
+            edge_pos = self.k.vehicle.get_position(rl_id)
 
+            observation[:4] = [yaw, speed, edge_hash, edge_pos]
+            observation[4] = 0 # TODO(@nliu) pedestrians implementation later
+
+            #TODO(@nliu) sort by angle
+            for index, veh_id in enumerate(visible_vehicles):
+                observed_yaw = self.k.vehicle.get_yaw(veh_id)
+                observed_speed = self.k.vehicle.get_speed(veh_id)
+                observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
+                rel_x = observed_x - veh_x
+                rel_y = observed_y - veh_y
+
+                if index <= 1: # TODO(@nliu) only allowing 2 because of observations size
+                    observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
+                            [observed_yaw, observed_speed, rel_x, rel_y]
+
+            print(observation)
             obs.update({rl_id: observation})
-            print(obs)
+            #print(obs)
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -152,16 +153,14 @@ class Bayesian1Env(MultiEnv):
 
         Returns
         -------
-        close_objects : [str]
-            Returns a list of the IDs of pedestrians and cars that are within a radius of the car and are unobscured
+        visible_vehicles, visible_pedestrians : [str], [str]
+            Returns two lists of the IDs of vehicles and pedestrians that are within a radius of the car and are unobscured
 
         """
-        # TODO(@nliu)
-        viewable_vehicles = self.k.vehicle.get_observed_vehicles(veh_id, radius)
-        print(veh_id, 'vehicles', viewable_vehicles)
-        viewable_pedestrians = self.k.vehicle.get_observed_pedestrians(veh_id, \
-                self.k.pedestrian, radius)
-        
-        viewable_vehicles = self.k.vehicle.get_observed_vehicles(veh_id, \
-                self.k.vehicle, radius)
-        return viewable_pedestrians + viewable_vehicles
+        visible_vehicles, visible_pedestrians = self.k.vehicle.get_viewable_objects( \
+                veh_id,
+                self.k.pedestrian,
+                radius)
+
+        return visible_vehicles, visible_pedestrians
+
