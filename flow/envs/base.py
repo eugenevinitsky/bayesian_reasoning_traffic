@@ -127,7 +127,13 @@ class Env(gym.Env):
         self.network = scenario if scenario is not None else network
         self.net_params = self.network.net_params
         self.initial_config = self.network.initial_config
-        self.sim_params = sim_params
+        self.sim_params = deepcopy(sim_params)
+        print(self.sim_params.render)
+
+        # check whether we should be rendering
+        self.should_render = self.sim_params.render
+        self.sim_params.render = False
+
         time_stamp = ''.join(str(time.time()).split('.'))
         if os.environ.get("TEST_FLAG", 0):
             # 1.0 works with stress_test_start 10k times
@@ -138,8 +144,6 @@ class Env(gym.Env):
         self.time_counter = 0
         # step_counter: number of total steps taken
         self.step_counter = 0
-        # rollout_counter: number of total rollouts
-        self.rollout_counter = 0
         # initial_state:
         self.initial_state = {}
         self.state = None
@@ -153,7 +157,7 @@ class Env(gym.Env):
 
         # create the Flow kernel
         self.k = Kernel(simulator=self.simulator,
-                        sim_params=sim_params)
+                        sim_params=self.sim_params)
 
         # use the network class's network parameters to generate the necessary
         # network components within the network kernel
@@ -162,17 +166,11 @@ class Env(gym.Env):
         # initial the vehicles kernel using the VehicleParams object
         self.k.vehicle.initialize(deepcopy(self.network.vehicles))
 
-        # this is a hack used to prevent rllib from opening 1000 windows before anything happens
-        # this is a flag used to track that we should turn rendering back on
-        self.turn_render_back = False
-        if sim_params.render and sim_params.rllib_training:
-            sim_params.render = False
-            self.turn_render_back = True
         # initialize the simulation using the simulation kernel. This will use
         # the network kernel as an input in order to determine what network
         # needs to be simulated.
         kernel_api = self.k.simulation.start_simulation(
-            network=self.k.network, sim_params=sim_params)
+            network=self.k.network, sim_params=self.sim_params)
 
         # pass the kernel api to the kernel and it's subclasses
         self.k.pass_api(kernel_api)
@@ -245,10 +243,6 @@ class Env(gym.Env):
             specifies whether to use the gui
         """
         self.k.close()
-
-        if self.turn_render_back and self.rollout_counter >= 2:
-            self.turn_render_back = False
-            sim_params.render = True
 
         # killed the sumo process if using sumo/TraCI
         if self.simulator == 'traci':
@@ -432,7 +426,13 @@ class Env(gym.Env):
         """
         # reset the time counter
         self.time_counter = 0
-        self.rollout_counter += 1
+
+        # Now that we've passed the possibly fake init steps some rl libraries
+        # do, we can feel free to actually render things
+        if self.should_render:
+            self.sim_params.render = True
+            # got to restart the simulation to make it actually display anything
+            self.restart_simulation(self.sim_params)
 
         # warn about not using restart_instance when using inflows
         if len(self.net_params.inflows.get()) > 0 and \

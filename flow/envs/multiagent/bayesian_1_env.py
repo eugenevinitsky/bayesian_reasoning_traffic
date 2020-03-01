@@ -95,7 +95,6 @@ class Bayesian1Env(MultiEnv):
             print(num_obs)
             print(self.observation_space)
             observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
-            import ipdb; ipdb.set_trace()
             visible_ids = self.find_visible_objects(rl_id, self.search_radius)
             print(self.search_radius)
             print(visible_ids)
