@@ -21,6 +21,9 @@ ADDITIONAL_ENV_PARAMS = {
 
 class Bayesian1Env(AccelEnv):
     """Specify the starting positions and routes of 3 cars and 1 pedestrian"""
+    def __init__(self, env_params, sim_params, network, simulator='traci'):
+            super().__init__(env_params, sim_params, network, simulator)
+
 
     def setup_initial_state(self):
         # generate starting position for the 3 vehicles in the network
