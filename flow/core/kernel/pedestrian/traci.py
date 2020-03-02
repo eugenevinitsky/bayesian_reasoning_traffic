@@ -55,6 +55,10 @@ class TraCIPedestrian(KernelPedestrian):
         # as a pedestrian might have speed == 0 when waiting at an intersectionself.
         # Querying the position of a pedestrian in the simulation throws an error
         # TODO: fix the above note
+
+        if reset:
+            self.__ids.clear()
+
         for ped_id in obs_ids:
             if ped_id not in self.__ids:
                 obs = self._add_departed(ped_id)
