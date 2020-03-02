@@ -124,12 +124,6 @@ def make_flow_params(pedestrians=False):
 
         # name of the network class the experiment is running on 
         network=Bayesian1Network,
-        # network = Bayesian1Network(
-        #     name="bayesian_1",
-        #     vehicles=vehicles,
-        #     net_params=net_params,
-        #     pedestrians=pedestrian_params,
-        #     initial_config=initial_config),
 
         # simulator that is used by the experiment
         simulator='traci',
@@ -181,7 +175,7 @@ def make_flow_params(pedestrians=False):
         # flow.core.params.VehicleParams)
         veh=vehicles,
 
-        # pedestrians=pedestrian_params,
+        ped=pedestrian_params,
 
         # parameters specifying the positioning of vehicles upon initialization
         # or reset (see flow.core.params.InitialConfig)
