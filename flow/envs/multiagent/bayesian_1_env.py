@@ -116,7 +116,7 @@ class Bayesian1Env(MultiEnv):
                 rel_x = observed_x - veh_x
                 rel_y = observed_y - veh_y
 
-                if index <= 1: # TODO(@nliu) only allowing 2 because of observations size
+                if index <= 2: 
                     observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
                             [observed_yaw, observed_speed, rel_x, rel_y]
 
