@@ -18,7 +18,10 @@ from flow.envs.multiagent import Bayesian1Env
 from flow.networks import Bayesian1Network
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import SumoCarFollowingParams, VehicleParams
+from flow.core.params import PedestrianParams
+
 from flow.controllers import SimCarFollowingController, GridRouter, RLController
+
 
 from flow.utils.registry import make_create_env
 from flow.utils.rllib import FlowParamsEncoder
@@ -36,7 +39,7 @@ INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 
 
-def make_flow_params():
+def make_flow_params(pedestrians=False):
     """
     Generate the flow params for the experiment.
 
@@ -48,6 +51,17 @@ def make_flow_params():
     dict
         flow_params object
     """
+
+    pedestrian_params = None
+    if pedestrians:
+        pedestrian_params = PedestrianParams()
+        pedestrian_params.add(
+            ped_id='ped_0',
+            depart_time='0.00',
+            start='(1.0)--(1.1)',
+            end='(1.1)--(1.2)',
+            depart_pos='30')
+
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
     # support traffic light compliance
@@ -63,7 +77,6 @@ def make_flow_params():
         ),
         routing_controller=(GridRouter, {}),
         num_vehicles=1)
-    # import ipdb; ipdb.set_trace()
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
@@ -87,10 +100,20 @@ def make_flow_params():
         routing_controller=(GridRouter, {}),
         num_vehicles=1)
 
-
-
     n_rows = 1
     n_columns = 1
+
+    # define initial configs to pass into dict
+    if pedestrians:
+        initial_config = InitialConfig(
+            spacing='custom',
+            shuffle=False, 
+            sidewalks=True, 
+            lanes_distribution=float('inf'))
+    else:
+        initial_config = InitialConfig(
+            spacing='custom',
+            shuffle=False)
 
     flow_params = dict(
         # name of the experiment
@@ -99,7 +122,7 @@ def make_flow_params():
         # name of the flow environment the experiment is running on
         env_name=Bayesian1Env,
 
-        # name of the network class the experiment is running on TODO(KLin) change this to the correct network
+        # name of the network class the experiment is running on 
         network=Bayesian1Network,
 
         # simulator that is used by the experiment
@@ -152,13 +175,13 @@ def make_flow_params():
         # flow.core.params.VehicleParams)
         veh=vehicles,
 
+        ped=pedestrian_params,
+
         # parameters specifying the positioning of vehicles upon initialization
         # or reset (see flow.core.params.InitialConfig)
-        initial=InitialConfig(
-            spacing='custom',
-            shuffle=False,
-        ),
+        initial = initial_config
     )
+
     return flow_params
 
 
@@ -246,10 +269,13 @@ if __name__ == '__main__':
                         help="Experiment run mode (local | cluster)")
     parser.add_argument('--algo', type=str, default='PPO',
                         help="RL method to use (PPO)")
+    parser.add_argument("--pedestrians",
+                        help="use pedestrians, sidewalks, and crossings in the simulation",
+                        action="store_true")
     args = parser.parse_args()
 
-
-    flow_params = make_flow_params()
+    pedestrians = args.pedestrians
+    flow_params = make_flow_params(pedestrians)
 
     upload_dir = args.upload_dir
     RUN_MODE = args.run_mode

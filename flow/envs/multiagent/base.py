@@ -139,10 +139,13 @@ class MultiEnv(MultiAgentEnv, Env):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
-        # remove the issue of the three dummy renderings (i.e. renderings with no vehicles or movement)
-        self.num_resets += 1
-        if self.num_resets > 0:
+	    # Now that we've passed the possibly fake init steps some rl libraries
+        # do, we can feel free to actually render things
+        if self.should_render:
+            # import ipdb; ipdb.set_trace()
             self.sim_params.render = True
+            # got to restart the simulation to make it actually display anything
+            # self.restart_simulation(self.sim_params)
 
         # reset the time counter
         self.time_counter = 0

@@ -83,13 +83,14 @@ def make_create_env(params, version=0, render=None):
     def create_env(*_):
         sim_params = deepcopy(params['sim'])
         vehicles = deepcopy(params['veh'])
-
+        ped_params = deepcopy(params.get('ped', False))
         network = network_class(
             name=exp_tag,
             vehicles=vehicles,
             net_params=net_params,
             initial_config=initial_config,
             traffic_lights=traffic_lights,
+            pedestrians=ped_params
         )
 
         # accept new render type if not set to None
