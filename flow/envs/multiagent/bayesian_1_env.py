@@ -56,15 +56,15 @@ class Bayesian1Env(MultiEnv):
                     'Environment parameter "{}" not supplied'.format(p))
 
         super().__init__(env_params, sim_params, network, simulator)
-        self.observation_names = ["rel_x", "rel_y", "speed", "is_ped", "yaw"]
+        self.observation_names = ["rel_x", "rel_y", "speed", "yaw"]
         self.search_radius = self.env_params.additional_params["search_radius"]
 
     @property
     def observation_space(self):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
-        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw
-        return Box(-float('inf'), float('inf'), shape=(max_objects * len(self.observation_names),), dtype=np.float32)
+        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
+        return Box(-float('inf'), float('inf'), shape=(5 + max_objects * len(self.observation_names),), dtype=np.float32)
 
     @property
     def action_space(self):
@@ -86,7 +86,7 @@ class Bayesian1Env(MultiEnv):
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
-        
+
         obs = {}
         for rl_id in self.k.vehicle.get_rl_ids():
             # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
@@ -116,7 +116,7 @@ class Bayesian1Env(MultiEnv):
                 rel_x = observed_x - veh_x
                 rel_y = observed_y - veh_y
 
-                if index <= 1: # TODO(@nliu) only allowing 2 because of observations size
+                if index <= 2: 
                     observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
                             [observed_yaw, observed_speed, rel_x, rel_y]
 
@@ -135,9 +135,19 @@ class Bayesian1Env(MultiEnv):
         for rl_id in self.k.vehicle.get_rl_ids():
 
             # TODO(@evinitsky) pick the right reward
+
             reward = 0
 
+            # TODO(@nliu) verify this works
+            collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
+            if rl_id in collision_vehicles:
+                reward = -10
+            else:
+                # TODO(@nliu & evinitsky) positive reward?
+                reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+
             rewards[rl_id] = reward
+
         return rewards
 
 
@@ -163,4 +173,3 @@ class Bayesian1Env(MultiEnv):
                 radius)
 
         return visible_vehicles, visible_pedestrians
-

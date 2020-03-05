@@ -109,7 +109,7 @@ def make_flow_params():
         sim=SumoParams(
             restart_instance=True,
             sim_step=0.1,
-            render=True,
+            render=False,
         ),
 
         # environment related parameters (see flow.core.params.EnvParams)
