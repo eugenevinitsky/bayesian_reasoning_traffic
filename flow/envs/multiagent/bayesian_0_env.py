@@ -14,13 +14,13 @@ ADDITIONAL_ENV_PARAMS = {
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
     # how many objects in our local radius we want to return
-    "max_num_objects": 3,
+    "max_num_objects": 1,
     # how large of a radius to search in for a given vehicle in meters
     "search_radius": 20
 }
 
 
-class Bayesian1Env(MultiEnv):
+class Bayesian0Env(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
     in scenario 1 of Jakob's diagrams. Please refer to the sketch for more details. Basically,
     inferring that the human is going to cross allows one of the vehicles to succesfully cross.
@@ -63,8 +63,10 @@ class Bayesian1Env(MultiEnv):
     def observation_space(self):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
-        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
-        return Box(-float('inf'), float('inf'), shape=(5 + max_objects * len(self.observation_names),), dtype=np.float32)
+        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number, the stuff from the car itself)
+        # have 1 for pedestrians, 0 for no pedestrian
+        return Box(-float('inf'), float('inf'), shape=(5 + max_objects * 1,), dtype=np.float32)
+        # return Box(-float('inf'), float('inf'), shape=(5 + max_objects * len(self.observation_names),), dtype=np.float32)
 
     @property
     def action_space(self):
@@ -79,6 +81,7 @@ class Bayesian1Env(MultiEnv):
         """See class definition."""
         # in the warmup steps, rl_actions is None
         if rl_actions:
+            import ipdb; ipdb.set_trace()
             for rl_id, actions in rl_actions.items():
                 accel = actions[0]
                 self.k.vehicle.apply_acceleration(rl_id, accel)
@@ -108,17 +111,18 @@ class Bayesian1Env(MultiEnv):
             observation[:4] = [yaw, speed, edge_hash, edge_pos]
             observation[4] = 0 # TODO(@nliu) pedestrians implementation later
 
-            #TODO(@nliu) sort by angle
-            for index, veh_id in enumerate(visible_vehicles):
-                observed_yaw = self.k.vehicle.get_yaw(veh_id)
-                observed_speed = self.k.vehicle.get_speed(veh_id)
-                observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
-                rel_x = observed_x - veh_x
-                rel_y = observed_y - veh_y
+            print(visible_pedestrians)
+            # #TODO(@nliu) sort by angle
+            # for index, ped_id in enumerate(visible_pedestrians):
+            #     observed_yaw = self.k.vehicle.get_yaw(veh_id)
+            #     observed_speed = self.k.vehicle.get_speed(veh_id)
+            #     observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
+            #     rel_x = observed_x - veh_x
+            #     rel_y = observed_y - veh_y
 
-                if index <= 2: 
-                    observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
-                            [observed_yaw, observed_speed, rel_x, rel_y]
+            #     if index <= 2: 
+            #         observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
+            #                 [observed_yaw, observed_speed, rel_x, rel_y]
 
             obs.update({rl_id: observation})
             #print(obs)

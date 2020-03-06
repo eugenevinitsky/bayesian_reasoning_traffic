@@ -27,7 +27,7 @@ class BayesianExperiment(Experiment):
             ret_list = []
             state = self.env.reset()
             for j in range(num_steps):
-
+                # import ipdb; ipdb.set_trace()
                 state, reward, done, _ = self.env.step(rl_actions(state))
         return
 

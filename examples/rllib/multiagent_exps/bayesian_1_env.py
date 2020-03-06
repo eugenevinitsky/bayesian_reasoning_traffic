@@ -1,6 +1,3 @@
-"""Sets up and runs the basic bayesian example. This script is just for debugging and checking that everything
-actually arrives at the desired time so that the conflict occurs. """
-
 import json
 import argparse
 
