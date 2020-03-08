@@ -423,6 +423,14 @@ class TraCIVehicle(KernelVehicle):
         """Return the initial speed of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["initial_speed"]
 
+    def get_relative_angle(self, veh_id, position):
+        """Return the relative angle between veh_id and another position."""
+        #TODO(@nliu) no magic numbers
+        x, y = self.get_orientation(veh_id)[:2]
+        delta_x = position[0] - x
+        delta_y = position[1] - y
+        return (util.get_angle(delta_x, delta_y) - self.get_yaw(veh_id)) % 360
+
     def get_viewable_objects(self, veh_id, pedestrians=None, radius=50, visualize=False):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.
 

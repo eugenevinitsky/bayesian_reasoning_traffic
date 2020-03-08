@@ -88,6 +88,18 @@ class Bayesian1Env(MultiEnv):
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
 
         obs = {}
+
+        edge_to_int = {
+                "(1.1)--(2.1)" : 0,
+                "(2.1)--(1.1)" : 1,
+                "(1.1)--(1.2)" : 2,
+                "(1.2)--(1.1)" : 3,
+                "(1.1)--(0.1)" : 4,
+                "(0.1)--(1.1)" : 5,
+                "(1.1)--(1.0)" : 6,
+                "(1.0)--(1.1)" : 7
+        }
+
         for rl_id in self.k.vehicle.get_rl_ids():
             # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
 
@@ -95,17 +107,20 @@ class Bayesian1Env(MultiEnv):
 
             observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
             #TODO(@nliu): currently not using pedestrians
-
             visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
+            # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
+            visible_vehicles = sorted(visible_vehicles, key=lambda v: \
+                    (self.k.vehicle.get_relative_angle(rl_id, \
+                    self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
             veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
             yaw = self.k.vehicle.get_yaw(rl_id)
             speed = self.k.vehicle.get_speed(rl_id)
             edge = self.k.vehicle.get_edge(rl_id)
-            edge_hash = abs(hash(edge)) % 100 #TODO(@nliu) find a better way to map edges to ints
+            edge_int = edge_to_int.get(edge, -1)
             edge_pos = self.k.vehicle.get_position(rl_id)
 
-            observation[:4] = [yaw, speed, edge_hash, edge_pos]
+            observation[:4] = [yaw, speed, edge_int, edge_pos]
             observation[4] = 0 # TODO(@nliu) pedestrians implementation later
 
             #TODO(@nliu) sort by angle
@@ -120,8 +135,9 @@ class Bayesian1Env(MultiEnv):
                     observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
                             [observed_yaw, observed_speed, rel_x, rel_y]
 
+            #print(observation)
             obs.update({rl_id: observation})
-            #print(obs)
+        
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
