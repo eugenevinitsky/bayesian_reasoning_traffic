@@ -59,6 +59,8 @@ class Bayesian1Env(MultiEnv):
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw"]
         self.search_radius = self.env_params.additional_params["search_radius"]
 
+        self.all_rl_ids = []
+
     @property
     def observation_space(self):
         """See class definition."""
@@ -100,8 +102,14 @@ class Bayesian1Env(MultiEnv):
                 "(1.0)--(1.1)" : 7
         }
 
+        for rl_id in self.all_rl_ids:
+            obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+
         for rl_id in self.k.vehicle.get_rl_ids():
             # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+
+            if rl_id not in self.all_rl_ids:
+                self.all_rl_ids.append(rl_id)
 
             num_obs = len(self.observation_names)
 
@@ -147,6 +155,10 @@ class Bayesian1Env(MultiEnv):
             return {}
 
         rewards = {}
+
+        for rl_id in self.all_rl_ids:
+            rewards[rl_id] = 0
+
         for rl_id in self.k.vehicle.get_rl_ids():
 
             # TODO(@evinitsky) pick the right reward
