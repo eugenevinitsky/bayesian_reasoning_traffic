@@ -2,7 +2,7 @@
 import math
 import matplotlib.pyplot as plt
 
-def observed(position, orientation, target_position, fov=90, looking_distance=50):
+def observed(position, orientation, target_position, fov=180, looking_distance=50):
     """Check if a single vehicle/pedestrian can see another vehicle/pedestrian.
 
     Parameters

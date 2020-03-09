@@ -10,7 +10,7 @@ from flow.core.experiment import Experiment
 from flow.core.util import emission_to_csv
 
 
-class BayesianExperiment(Experiment):
+class Bayesian0Experiment(Experiment):
 
     def __init__(self, env):
         super().__init__(env)
@@ -19,7 +19,10 @@ class BayesianExperiment(Experiment):
         """
         See parent class
         """
-
+        if rl_actions is None:
+            def rl_actions(*_):
+                return None
+        
         for i in range(num_runs):
             vel = np.zeros(num_steps)
             logging.info("Iter #" + str(i))
@@ -29,5 +32,7 @@ class BayesianExperiment(Experiment):
             for j in range(num_steps):
                 # import ipdb; ipdb.set_trace()
                 state, reward, done, _ = self.env.step(rl_actions(state))
+                # import ipdb; ipdb.set_trace()
+                
         return
 
