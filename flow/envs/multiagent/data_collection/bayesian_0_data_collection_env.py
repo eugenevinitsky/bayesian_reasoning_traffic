@@ -16,7 +16,7 @@ ADDITIONAL_ENV_PARAMS = {
     # how many objects in our local radius we want to return
     "max_num_objects": 3,
     # how large of a radius to search in for a given vehicle in meters
-    "search_radius": 20,
+    "search_radius": 30,
     # specifies whether vehicles are to be sorted by position during a
     # simulation step. If set to True, the environment parameter
     # self.sorted_ids will return a list of all vehicles sorted in accordance
@@ -93,18 +93,17 @@ class Bayesian0DataCollectionEnv(AccelEnv):
                 "(1.1)--(1.0)" : 6,
                 "(1.0)--(1.1)" : 7
         }
-
-        for rl_id in self.k.vehicle.get_ids():
+        # TODO(KL) remove this hardcoding
+        for rl_id in ["human_0_0"]:
             # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
             num_obs = len(self.observation_names)
             observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
             #TODO(@nliu): currently not using pedestrians
-            visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
+            (visible_vehicles, visible_pedestrians) = self.find_visible_objects(rl_id, self.search_radius)
             # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
             visible_vehicles = sorted(visible_vehicles, key=lambda v: \
                     (self.k.vehicle.get_relative_angle(rl_id, \
                     self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
-
             veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
             yaw = self.k.vehicle.get_yaw(rl_id)
             speed = self.k.vehicle.get_speed(rl_id)
@@ -113,25 +112,13 @@ class Bayesian0DataCollectionEnv(AccelEnv):
             edge_pos = self.k.vehicle.get_position(rl_id)
 
             observation[:4] = [yaw, speed, edge_int, edge_pos]
+            # import ipdb;ipdb.set_trace()
             
-            observation[4] = 0 # TODO(@nliu) pedestrians implementation later
+            # record if car sees a pedestrian
+            observation[4] = 1 if visible_pedestrians else 0
 
-
-            # #TODO(@nliu) sort by angle
-            # for index, veh_id in enumerate(visible_vehicles):
-            #     observed_yaw = self.k.vehicle.get_yaw(veh_id)
-            #     observed_speed = self.k.vehicle.get_speed(veh_id)
-            #     observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
-            #     rel_x = observed_x - veh_x
-            #     rel_y = observed_y - veh_y
-
-            #     if index <= 2: 
-            #         observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
-            #                 [observed_yaw, observed_speed, rel_x, rel_y]
-
-            # obs.update({rl_id: observation})
-        
-        return obs
+            obs.update({rl_id: (observation[:4], observation[4])})
+        return [obs]
 
     def compute_reward(self, rl_actions, **kwargs):
         """See class definition."""

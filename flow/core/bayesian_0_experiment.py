@@ -8,6 +8,7 @@ import os
 
 from flow.core.experiment import Experiment
 from flow.core.util import emission_to_csv
+import csv
 
 
 class Bayesian0Experiment(Experiment):
@@ -23,6 +24,7 @@ class Bayesian0Experiment(Experiment):
             def rl_actions(*_):
                 return None
         
+        state_data = []
         for i in range(num_runs):
             vel = np.zeros(num_steps)
             logging.info("Iter #" + str(i))
@@ -30,9 +32,16 @@ class Bayesian0Experiment(Experiment):
             ret_list = []
             state = self.env.reset()
             for j in range(num_steps):
-                # import ipdb; ipdb.set_trace()
+                # state is returned as an array
                 state, reward, done, _ = self.env.step(rl_actions(state))
                 # import ipdb; ipdb.set_trace()
+                state_data.append(state[0]['human_0_0'])
+        with open('test.csv', 'w', newline='') as fp:
+            writer = csv.writer(fp, delimiter=',')
+            # writer.writerow(["Self data", "is_ped", "foo"])  # write header
+            for state in state_data:
                 
+                writer.writerows(state)
+                print(state)
         return
 
