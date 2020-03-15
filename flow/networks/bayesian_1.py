@@ -225,18 +225,49 @@ class Bayesian1Network(TrafficLightGridNetwork):
         1. list of start positions [(edge0, pos0), (edge1, pos1), ...]
         2. list of start lanes [lane0, lane1, lane 2, ...]"""
 
+        '''
+        # Randomized paths with distinct starting edges but not necessarily
+        # distinct ending edges
+        start_edges = ['(1.2)--(1.1)',
+                '(0.1)--(1.1)',
+                '(1.0)--(1.1)',
+                '(2.1)--(1.1)']
+        end_edges = ['(1.1)--(1.2)',
+                '(1.1)--(0.1)',
+                '(1.1)--(1.0)',
+                '(1.1)--(2.1)']
+
+        start_indices = [0, 1, 2, 3]
+        np.random.shuffle(start_indices)
+
+        car_1_start_edge = start_edges[start_indices[0]]
+        car_2_start_edge = start_edges[start_indices[1]]
+        car_3_start_edge = start_edges[start_indices[2]]
+
+        car_1_end_edge = end_edges[np.random.randint(0, 4)]
+        car_2_end_edge = end_edges[np.random.randint(0, 4)]
+        car_3_end_edge = end_edges[np.random.randint(0, 4)]
+
+        car_1_start_pos = max(np.random.normal(20, 7), 0)
+        car_2_start_pos = max(np.random.normal(20, 7), 0)
+        car_3_start_pos = max(np.random.normal(20, 7), 0)
+
+        '''
         # pos = 0 starts from the starting node of the edge
         car_1_start_edge = "(2.1)--(1.1)"
         car_1_end_edge = "(1.1)--(0.1)"
-        car_1_start_pos = 20
+        #car_1_start_pos = 0
+        car_1_start_pos = max(np.random.normal(20, 7), 0)
 
         car_2_start_edge = "(1.2)--(1.1)"
         car_2_end_edge = "(1.1)--(2.1)"
-        car_2_start_pos = 10
+        #car_2_start_pos = 0
+        car_2_start_pos = max(np.random.normal(20, 7), 0)
 
         car_3_start_edge = "(1.0)--(1.1)"
         car_3_end_edge = "(1.1)--(2.1)"
-        car_3_start_pos = 0
+        #car_3_start_pos = 0
+        car_3_start_pos = max(np.random.normal(20, 7), 0)
 
         start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
         # In SUMO, lanes are zero-indexed starting from the right-most lane
