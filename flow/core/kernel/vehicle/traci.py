@@ -431,6 +431,24 @@ class TraCIVehicle(KernelVehicle):
         delta_y = position[1] - y
         return (util.get_angle(delta_x, delta_y) - self.get_yaw(veh_id)) % 360
 
+    def get_pedestrian_crash(self, veh_id, pedestrian_kernel):
+
+        veh_x, veh_y = self.get_orientation(veh_id)[:2]
+        crashed_pedestrians = []
+
+        for ped_id in pedestrian_kernel.get_ids():
+            ped_pos = pedestrian_kernel.get_position(ped_id)
+            crash = util.pedestrian_too_close(self.get_orientation(veh_id)[:2],
+                    self.get_yaw(veh_id),
+                    self.get_length(veh_id),
+                    self.get_width(veh_id),
+                    ped_pos)
+            if crash:
+                crashed_pedestrians.append(ped_id)
+
+        return crashed_pedestrians
+
+
     def get_viewable_objects(self, veh_id, pedestrians=None, radius=50, visualize=False):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.
 
@@ -573,7 +591,7 @@ class TraCIVehicle(KernelVehicle):
         if len(self._arrived_ids) > 0:
             return self._arrived_ids[-1]
         else:
-            return 0
+            return []
 
     def get_departed_ids(self):
         """See parent class."""

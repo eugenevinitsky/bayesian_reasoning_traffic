@@ -59,7 +59,7 @@ class Bayesian1Env(MultiEnv):
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw"]
         self.search_radius = self.env_params.additional_params["search_radius"]
 
-        self.all_rl_ids = []
+        self.rl_set = set()
 
     @property
     def observation_space(self):
@@ -90,7 +90,6 @@ class Bayesian1Env(MultiEnv):
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
 
         obs = {}
-
         edge_to_int = {
                 "(1.1)--(2.1)" : 0,
                 "(2.1)--(1.1)" : 1,
@@ -102,14 +101,12 @@ class Bayesian1Env(MultiEnv):
                 "(1.0)--(1.1)" : 7
         }
 
-        for rl_id in self.all_rl_ids:
-            obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+        for rl_id in self.rl_set:
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-
-            if rl_id not in self.all_rl_ids:
-                self.all_rl_ids.append(rl_id)
+            self.rl_set.add(rl_id)
 
             num_obs = len(self.observation_names)
 
@@ -121,6 +118,7 @@ class Bayesian1Env(MultiEnv):
                     (self.k.vehicle.get_relative_angle(rl_id, \
                     self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
+            # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
             veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
             yaw = self.k.vehicle.get_yaw(rl_id)
             speed = self.k.vehicle.get_speed(rl_id)
@@ -156,22 +154,28 @@ class Bayesian1Env(MultiEnv):
 
         rewards = {}
 
-        for rl_id in self.all_rl_ids:
-            rewards[rl_id] = 0
+        for rl_id in self.rl_set:
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                rewards[rl_id] = 0
 
         for rl_id in self.k.vehicle.get_rl_ids():
 
-            # TODO(@evinitsky) pick the right reward
 
+            # TODO(@evinitsky) pick the right reward
             reward = 0
 
-            # TODO(@nliu) verify this works
             collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
-            if rl_id in collision_vehicles:
+            collision_pedestrians = self.k.get_pedestrian_crash(rl_id, self.k.pedestrian)
+
+            if len(collision_pedestrians):
+                reward = -50
+            elif rl_id in collision_vehicles:
                 reward = -10
             else:
                 # TODO(@nliu & evinitsky) positive reward?
-                reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                #reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                reward = self.k.vehicle.get_speed(rl_id) / 100 #speed may be better for no braking randomly
+                #reward = -0.01
 
             rewards[rl_id] = reward
 
