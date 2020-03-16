@@ -214,7 +214,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         return Experiment(env)
     else:
         env = Bayesian0DataCollectionEnv(env_params, sim_params, network)
-        return Experiment(env)
+        return Bayesian0Experiment(env)
 
 if __name__ == "__main__":
     # check for pedestrians
@@ -227,12 +227,15 @@ if __name__ == "__main__":
                         help="collect training data from this experiment by using bayesian 0 experiment rather than Experiment",
                         action="store_true")
 
+    parser.add_argument("--render",
+                        help="render the SUMO simulation",
+                        action="store_true")
+
     args = parser.parse_args()
     pedestrians = args.pedestrians
     collect_data = args.collect_data
-
+    render = args.render
     # import the experiment variable
-    exp = bayesian_0_example(render=True, pedestrians=pedestrians, collect_data=collect_data)
+    exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
-    exp.env.sim_params.render=True
-    exp.run(4, 1500)
+    exp.run(1, 150)
