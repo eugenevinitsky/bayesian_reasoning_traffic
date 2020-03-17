@@ -165,17 +165,17 @@ class Bayesian1Env(MultiEnv):
             reward = 0
 
             collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
-            collision_pedestrians = self.k.get_pedestrian_crash(rl_id, self.k.pedestrian)
+            collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
 
-            if len(collision_pedestrians):
+            if len(collision_pedestrians) > 0:
                 reward = -50
             elif rl_id in collision_vehicles:
                 reward = -10
             else:
                 # TODO(@nliu & evinitsky) positive reward?
-                #reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                reward = self.k.vehicle.get_speed(rl_id) / 100 #speed may be better for no braking randomly
-                #reward = -0.01
+                # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                # reward = self.k.vehicle.get_speed(rl_id) / 100 #speed may be better for no braking randomly
+                reward = -0.01
 
             rewards[rl_id] = reward
 
