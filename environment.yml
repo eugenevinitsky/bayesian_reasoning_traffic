@@ -1,4 +1,4 @@
-name: flow
+name: bayesian_traffic
 
 dependencies:
     - python==3.6.8

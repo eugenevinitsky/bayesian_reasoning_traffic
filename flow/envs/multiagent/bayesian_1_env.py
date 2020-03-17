@@ -165,7 +165,7 @@ class Bayesian1Env(MultiEnv):
             reward = 0
 
             collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
-            collision_pedestrians = self.k.get_pedestrian_crash(rl_id, self.k.pedestrian)
+            collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
 
             if len(collision_pedestrians):
                 reward = -50
