@@ -113,6 +113,7 @@ class Bayesian1Env(MultiEnv):
             observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
             #TODO(@nliu): currently not using pedestrians
             visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
+
             # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
             visible_vehicles = sorted(visible_vehicles, key=lambda v: \
                     (self.k.vehicle.get_relative_angle(rl_id, \
@@ -127,7 +128,12 @@ class Bayesian1Env(MultiEnv):
             edge_pos = self.k.vehicle.get_position(rl_id)
 
             observation[:4] = [yaw, speed, edge_int, edge_pos]
-            observation[4] = 0 # TODO(@nliu) pedestrians implementation later
+
+            pedestrian_in_view = 0
+            if len(visible_pedestrians) > 0:
+                pedestrian_in_view = 1
+
+            observation[4] = pedestrian_in_view
 
             #TODO(@nliu) sort by angle
             for index, veh_id in enumerate(visible_vehicles):
