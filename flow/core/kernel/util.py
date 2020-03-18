@@ -2,7 +2,7 @@
 import math
 import matplotlib.pyplot as plt
 
-def observed(position, orientation, target_position, fov=90, looking_distance=50):
+def observed(position, orientation, target_position, fov=140, looking_distance=50):
     """Check if a single vehicle/pedestrian can see another vehicle/pedestrian.
 
     Parameters
@@ -97,6 +97,59 @@ def get_angle(x, y):
 
     return math.degrees(math.atan(y / x))
 
+def pedestrian_too_close(veh_pos, veh_orientation, length, width, ped_pos, ped_radius=0.5):
+    """Check if a vehicle collided with a pedestrian
+
+    If a pedestrian's position within the vehcile or is too close to one of the perimeter
+    segments of the vehicle, determine that a crash has occured.
+
+    Parameters
+    ----------
+    b_segments : tuple of (tuple, tuple, tuple, tuple)
+        4 (x, y) tuples that define the perimeter segments of a vehicle
+    ped_pos : tuple of (float, float)
+        x, y position of the pedestrian
+
+    Return : boolean
+        whether or not the pedestrain is too close to the vehicle
+    """
+
+    corner_angle = math.degrees(math.atan(width / length))
+    corner_dist = euclidian_distance(length / 2, width / 2)
+    corners = get_corners(veh_pos[0], veh_pos[1], veh_orientation, corner_angle, corner_dist)
+
+    middle_x = sum([c[0] for c in corners]) / 4
+    middle_y = sum([c[1] for c in corners]) / 4
+
+    pedestrian_within_car = False
+
+    for i in range(4):
+        a, b = corners[i], corners[(i + 1) % 4]
+
+        delta_x = b[0] - a[0]
+        delta_y = b[1] - a[1]
+        theta = (get_angle(delta_x, delta_y) + 90) % 360
+
+        p1_x = ped_pos[0] + (ped_radius * math.cos(math.radians(theta)))
+        p1_y = ped_pos[1] + (ped_radius * math.sin(math.radians(theta)))
+        p2_x = ped_pos[0] - (ped_radius * math.cos(math.radians(theta)))
+        p2_y = ped_pos[1] - (ped_radius * math.sin(math.radians(theta)))
+
+        car_line = (a, b)
+        ped_line = ((p1_x, p1_y), (p2_x, p2_y))
+        ped_to_car_center = ((middle_x, middle_y), ped_pos)
+
+        # for a pedestrian not be within a car, the line between its position
+        # and the center position of the car must not intersect the perimeter
+        if lines_intersect(car_line, ped_to_car_center):
+            pedestrian_within_car = True
+
+        # pedestrian is too close to car perimeter
+        if lines_intersect(car_line, ped_line):
+            return True
+
+    return not pedestrian_within_car
+
 def get_blocked_segments(position, target_position, target_orientation, target_length, target_width):
     """Define a line segment that blocks the observation vehicle's line of sight.
 
@@ -135,7 +188,7 @@ def get_blocked_segments(position, target_position, target_orientation, target_l
 
     return(max_angle, min_angle)
 
-def get_corners(x, y, orientation, corner_angle, corner_dist, center_offset=1.5):
+def get_corners(x, y, orientation, corner_angle, corner_dist, center_offset=2):
     corners = []
 
     adjusted_x = x - center_offset * math.cos(math.radians(orientation))

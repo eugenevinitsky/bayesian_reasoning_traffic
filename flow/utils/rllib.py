@@ -11,7 +11,7 @@ import flow.envs
 from flow.core.params import SumoLaneChangeParams, SumoCarFollowingParams, \
     SumoParams, InitialConfig, EnvParams, NetParams, InFlows
 from flow.core.params import TrafficLightParams
-from flow.core.params import VehicleParams
+from flow.core.params import VehicleParams, PedestrianParams
 from flow.envs import Env
 from flow.networks import Network
 from ray.cloudpickle import cloudpickle
@@ -135,6 +135,16 @@ def get_flow_params(config):
             lane_change_params=lane_change_params,
             **veh_params)
 
+    # reinitialize the pedestrians class from stored data
+    ped = PedestrianParams()
+    for pedestrians in flow_params["ped"]["params"]:
+        ped_params = flow_params["ped"]["params"][pedestrians]
+        ped.add(ped_id=ped_params["id"],
+                depart_time=ped_params["depart"],
+                start=ped_params["from"],
+                end=ped_params["to"],
+                depart_pos=ped_params["departPos"])
+
     # convert all parameters from dict to their object form
     sim = SumoParams()  # TODO: add check for simulation type
     sim.__dict__ = flow_params["sim"].copy()
@@ -186,6 +196,7 @@ def get_flow_params(config):
     flow_params["initial"] = initial
     flow_params["net"] = net
     flow_params["veh"] = veh
+    flow_params["ped"] = ped
     flow_params["tls"] = tls
 
     return flow_params
