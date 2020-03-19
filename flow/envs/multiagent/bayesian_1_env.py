@@ -59,6 +59,8 @@ class Bayesian1Env(MultiEnv):
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw"]
         self.search_radius = self.env_params.additional_params["search_radius"]
 
+        self.rl_set = set()
+
     @property
     def observation_space(self):
         """See class definition."""
@@ -88,7 +90,6 @@ class Bayesian1Env(MultiEnv):
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
 
         obs = {}
-
         edge_to_int = {
                 "(1.1)--(2.1)" : 0,
                 "(2.1)--(1.1)" : 1,
@@ -100,19 +101,25 @@ class Bayesian1Env(MultiEnv):
                 "(1.0)--(1.1)" : 7
         }
 
+        for rl_id in self.rl_set:
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+
         for rl_id in self.k.vehicle.get_rl_ids():
-            # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+            self.rl_set.add(rl_id)
 
             num_obs = len(self.observation_names)
 
             observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
             #TODO(@nliu): currently not using pedestrians
             visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
+
             # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
             visible_vehicles = sorted(visible_vehicles, key=lambda v: \
                     (self.k.vehicle.get_relative_angle(rl_id, \
                     self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
+            # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
             veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
             yaw = self.k.vehicle.get_yaw(rl_id)
             speed = self.k.vehicle.get_speed(rl_id)
@@ -121,7 +128,12 @@ class Bayesian1Env(MultiEnv):
             edge_pos = self.k.vehicle.get_position(rl_id)
 
             observation[:4] = [yaw, speed, edge_int, edge_pos]
-            observation[4] = 0 # TODO(@nliu) pedestrians implementation later
+
+            pedestrian_in_view = 0
+            if len(visible_pedestrians) > 0:
+                pedestrian_in_view = 1
+
+            observation[4] = pedestrian_in_view
 
             #TODO(@nliu) sort by angle
             for index, veh_id in enumerate(visible_vehicles):
@@ -147,19 +159,29 @@ class Bayesian1Env(MultiEnv):
             return {}
 
         rewards = {}
+
+        for rl_id in self.rl_set:
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                rewards[rl_id] = 0
+
         for rl_id in self.k.vehicle.get_rl_ids():
 
-            # TODO(@evinitsky) pick the right reward
 
+            # TODO(@evinitsky) pick the right reward
             reward = 0
 
-            # TODO(@nliu) verify this works
             collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
-            if rl_id in collision_vehicles:
+            collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
+
+            if len(collision_pedestrians) > 0:
+                reward = -50
+            elif rl_id in collision_vehicles:
                 reward = -10
             else:
                 # TODO(@nliu & evinitsky) positive reward?
-                reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                # reward = self.k.vehicle.get_speed(rl_id) / 100 #speed may be better for no braking randomly
+                reward = -0.01
 
             rewards[rl_id] = reward
 

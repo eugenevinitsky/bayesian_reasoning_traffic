@@ -24,11 +24,11 @@ from flow.utils.registry import make_create_env
 from flow.utils.rllib import FlowParamsEncoder
 
 # Experiment parameters
-N_ROLLOUTS = 10  # number of rollouts per training iteration
-N_CPUS = 1  # number of parallel workers
+N_ROLLOUTS = 20  # number of rollouts per training iteration
+N_CPUS = 8 # number of parallel workers
 
 # Environment parameters
-HORIZON = 400  # time horizon of a single rollout
+HORIZON = 500  # time horizon of a single rollout
 # TODO(@klin) make sure these parameters match what you've set up in the SUMO version here
 V_ENTER = 30  # enter speed for departing vehicles
 INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
@@ -52,17 +52,33 @@ def make_flow_params(pedestrians=False):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-        pedestrian_params.add(
-            ped_id='ped_0',
-            depart_time='0.00',
-            start='(1.0)--(1.1)',
-            end='(1.1)--(1.2)',
-            depart_pos='30')
+
+        for i in range(1):
+            name = "ped_" + str(i)
+            time = str(i * 5) + '.00'
+            pedestrian_params.add(
+                ped_id=name,
+                depart_time=time,
+                start='(1.0)--(1.1)',
+                end='(1.1)--(1.2)',
+                depart_pos='30')
+
 
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
     # support traffic light compliance
     vehicles = VehicleParams()
+
+    #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
+    vehicles.add(
+        veh_id='rl',
+        acceleration_controller=(RLController, {}),
+        car_following_params=SumoCarFollowingParams(
+            speed_mode='aggressive',
+        ),
+        routing_controller=(GridRouter, {}),
+        num_vehicles=3)
+    '''
     vehicles.add(
         veh_id="human",
         acceleration_controller=(SimCarFollowingController, {}),
@@ -74,17 +90,6 @@ def make_flow_params(pedestrians=False):
         ),
         routing_controller=(GridRouter, {}),
         num_vehicles=1)
-
-    #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
-    vehicles.add(
-        veh_id='rl',
-        acceleration_controller=(RLController, {}),
-        car_following_params=SumoCarFollowingParams(
-            speed_mode='right_of_way',
-        ),
-        routing_controller=(GridRouter, {}),
-        num_vehicles=1)
-
     vehicles.add(
         veh_id="human_1",
         acceleration_controller=(SimCarFollowingController, {}),
@@ -96,6 +101,7 @@ def make_flow_params(pedestrians=False):
         ),
         routing_controller=(GridRouter, {}),
         num_vehicles=1)
+    '''
 
     n_rows = 1
     n_columns = 1
@@ -145,7 +151,7 @@ def make_flow_params(pedestrians=False):
                 # how many objects in our local radius we want to return
                 "max_num_objects": 3,
                 # how large of a radius to search in for a given vehicle in meters
-                "search_radius": 3000
+                "search_radius": 50
             },
         ),
 
@@ -207,7 +213,7 @@ def setup_exps_PPO(flow_params):
     config['simple_optimizer'] = True
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [32, 32]})
-    config['lr'] = tune.grid_search([1e-5, 1e-4, 1e-3])
+    config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
     config['horizon'] = HORIZON
     config['observation_filter'] = 'NoFilter'
 
