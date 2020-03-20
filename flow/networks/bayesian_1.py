@@ -103,7 +103,7 @@ class Bayesian1Network(TrafficLightGridNetwork):
                  pedestrians=None):
         """Initialize an n*m traffic light grid network."""
         super().__init__(name, vehicles, net_params, initial_config,
-                         traffic_lights, pedestrians, use_traffic_lights=False)
+                         traffic_lights, pedestrians, use_traffic_lights=False, nodes_radius=0.1)
         self.nodes = self._nodes
 
     @property
@@ -240,7 +240,7 @@ class Bayesian1Network(TrafficLightGridNetwork):
                 '(2.1)--(1.1)']
 
         start_indices = [0, 1, 2, 3]
-        np.random.shuffle(start_indices)
+        # np.random.shuffle(start_indices)
 
         car_1_start_edge = start_edges[start_indices[0]]
         car_2_start_edge = start_edges[start_indices[1]]

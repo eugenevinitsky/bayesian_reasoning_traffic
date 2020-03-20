@@ -7,7 +7,7 @@ from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, Su
 from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
 from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
-from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
+# from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
 from flow.networks import Bayesian1Network
 from flow.core.params import PedestrianParams
 import argparse
@@ -151,7 +151,7 @@ def bayesian_1_example(render=None, pedestrians=False):
 
     vehicles = VehicleParams()
     vehicles.add(
-        veh_id="human",
+        veh_id="human_0",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
