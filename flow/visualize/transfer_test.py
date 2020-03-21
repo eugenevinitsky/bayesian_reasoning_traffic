@@ -191,7 +191,7 @@ def run_env(env, agent, config, flow_params):
         # delete the .xml version of the emission file
         os.remove(emission_path)
 
-def create_env(flow_params):
+def create_env(args, flow_params):
     # Create and register a gym+rllib env
     create_env, env_name = make_create_env(params=flow_params, version=0)
     register_env(env_name, create_env)
@@ -217,11 +217,31 @@ def create_env(flow_params):
     if args.horizon:
         env_params.horizon = args.horizon
 
-    env = gym.make(env_name)
+    sim_params = flow_params['sim']
+    # pick your rendering mode
+    if args.render_mode == 'sumo_web3d':
+        sim_params.num_clients = 2
+        sim_params.render = False
+    elif args.render_mode == 'drgb':
+        sim_params.render = 'drgb'
+        sim_params.pxpm = 4
+    elif args.render_mode == 'sumo_gui':
+        sim_params.render = True
+        print('NOTE: With render mode {}, an extra instance of the SUMO GUI '
+              'will display before the GUI for visualizing the result. Click '
+              'the green Play arrow to continue.'.format(args.render_mode))
+    elif args.render_mode == 'no_render':
+        sim_params.render = False
+    if args.save_render:
+        sim_params.render = 'drgb'
+        sim_params.pxpm = 4
+        sim_params.save_render = True
+
+    env = create_env()
     return env, env_name
 
 
-def create_agent(args):
+def create_agent(args, flow_params):
     """Visualizer for RLlib experiments.
 
     This function takes args (see function create_parser below for
@@ -241,8 +261,6 @@ def create_agent(args):
 
     # Run on only one cpu for rendering purposes
     config['num_workers'] = 0
-
-    flow_params = get_flow_params(config)
 
     # Determine agent and checkpoint
     config_run = config['env_config']['run'] if 'run' in config['env_config'] \
@@ -267,7 +285,7 @@ def create_agent(args):
         sys.exit(1)
 
     # TODO(@evinitsky) duplication
-    env, env_name = create_env(flow_params)
+    env, env_name = create_env(args, flow_params)
 
     # create the agent that will be used to compute the actions
     agent = agent_cls(env=env_name, config=config)
@@ -280,9 +298,10 @@ def create_agent(args):
 
 def run_transfer(args):
     # run transfer on the bayesian 1 env first
-    from examples.rllib.multiagent_exps.bayesian_1_env import flow_params as bayesian_1_params
-    agent, config = create_agent(args)
-    env, env_name = create_env(bayesian_1_params)
+    from examples.rllib.multiagent_exps.bayesian_1_env import make_flow_params as bayesian_1_flow_params
+    bayesian_1_params = bayesian_1_flow_params(pedestrians=True)
+    env, env_name = create_env(args, bayesian_1_params)
+    agent, config = create_agent(args, flow_params=bayesian_1_params)
     run_env(env, agent, config, bayesian_1_params)
 
 
