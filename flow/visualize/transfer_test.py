@@ -82,6 +82,7 @@ def run_env(env, agent, config, flow_params):
     final_inflows = []
     mean_speed = []
     std_speed = []
+    num_pedestrian_crash = 0
     for i in range(args.num_rollouts):
         vel = []
         state = env.reset()
@@ -91,6 +92,7 @@ def run_env(env, agent, config, flow_params):
             ret = 0
         for _ in range(flow_params['env'].horizon):
             vehicles = env.unwrapped.k.vehicle
+            pedestrian = env.unwrapped.k.pedestrian
             vel.append(np.mean(vehicles.get_speed(vehicles.get_ids())))
             if multiagent:
                 action = {}
@@ -115,6 +117,10 @@ def run_env(env, agent, config, flow_params):
                 break
             if not multiagent and done:
                 break
+
+            for rl_id in vehicles.get_rl_ids():
+                num_collision = len(vehicles.get_pedestrian_crash(rl_id, pedestrian))
+                num_pedestrian_crash += num_collision
 
         if multiagent:
             for key in rets.keys():
@@ -167,6 +173,9 @@ def run_env(env, agent, config, flow_params):
     print(final_inflows)
     print('Average, std: {}, {}'.format(np.mean(final_inflows),
                                         np.std(final_inflows)))
+
+    print("Number of pedestrian crashes:")
+    print(num_pedestrian_crash)
 
     # terminate the environment
     env.unwrapped.terminate()
