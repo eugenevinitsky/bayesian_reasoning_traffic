@@ -106,6 +106,33 @@ class Bayesian1Network(TrafficLightGridNetwork):
                          traffic_lights, pedestrians, use_traffic_lights=False)
         self.nodes = self._nodes
 
+    def randomize_pedestrian_routes(self, pedestrians):
+
+        if not pedestrians:
+            return None
+
+        edges = ['(1.2)--(1.1)',
+                '(0.1)--(1.1)',
+                '(1.0)--(1.1)',
+                '(2.1)--(1.1)',
+                '(1.1)--(1.2)',
+                '(1.1)--(0.1)',
+                '(1.1)--(1.0)',
+                '(1.1)--(2.1)']
+
+        for ped_id in pedestrians.params:
+            edge_indices = [0, 1, 2, 3, 4, 5, 6, 7]
+            np.random.shuffle(edge_indices)
+
+            pedestrians.params[ped_id]['from'] = edges[edge_indices[0]]
+            pedestrians.params[ped_id]['to'] = edges[edge_indices[1]]
+
+            if edge_indices[0] <= 3:
+                pos = min(np.random.normal(45, 5), 50)
+            else:
+                pos = max(np.random.normal(5, 5), 0)
+            pedestrians.params[ped_id]['departPos'] = str(pos)
+
     @property
     def _nodes(self):
         """See parent class"""
