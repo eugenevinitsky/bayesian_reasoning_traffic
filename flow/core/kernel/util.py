@@ -121,7 +121,7 @@ def pedestrian_too_close(veh_pos, veh_orientation, length, width, ped_pos, ped_r
     middle_x = sum([c[0] for c in corners]) / 4
     middle_y = sum([c[1] for c in corners]) / 4
 
-    pedestrian_within_car = True
+    pedestrian_within_car = False
 
     for i in range(4):
         a, b = corners[i], corners[(i + 1) % 4]
@@ -142,13 +142,13 @@ def pedestrian_too_close(veh_pos, veh_orientation, length, width, ped_pos, ped_r
         # for a pedestrian not be within a car, the line between its position
         # and the center position of the car must not intersect the perimeter
         if lines_intersect(car_line, ped_to_car_center):
-            pedestrian_within_car = False
+            pedestrian_within_car = True
 
         # pedestrian is too close to car perimeter
         if lines_intersect(car_line, ped_line):
             return True
 
-    return pedestrian_within_car
+    return not pedestrian_within_car
 
 def get_blocked_segments(position, target_position, target_orientation, target_length, target_width):
     """Define a line segment that blocks the observation vehicle's line of sight.

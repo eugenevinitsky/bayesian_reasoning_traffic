@@ -28,7 +28,7 @@ from flow.utils.rllib import FlowParamsEncoder
 
 # Experiment parameters
 N_ROLLOUTS = 20  # number of rollouts per training iteration
-N_CPUS = 1 # number of parallel workers
+N_CPUS = 8 # number of parallel workers
 
 # Environment parameters
 HORIZON = 500  # time horizon of a single rollout
@@ -56,7 +56,7 @@ def make_flow_params(pedestrians=False):
     if pedestrians:
         pedestrian_params = PedestrianParams()
 
-        for i in range(10):
+        for i in range(1):
             name = "ped_" + str(i)
             time = str(i * 5) + '.00'
             pedestrian_params.add(
@@ -138,7 +138,7 @@ def make_flow_params(pedestrians=False):
         sim=SumoParams(
             restart_instance=True,
             sim_step=0.1,
-            render=True,
+            render=False,
         ),
 
         # environment related parameters (see flow.core.params.EnvParams)
@@ -154,7 +154,7 @@ def make_flow_params(pedestrians=False):
                 # how many objects in our local radius we want to return
                 "max_num_objects": 3,
                 # how large of a radius to search in for a given vehicle in meters
-                "search_radius": 3000
+                "search_radius": 50
             },
         ),
 
