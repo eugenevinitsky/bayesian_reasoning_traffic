@@ -1,5 +1,6 @@
 import json
 import argparse
+import numpy as np
 
 import ray
 try:
@@ -63,13 +64,13 @@ def make_flow_params(pedestrians=False):
                 end='(1.1)--(1.2)',
                 depart_pos='30')
 
-
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
     # support traffic light compliance
     vehicles = VehicleParams()
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
+
     vehicles.add(
         veh_id='rl',
         acceleration_controller=(RLController, {}),
@@ -216,6 +217,33 @@ def setup_exps_PPO(flow_params):
     config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
     config['horizon'] = HORIZON
     config['observation_filter'] = 'NoFilter'
+
+    # define callbacks for tensorboard
+
+    def on_episode_start(info):
+        episode = info['episode']
+        episode.user_data['num_ped_collisions'] = 0
+        episode.user_data['avg_speed'] = []
+
+    def on_episode_step(info):
+        episode = info['episode']
+        env = info['env'].get_unwrapped()[0]
+        for v_id in env.k.vehicle.get_rl_ids():
+            if len(env.k.vehicle.get_pedestrian_crash(v_id, env.k.pedestrian)) > 0:
+                episode.user_data['num_ped_collisions'] += 1
+
+        avg_speed = np.mean(env.k.vehicle.get_speed(env.k.vehicle.get_rl_ids()))
+        episode.user_data['avg_speed'].append(avg_speed)
+
+    def on_episode_end(info):
+        episode = info['episode']
+        episode.custom_metrics['num_ped_collisions'] = episode.user_data['num_ped_collisions']
+        episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
+
+    config['callbacks'] = {
+            "on_episode_start":tune.function(on_episode_start),
+            "on_episode_step":tune.function(on_episode_step),
+            "on_episode_end":tune.function(on_episode_end)}
 
     # save the flow params for replay
     flow_json = json.dumps(

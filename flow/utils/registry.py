@@ -120,7 +120,8 @@ def make_create_env(params, version=0, render=None):
                     "network": network,
                     "simulator": params['simulator']
                 })
-        except Exception:
+        except Exception as e:
+            print('Error making env ', e)
             pass
         return gym.envs.make(env_name)
 

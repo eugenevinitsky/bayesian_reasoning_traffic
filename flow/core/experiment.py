@@ -118,8 +118,13 @@ class Experiment:
             state = self.env.reset()
             for j in range(num_steps):
 
+<<<<<<< HEAD
                 print(self.env.k.vehicle.get_viewable_objects('human_0_0', \
                         pedestrians=self.env.k.pedestrian, visualize=True))
+=======
+                # print(self.env.k.vehicle.get_viewable_objects('human_1', \
+                #         pedestrians=self.env.k.pedestrian, visualize=True))
+>>>>>>> c771567c31ee1ee6e77e5db9379ca2694bf9d7e3
 
                 state, reward, done, _ = self.env.step(rl_actions(state))
                 vel[j] = np.mean(

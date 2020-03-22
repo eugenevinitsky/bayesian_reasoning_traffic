@@ -337,8 +337,8 @@ class Network(object):
         self.traffic_lights = traffic_lights
         self.pedestrians = pedestrians
 
-        # specify routes vehicles can take
-        self.routes = self.specify_routes(net_params)
+        # sets/randomized routes for vehicles and pedestrians
+        self.randomize_routes()
 
         if net_params.template is None and net_params.osm_path is None:
             # specify the attributes of the nodes
@@ -356,6 +356,7 @@ class Network(object):
         # file is specified                 pedestrians=None,
 
         elif type(net_params.template) is dict:
+
             if 'rou' in net_params.template:
                 veh, rou = self._vehicle_infos(net_params.template['rou'])
 
@@ -393,6 +394,13 @@ class Network(object):
         self.internal_edge_starts = self.specify_internal_edge_starts()
         self.intersection_edge_starts = []  # this will be deprecated
 
+    def randomize_routes(self):
+        # specify routes vehicles can take
+        self.routes = self.specify_routes(self.net_params)
+
+        # randomize pedestrian routes
+        self.randomize_pedestrian_routes(self.pedestrians)
+
     # TODO: convert to property
     def specify_edge_starts(self):
         """Define edge starts for road sections in the network.
@@ -411,6 +419,9 @@ class Network(object):
             list of edge names and starting positions,
             ex: [(edge0, pos0), (edge1, pos1), ...]
         """
+        return None
+
+    def randomize_pedestrian_routes(self, pedestrians):
         return None
 
     # TODO: convert to property
