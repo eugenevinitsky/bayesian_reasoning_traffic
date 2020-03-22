@@ -4,11 +4,11 @@ stopped and so we should also slow down and stop.
 actually arrives at the desired time so that the conflict occurs. """
 
 from flow.core.experiment import Experiment
-from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, SumoLaneChangeParams
+from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.envs.test import TestEnv
-from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
+from flow.envs.multiagent.bayesian_1_env import ADDITIONAL_ENV_PARAMS
 from flow.core.params import SumoCarFollowingParams, VehicleParams
-from flow.controllers import SimCarFollowingController, GridRouter, RLController
+from flow.controllers import GridRouter
 
 from flow.networks import Bayesian3Network
 from flow.core.params import PedestrianParams
@@ -133,15 +133,6 @@ def bayesian_3_example(render=None, pedestrians=False):
 
     if render is not None:
         sim_params.render = render
-
-    lane_change_params = SumoLaneChangeParams(
-        lc_assertive=20,
-        lc_pushy=0.8,
-        lc_speed_gain=4.0,
-        model="LC2013",
-        lane_change_mode="strategic",   # TODO: check-is there a better way to change lanes?
-        lc_keep_right=0.8
-    )
 
     pedestrian_params = None
     if pedestrians:
