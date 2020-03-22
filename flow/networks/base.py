@@ -337,8 +337,12 @@ class Network(object):
         self.traffic_lights = traffic_lights
         self.pedestrians = pedestrians
 
-        # sets/randomized routes for vehicles and pedestrians
-        self.randomize_routes()
+        # TODO(@nliu) find a better solution to passing in pedestrian kernel
+        # to randomize pedestrian routes
+        self.net_params.additional_params["pedestrian_kernel"] = pedestrians
+
+        # specify routes vehicles and pedestrians can take
+        self.routes = self.specify_routes(net_params)
 
         if net_params.template is None and net_params.osm_path is None:
             # specify the attributes of the nodes
@@ -353,7 +357,7 @@ class Network(object):
             self.crossings = self.specify_crossings(net_params)
 
         # this is to be used if file paths other than the the network geometry
-        # file is specified                 pedestrians=None,
+        # file is specified
 
         elif type(net_params.template) is dict:
 
@@ -393,13 +397,6 @@ class Network(object):
         self.edge_starts = self.specify_edge_starts()
         self.internal_edge_starts = self.specify_internal_edge_starts()
         self.intersection_edge_starts = []  # this will be deprecated
-
-    def randomize_routes(self):
-        # specify routes vehicles can take
-        self.routes = self.specify_routes(self.net_params)
-
-        # randomize pedestrian routes
-        self.randomize_pedestrian_routes(self.pedestrians)
 
     # TODO: convert to property
     def specify_edge_starts(self):

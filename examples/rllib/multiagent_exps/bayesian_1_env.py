@@ -56,7 +56,6 @@ def make_flow_params(pedestrians=False):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-
         for i in range(1):
             name = "ped_" + str(i)
             time = str(i * 5) + '.00'
@@ -175,6 +174,7 @@ def make_flow_params(pedestrians=False):
                 },
                 "horizontal_lanes": 1,
                 "vertical_lanes": 1,
+                "randomize_routes": True,
             },
         ),
 
