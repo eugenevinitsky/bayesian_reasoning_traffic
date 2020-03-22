@@ -3,6 +3,7 @@ stopped and so we should also slow down and stop.
  This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
+from flow.controllers.velocity_controllers import FullStop
 from flow.core.experiment import Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.envs.test import TestEnv
@@ -171,6 +172,7 @@ def bayesian_3_example(render=None, pedestrians=False):
             speed_mode="right_of_way",
             max_speed=0.0000000000001
         ),
+        acceleration_controller=(FullStop, {}),
         num_vehicles=3)
 
     env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
