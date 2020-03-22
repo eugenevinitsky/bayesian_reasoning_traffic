@@ -16,7 +16,7 @@ ADDITIONAL_ENV_PARAMS = {
     # how many objects in our local radius we want to return
     "max_num_objects": 3,
     # how large of a radius to search in for a given vehicle in meters
-    "search_radius": 20
+    "search_radius": 50
 }
 
 
@@ -66,7 +66,7 @@ class Bayesian1Env(MultiEnv):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
         # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
-        return Box(-float('inf'), float('inf'), shape=(5 + max_objects * len(self.observation_names),), dtype=np.float32)
+        return Box(-float('inf'), float('inf'), shape=(7 + max_objects * len(self.observation_names),), dtype=np.float32)
 
     @property
     def action_space(self):
@@ -129,11 +129,21 @@ class Bayesian1Env(MultiEnv):
 
             observation[:4] = [yaw, speed, edge_int, edge_pos]
 
+            '''
             pedestrian_in_view = 0
             if len(visible_pedestrians) > 0:
                 pedestrian_in_view = 1
 
             observation[4] = pedestrian_in_view
+            '''
+            if len(visible_pedestrians) > 0:
+                ped_x, ped_y = self.k.pedestrian.get_position(visible_pedestrians[0])
+                ped_orientation = self.k.pedestrian.get_yaw(visible_pedestrians[0])
+                rel_x = ped_x - veh_x
+                rel_y = ped_y - veh_y
+                observation[4:7] = [rel_x, rel_y, ped_orientation]
+            else:
+                observation[4:7] = [0, 0, 0]
 
             #TODO(@nliu) sort by angle
             for index, veh_id in enumerate(visible_vehicles):
@@ -144,7 +154,7 @@ class Bayesian1Env(MultiEnv):
                 rel_y = observed_y - veh_y
 
                 if index <= 2: 
-                    observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
+                    observation[(index * 4) + 7: 4 * (index + 1) + 7] = \
                             [observed_yaw, observed_speed, rel_x, rel_y]
 
             #print(observation)
@@ -176,12 +186,12 @@ class Bayesian1Env(MultiEnv):
             if len(collision_pedestrians) > 0:
                 reward = -50
             elif rl_id in collision_vehicles:
-                reward = -10
+                reward = -30
             else:
                 # TODO(@nliu & evinitsky) positive reward?
                 # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                # reward = self.k.vehicle.get_speed(rl_id) / 100 #speed may be better for no braking randomly
-                reward = -0.01
+                reward = self.k.vehicle.get_speed(rl_id) / 10.0 #speed may be better for no braking randomly
+                # reward = -1
 
             rewards[rl_id] = reward
 
