@@ -214,7 +214,7 @@ class Bayesian1Env(MultiEnv):
             Returns two lists of the IDs of vehicles and pedestrians that are within a radius of the car and are unobscured
 
         """
-        visible_vehicles, visible_pedestrians = self.k.vehicle.get_viewable_objects( \
+        visible_vehicles, visible_pedestrians = self.k.vehicle.get_viewable_objects(
                 veh_id,
                 self.k.pedestrian,
                 radius)
