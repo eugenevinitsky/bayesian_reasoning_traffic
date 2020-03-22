@@ -313,6 +313,13 @@ def run_transfer(args):
     agent, config = create_agent(args, flow_params=bayesian_1_params)
     run_env(env, agent, config, bayesian_1_params)
 
+    # run transfer on the bayesian 3 env
+    from examples.rllib.multiagent_exps.exp_configs.bayesian_3_config import make_flow_params as bayesian_3_flow_params
+    bayesian_3_params = bayesian_3_flow_params()
+    env, env_name = create_env(args, bayesian_3_params)
+    agent, config = create_agent(args, flow_params=bayesian_3_params)
+    run_env(env, agent, config, bayesian_3_params)
+
 
 def create_parser():
     """Create the parser to capture CLI arguments."""

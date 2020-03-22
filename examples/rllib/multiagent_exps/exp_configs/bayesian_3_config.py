@@ -1,40 +1,11 @@
 """Check if the AV learns to slow down and not hit a pedestrian that is invisible."""
 
-from flow.envs.multiagent import Bayesian1Env
 from flow.networks import Bayesian3Network
-from flow.controllers import GridRouter
+from flow.controllers import GridRouter, RLController
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, PedestrianParams
 from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
 
-
-def get_non_flow_params(enter_speed, add_net_params, pedestrians=False):
-    """Define the network and initial params in the absence of inflows.
-
-    Parameters
-    ----------
-    enter_speed : float
-        initial speed of vehicles as they enter the network.
-    add_net_params: dict
-        additional network-specific parameters (unique to the traffic light grid)
-
-    Returns
-    -------
-    flow.core.params.InitialConfig
-        parameters specifying the initial configuration of vehicles in the
-        network
-    flow.core.params.NetParams
-        network-specific parameters used to generate the network
-    """
-    additional_init_params = {'enter_speed': enter_speed}
-    initial = InitialConfig(
-        spacing='custom', additional_params=additional_init_params, shuffle=False)
-    if pedestrians:
-        initial = InitialConfig(
-            spacing='custom', sidewalks=True, lanes_distribution=float('inf'), shuffle=False)
-    net = NetParams(additional_params=add_net_params)
-
-    return initial, net
 
 def make_flow_params():
     """
@@ -94,13 +65,14 @@ def make_flow_params():
     vehicles = VehicleParams()
 
     vehicles.add(
-        veh_id="human",
+        veh_id="av",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="right_of_way",
         ),
+        acceleration_controller=(RLController, {}),
         num_vehicles=1)
 
     vehicles.add(
@@ -121,10 +93,9 @@ def make_flow_params():
         "vertical_lanes": 2
     }
 
-    initial_config, net_params = get_non_flow_params(
-        enter_speed=v_enter,
-        add_net_params=additional_net_params,
-        pedestrians=True)
+    initial = InitialConfig(
+        spacing='custom', sidewalks=True, lanes_distribution=float('inf'), shuffle=False)
+    net = NetParams(additional_params=additional_net_params)
 
     flow_params = dict(
         # name of the experiment
@@ -152,7 +123,7 @@ def make_flow_params():
 
         # network-related parameters (see flow.core.params.NetParams and the
         # network's documentation or ADDITIONAL_NET_PARAMS component)
-        net=net_params,
+        net=net,
 
         # vehicles to be placed in the network at the start of a rollout (see
         # flow.core.params.VehicleParams)
@@ -162,9 +133,6 @@ def make_flow_params():
 
         # parameters specifying the positioning of vehicles upon initialization
         # or reset (see flow.core.params.InitialConfig)
-        initial=InitialConfig(
-            spacing='custom',
-            shuffle=False,
-        ),
+        initial=initial,
     )
     return flow_params
