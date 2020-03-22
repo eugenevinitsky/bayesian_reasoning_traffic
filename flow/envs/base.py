@@ -255,6 +255,8 @@ class Env(gym.Env):
             ensure_dir(sim_params.emission_path)
             self.sim_params.emission_path = sim_params.emission_path
 
+        self.network.randomize_routes()
+
         self.k.network.generate_network(self.network)
         self.k.vehicle.initialize(deepcopy(self.network.vehicles))
         kernel_api = self.k.simulation.start_simulation(

@@ -370,7 +370,7 @@ class PedestrianParams:
         ----------
         ped_id : str
             base pedestrian ID for the pedestrians
-        depart_time : float
+        depart_time : str
             Time in the simulation the pedestrian spawns
         start: str
             Name of the edge the pedestrian starts at at depart_time
