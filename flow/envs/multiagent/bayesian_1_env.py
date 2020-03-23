@@ -146,7 +146,8 @@ class Bayesian1Env(MultiEnv):
                 if index <= 2: 
                     observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
                             [observed_yaw, observed_speed, rel_x, rel_y]
-
+            # print(self.k.vehicle.get_viewable_objects('rl_0', \
+            #             pedestrians=self.k.pedestrian, visualize=True))
             #print(observation)
             obs.update({rl_id: observation})
         

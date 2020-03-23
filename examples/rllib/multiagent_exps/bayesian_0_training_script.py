@@ -14,7 +14,7 @@ from ray import tune
 from ray.tune.registry import register_env
 from ray.tune import run_experiments
 
-from flow.envs.multiagent import Bayesian0Env
+from flow.envs.multiagent import Bayesian1Env
 from flow.networks import Bayesian0Network
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import SumoCarFollowingParams, VehicleParams
@@ -58,9 +58,9 @@ def make_flow_params(pedestrians=False, render=False):
         pedestrian_params.add(
             ped_id='ped_0',
             depart_time='0.00',
-            start='(1.0)--(1.1)',
-            end='(1.1)--(1.2)',
-            depart_pos='30')
+            start='(1.2)--(1.1)',
+            end='(1.1)--(1.0)',
+            depart_pos='43')
 
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -120,7 +120,7 @@ def make_flow_params(pedestrians=False, render=False):
         exp_tag="bayesian_0_env",
 
         # name of the flow environment the experiment is running on
-        env_name=Bayesian0Env,
+        env_name=Bayesian1Env,
 
         # name of the network class the experiment is running on 
         network=Bayesian0Network,
@@ -304,7 +304,7 @@ if __name__ == '__main__':
         'checkpoint_freq': 25,
         "max_failures": 10,
         'stop': {
-            'training_iteration': 100
+            'training_iteration': 1000
         },
         'config': config,
         "num_samples": 1,
