@@ -104,10 +104,11 @@ def run_env(env, agent, config, flow_params):
                         action[agent_id], _, logit = agent.compute_action(
                             state[agent_id], policy_id=policy_map_fn(agent_id), full_fetch=True)
                         logits[agent_id] = logit['behaviour_logits']
-
+                        
                         mu = logits[agent_id][0]
                         sigma = logits[agent_id][1]
                         actual = action[agent_id]
+                        print(mu, sigma)
                         print(accel_probability(mu, sigma, actual))
             else:
                 action = agent.compute_action(state)
