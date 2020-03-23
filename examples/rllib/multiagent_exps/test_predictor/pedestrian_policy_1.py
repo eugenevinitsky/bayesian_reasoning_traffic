@@ -79,6 +79,9 @@ def run_env(env, agent, config, flow_params):
     mean_speed = []
     std_speed = []
     num_pedestrian_crash = 0
+    actual_pdf = []
+    flipped_pdf = []
+
     for i in range(args.num_rollouts):
         vel = []
         state = env.reset()
@@ -101,15 +104,32 @@ def run_env(env, agent, config, flow_params):
                             policy_id=policy_map_fn(agent_id))
                     else:
                         # import ipdb;ipdb.set_trace()
-                        action[agent_id], _, logit = agent.compute_action(
+                        # TODO(KL) HARD CODED state alert! is_ped_visible is the 5th item in the state vector (i.e. index-4)
+                        ped_idx = 4
+                        curr_ped = state[agent_id][ped_idx]
+                        flipped_ped = 1 if curr_ped == 0 else 0
+                        ped_flipped_state = np.copy(state[agent_id])
+                        ped_flipped_state[ped_idx] = flipped_ped
+
+                        action[agent_id], _, logit_actual = agent.compute_action(
                             state[agent_id], policy_id=policy_map_fn(agent_id), full_fetch=True)
-                        logits[agent_id] = logit['behaviour_logits']
-                        
-                        mu = logits[agent_id][0]
-                        sigma = logits[agent_id][1]
-                        actual = action[agent_id]
-                        print(mu, sigma)
-                        print(accel_probability(mu, sigma, actual))
+                            
+                        _, _, logit_flipped = agent.compute_action(
+                            ped_flipped_state, policy_id=policy_map_fn(agent_id), full_fetch=True)
+
+                        actual_mu, actual_ln_sigma = logit_actual['behaviour_logits']
+                        flipped_mu, flipped_ln_sigma = logit_flipped['behaviour_logits']
+
+                        actual_sigma = np.exp(actual_ln_sigma)
+                        flipped_sigma = np.exp(flipped_ln_sigma)
+
+                        actual_action = action[agent_id]
+                        print('Prob of action from when there is a pedestrian vs prob from of action when there is no pedestrian')
+                        print(accel_pdf(actual_mu, actual_sigma, actual_action))
+                        print(accel_pdf(flipped_mu, flipped_sigma, actual_action))
+                        actual_pdf.append(accel_pdf(actual_mu, actual_sigma, actual_action))
+                        flipped_pdf.append(accel_pdf(flipped_mu, flipped_sigma, actual_action))
+
             else:
                 action = agent.compute_action(state)
             state, reward, done, _ = env.step(action)
@@ -126,7 +146,7 @@ def run_env(env, agent, config, flow_params):
             for rl_id in vehicles.get_rl_ids():
                 num_collision = len(vehicles.get_pedestrian_crash(rl_id, pedestrian))
                 num_pedestrian_crash += num_collision
-
+        plot_2_lines(actual_pdf, flipped_pdf)
         if multiagent:
             for key in rets.keys():
                 rets[key].append(ret[key])
@@ -308,7 +328,7 @@ def create_agent(args, flow_params):
 
     return agent, config
 
-def accel_probability(mu, sigma, actual):
+def accel_pdf(mu, sigma, actual):
     """Return pdf evaluated at actual acceleration"""
     coeff = 1 / np.sqrt(2 * np.pi * (sigma**2))
     exp = -0.5 * ((actual - mu) / sigma)**2
@@ -328,6 +348,16 @@ def run_transfer(args):
     # env, env_name = create_env(args, bayesian_3_params)
     # agent, config = create_agent(args, flow_params=bayesian_3_params)
     # run_env(env, agent, config, bayesian_3_params)
+
+def plot_2_lines(actual_pdfs, flipped_pdfs):
+    import matplotlib.pyplot as plt
+    x = np.arange(len(actual_pdfs))
+    plt.plot(x, actual_pdfs)
+    plt.plot(x, flipped_pdfs)
+    plt.legend(['actual_pdf', 'flipped_pdfs'], loc='upper left')
+
+    plt.show()
+
 
 
 def create_parser():
@@ -383,7 +413,6 @@ def create_parser():
         type=int,
         help='Specifies the horizon.')
     return parser
-
 
 if __name__ == '__main__':
     parser = create_parser()
