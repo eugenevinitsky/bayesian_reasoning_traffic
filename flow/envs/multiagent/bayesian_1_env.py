@@ -101,6 +101,11 @@ class Bayesian1Env(MultiEnv):
                 "(1.0)--(1.1)" : 7
         }
 
+        in_edges = ["(2.1)--(1.1)",
+                "(1.2)--(1.1)",
+                "(0.1)--(1.1)",
+                "(1.0)--(1.1)"]
+
         for rl_id in self.rl_set:
             if rl_id in self.k.vehicle.get_arrived_ids():
                 obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
@@ -123,12 +128,23 @@ class Bayesian1Env(MultiEnv):
             veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
             yaw = self.k.vehicle.get_yaw(rl_id)
             speed = self.k.vehicle.get_speed(rl_id)
-            edge = self.k.vehicle.get_edge(rl_id)
-            edge_int = edge_to_int.get(edge, -1)
             edge_pos = self.k.vehicle.get_position(rl_id)
+            if self.k.vehicle.get_edge(rl_id) in in_edges:
+                edge_pos = 50 - edge_pos
 
-            observation[:4] = [yaw, speed, edge_int, edge_pos]
+            start, end = self.k.vehicle.get_route(rl_id)
+            start = edge_to_int[start]
+            end = edge_to_int[end]
+            turn_num = (end - start) % 8
 
+            if turn_num == 1:
+                turn_num = 0 # turn right
+            elif turn_num == 3:
+                turn_num = 1 # go straight
+            else:
+                turn_num = 2 # turn left
+
+            observation[:4] = [yaw, speed, turn_num, edge_pos]
             '''
             pedestrian_in_view = 0
             if len(visible_pedestrians) > 0:
@@ -154,10 +170,13 @@ class Bayesian1Env(MultiEnv):
                 rel_y = observed_y - veh_y
 
                 if index <= 2: 
+                    # observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
+                    #         [observed_yaw, observed_speed, rel_x, rel_y]
                     observation[(index * 4) + 7: 4 * (index + 1) + 7] = \
                             [observed_yaw, observed_speed, rel_x, rel_y]
 
-            #print(observation)
+
+            # print(rl_id, observation)
             obs.update({rl_id: observation})
         
         return obs
@@ -184,9 +203,9 @@ class Bayesian1Env(MultiEnv):
             collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
 
             if len(collision_pedestrians) > 0:
-                reward = -50
+                reward = -100
             elif rl_id in collision_vehicles:
-                reward = -30
+                reward = -100
             else:
                 # TODO(@nliu & evinitsky) positive reward?
                 # reward = rl_actions[rl_id][0] / 10 # small reward for going forward

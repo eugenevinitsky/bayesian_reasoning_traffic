@@ -144,7 +144,7 @@ class Bayesian1Network(TrafficLightGridNetwork):
 
         rts = {}
 
-        if net_params.additional_params["randomize_routes"]:
+        if net_params.additional_params.get("randomize_routes", False):
             start_edges = ['(1.2)--(1.1)',
                     '(0.1)--(1.1)',
                     '(1.0)--(1.1)',
@@ -273,7 +273,7 @@ class Bayesian1Network(TrafficLightGridNetwork):
         1. list of start positions [(edge0, pos0), (edge1, pos1), ...]
         2. list of start lanes [lane0, lane1, lane 2, ...]"""
 
-        if net_params.additional_params["randomize_routes"]:
+        if net_params.additional_params.get("randomize_routes", False):
             # Randomized paths with distinct starting edges but not necessarily
             # distinct ending edges
             start_edges = ['(1.2)--(1.1)',
