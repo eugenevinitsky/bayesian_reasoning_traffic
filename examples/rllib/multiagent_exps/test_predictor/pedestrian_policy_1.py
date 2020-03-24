@@ -100,14 +100,16 @@ def run_env(env, agent, config, flow_params):
     fixed_prior_prob_ped = 0.5
     fixed_prior_prob_no_ped = 0.5
 
-    for i in range(args.num_rollouts):
+    visible_pedestrian = []
+
+    for i in range(args.num_rollouts + 400):
         vel = []
         state = env.reset()
         if multiagent:
             ret = {key: [0] for key in rets.keys()}
         else:
             ret = 0
-        for _ in range(flow_params['env'].horizon):
+        for _ in range(flow_params['env'].horizon + 400):
             vehicles = env.unwrapped.k.vehicle
             pedestrian = env.unwrapped.k.pedestrian
             vel.append(np.mean(vehicles.get_speed(vehicles.get_ids())))
@@ -125,6 +127,7 @@ def run_env(env, agent, config, flow_params):
                         # TODO(KL) HARD CODED state alert! is_ped_visible is the 5th item in the state vector (i.e. index-4)
                         ped_idx = 4
                         curr_ped = state[agent_id][ped_idx]
+                        visible_pedestrian.append(curr_ped)
                         # no
                         flipped_ped = 1 if curr_ped == 0 else 0
                         ped_flipped_state = np.copy(state[agent_id])
@@ -195,8 +198,8 @@ def run_env(env, agent, config, flow_params):
         
         # plot_2_licnes(prob_action_given_ped, prob_action_given_no_ped)
         import ipdb; ipdb.set_trace()
-        plot_2_lines(probs_ped_given_action, probs_no_ped_given_action, updated_priors=True)
-        plot_2_lines(probs_ped_given_action_fixed_priors, probs_no_ped_given_action_fixed_priors, updated_priors=False)
+        plot_2_lines(probs_ped_given_action, probs_no_ped_given_action, updated_priors=True, viewable_ped=visible_pedestrian)
+        plot_2_lines(probs_ped_given_action_fixed_priors, probs_no_ped_given_action_fixed_priors, updated_priors=False, viewable_ped=visible_pedestrian)
 
 
 def create_env(args, flow_params):
@@ -316,11 +319,13 @@ def run_transfer(args):
     agent, config = create_agent(args, flow_params=bayesian_1_params)
     run_env(env, agent, config, bayesian_1_params)
 
-def plot_2_lines(actual_pdfs, flipped_pdfs, updated_priors=True):
+def plot_2_lines(actual_pdfs, flipped_pdfs, updated_priors=True, viewable_ped=False):
     import matplotlib.pyplot as plt
     x = np.arange(len(actual_pdfs))
     plt.plot(x, actual_pdfs)
     plt.plot(x, flipped_pdfs)
+    if viewable_ped:
+        plt.plot(x, viewable_ped)
     if updated_priors:
         plt.legend(['Pr(ped | action) using updated priors', 'Pr(no_ped | action) using updated priors'], loc='upper left')
     else:
