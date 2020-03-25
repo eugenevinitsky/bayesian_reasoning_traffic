@@ -101,6 +101,12 @@ class MultiEnv(MultiAgentEnv, Env):
             # crash encodes whether the simulator experienced a collision
             crash = self.k.simulation.check_collision()
 
+            # update crash if there's an pedestrian-vehicle collision
+            if self.k.pedestrian:
+                for veh_id in self.k.vehicle.get_ids():
+                    if len(self.k.vehicle.get_pedestrian_crash(veh_id, self.k.pedestrian)) > 0:
+                        crash = True
+
             # stop collecting new simulation steps if there is a collision
             if crash:
                 break

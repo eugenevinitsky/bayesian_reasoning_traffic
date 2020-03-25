@@ -106,33 +106,6 @@ class Bayesian1Network(TrafficLightGridNetwork):
                          traffic_lights, pedestrians, use_traffic_lights=False, nodes_radius=0.1)
         self.nodes = self._nodes
 
-    def randomize_pedestrian_routes(self, pedestrians):
-
-        if not pedestrians:
-            return None
-
-        edges = ['(1.2)--(1.1)',
-                '(0.1)--(1.1)',
-                '(1.0)--(1.1)',
-                '(2.1)--(1.1)',
-                '(1.1)--(1.2)',
-                '(1.1)--(0.1)',
-                '(1.1)--(1.0)',
-                '(1.1)--(2.1)']
-
-        for ped_id in pedestrians.params:
-            edge_indices = [0, 1, 2, 3, 4, 5, 6, 7]
-            np.random.shuffle(edge_indices)
-
-            pedestrians.params[ped_id]['from'] = edges[edge_indices[0]]
-            pedestrians.params[ped_id]['to'] = edges[edge_indices[1]]
-
-            if edge_indices[0] <= 3:
-                pos = min(np.random.normal(45, 5), 50)
-            else:
-                pos = max(np.random.normal(5, 5), 0)
-            pedestrians.params[ped_id]['departPos'] = str(pos)
-
     @property
     def _nodes(self):
         """See parent class"""
@@ -164,29 +137,71 @@ class Bayesian1Network(TrafficLightGridNetwork):
         """See parent class."""
         return self._edges
 
-    def specify_routes(self, net_params):
+    def specify_routes(self, net_params=None):
 
-        start_edges = ['(1.2)--(1.1)',
+        if net_params == None:
+            net_params = self.net_params
+
+        rts = {}
+
+        if net_params.additional_params.get("randomize_routes", False):
+            start_edges = ['(1.2)--(1.1)',
+                    '(0.1)--(1.1)',
+                    '(1.0)--(1.1)',
+                    '(2.1)--(1.1)']
+            end_edges = ['(1.1)--(1.2)',
+                    '(1.1)--(0.1)',
+                    '(1.1)--(1.0)',
+                    '(1.1)--(2.1)']
+            for i in range(len(start_edges)):
+                start = start_edges[i]
+                end_index = np.random.randint(0, 4)
+                if end_index == i: # no u-turn routes
+                    end_index = (i + 1) % 4
+                end = end_edges[end_index]
+                rts[start] = [start, end]
+            if net_params.additional_params["pedestrian_kernel"]:
+                self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"])
+        else:
+            car_1_start_edge = "(2.1)--(1.1)"
+            car_1_end_edge = "(1.1)--(0.1)"
+            car_2_start_edge = "(1.2)--(1.1)"
+            car_2_end_edge = "(1.1)--(2.1)"
+            car_3_start_edge = "(1.0)--(1.1)"
+            car_3_end_edge = "(1.1)--(2.1)"
+            rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
+                   car_2_start_edge: [car_2_start_edge, car_2_end_edge],
+                   car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
+
+        return rts
+
+    def randomize_pedestrian_routes(self, pedestrians):
+
+        if not pedestrians:
+            return None
+
+        edges = ['(1.2)--(1.1)',
                 '(0.1)--(1.1)',
                 '(1.0)--(1.1)',
-                '(2.1)--(1.1)']
-        end_edges = ['(1.1)--(1.2)',
+                '(2.1)--(1.1)',
+                '(1.1)--(1.2)',
                 '(1.1)--(0.1)',
                 '(1.1)--(1.0)',
                 '(1.1)--(2.1)']
 
-        rts = {}
+        for ped_id in pedestrians.params:
+            edge_indices = [0, 1, 2, 3, 4, 5, 6, 7]
+            np.random.shuffle(edge_indices)
 
-        for i in range(len(start_edges)):
-            start = start_edges[i]
-            end_index = np.random.randint(0, 4)
-            if end_index == i: # no u-turn routes
-                end_index = (i + 1) % 4
-            end = end_edges[end_index]
+            pedestrians.params[ped_id]['from'] = edges[edge_indices[0]]
+            pedestrians.params[ped_id]['to'] = edges[edge_indices[1]]
 
-            rts[start] = [start, end]
+            if edge_indices[0] <= 3:
+                pos = min(np.random.normal(45, 5), 50)
+            else:
+                pos = max(np.random.normal(5, 5), 0)
+            pedestrians.params[ped_id]['departPos'] = str(pos)
 
-        return rts
 
     def specify_types(self, net_params):
         """See parent class."""
@@ -258,27 +273,39 @@ class Bayesian1Network(TrafficLightGridNetwork):
         1. list of start positions [(edge0, pos0), (edge1, pos1), ...]
         2. list of start lanes [lane0, lane1, lane 2, ...]"""
 
-        # Randomized paths with distinct starting edges but not necessarily
-        # distinct ending edges
-        start_edges = ['(1.2)--(1.1)',
-                '(0.1)--(1.1)',
-                '(1.0)--(1.1)',
-                '(2.1)--(1.1)']
+        if net_params.additional_params.get("randomize_routes", False):
+            # Randomized paths with distinct starting edges but not necessarily
+            # distinct ending edges
+            start_edges = ['(1.2)--(1.1)',
+                    '(0.1)--(1.1)',
+                    '(1.0)--(1.1)',
+                    '(2.1)--(1.1)']
 
-        start_indices = [0, 1, 2, 3]
-        # np.random.shuffle(start_indices)
+            start_indices = [0, 1, 2, 3]
+            np.random.shuffle(start_indices)
 
-        car_1_start_edge = start_edges[start_indices[0]]
-        car_2_start_edge = start_edges[start_indices[1]]
-        car_3_start_edge = start_edges[start_indices[2]]
- 
-        car_1_start_pos = max(np.random.normal(20, 7), 0)
-        car_2_start_pos = max(np.random.normal(20, 7), 0)
-        car_3_start_pos = max(np.random.normal(20, 7), 0)
+            car_1_start_edge = start_edges[start_indices[0]]
+            car_2_start_edge = start_edges[start_indices[1]]
+            car_3_start_edge = start_edges[start_indices[2]]
 
-        start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
-        # In SUMO, lanes are zero-indexed starting from the right-most lane
-        start_lanes = [0, 0, 0]
+            car_1_start_pos = max(np.random.normal(20, 7), 0)
+            car_2_start_pos = max(np.random.normal(20, 7), 0)
+            car_3_start_pos = max(np.random.normal(20, 7), 0)
+
+            start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
+            # In SUMO, lanes are zero-indexed starting from the right-most lane
+            start_lanes = [0, 0, 0]
+
+        else:
+            car_1_start_edge = "(2.1)--(1.1)"
+            car_1_start_pos = 20
+            car_2_start_edge = "(1.2)--(1.1)"
+            car_2_start_pos = 10
+            car_3_start_edge = "(1.0)--(1.1)"
+            car_3_start_pos = 0
+
+            start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
+            start_lanes = [0, 0, 0]
 
         return start_pos, start_lanes
 
@@ -306,7 +333,7 @@ class Bayesian3Network(Bayesian1Network):
         car_3_start_edge = start_edges[start_indices[2]]
         car_4_start_edge = start_edges[start_indices[3]]
 
-        car_1_start_pos = 5
+        car_1_start_pos = 35
         car_2_start_pos = 30
         car_3_start_pos = 40
         car_4_start_pos = 50
@@ -317,6 +344,74 @@ class Bayesian3Network(Bayesian1Network):
         start_lanes = [1, 0, 0, 0]
 
         return start_pos, start_lanes
+
+    def randomize_pedestrian_routes(self, pedestrians):
+        pass
+        #
+        # if not pedestrians:
+        #     return None
+        #
+        # edges = ['(1.2)--(1.1)',
+        #          '(0.1)--(1.1)',
+        #          '(1.0)--(1.1)',
+        #          '(2.1)--(1.1)',
+        #          '(1.1)--(1.2)',
+        #          '(1.1)--(0.1)',
+        #          '(1.1)--(1.0)',
+        #          '(1.1)--(2.1)']
+        #
+        # for ped_id in pedestrians.params:
+        #     edge_indices = [0, 1, 2, 3, 4, 5, 6, 7]
+        #
+        #     pedestrians.params[ped_id]['from'] = edges[edge_indices[0]]
+        #     pedestrians.params[ped_id]['to'] = edges[edge_indices[1]]
+        #
+        #     if edge_indices[0] <= 3:
+        #         pos = min(np.random.normal(45, 5), 50)
+        #     else:
+        #         pos = max(np.random.normal(5, 5), 0)
+        #     pedestrians.params[ped_id]['departPos'] = str(pos)
+
+class Bayesian4Network(Bayesian1Network):
+    @staticmethod
+    def gen_custom_start_pos(cls, net_params, initial_config, num_vehicles):
+        """See parent class for full explanation
+
+        Return 2 lists:
+        1. list of start positions [(edge0, pos0), (edge1, pos1), ...]
+        2. list of start lanes [lane0, lane1, lane 2, ...]"""
+
+        # Randomized paths with distinct starting edges but not necessarily
+        # distinct ending edges
+        start_edges = ['(1.2)--(1.1)',
+                       '(0.1)--(1.1)',
+                       '(1.0)--(1.1)',
+                       '(2.1)--(1.1)']
+
+        start_indices = [0, 3]
+
+        car_1_start_edge = start_edges[start_indices[0]]
+        car_2_start_edge = start_edges[start_indices[1]]
+
+        car_1_start_pos = 50
+        car_2_start_pos = 50
+
+        start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos)]
+        # In SUMO, lanes are zero-indexed starting from the right-most lane
+        start_lanes = [0, 0, 0, 0]
+
+        return start_pos, start_lanes
+
+    def specify_routes(self, net_params=None):
+
+        car_1_start_edge = "(2.1)--(1.1)"
+        car_1_end_edge = "(1.1)--(1.2)"
+        car_2_start_edge = "(1.2)--(1.1)"
+        car_2_end_edge = "(1.1)--(2.1)"
+        rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
+               car_2_start_edge: [car_2_start_edge, car_2_end_edge]}
+
+        return rts
 
     def randomize_pedestrian_routes(self, pedestrians):
         pass
