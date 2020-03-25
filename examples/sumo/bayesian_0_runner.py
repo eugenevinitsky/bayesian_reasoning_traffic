@@ -3,11 +3,12 @@ actually arrives at the desired time so that the conflict occurs. """
 
 from flow.controllers import GridRouter
 from flow.core.experiment import Experiment
+from flow.core.bayesian_0_experiment import Bayesian0Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, SumoLaneChangeParams
 from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
 from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
-from flow.envs.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
+from flow.envs.multiagent.data_collection.bayesian_0_data_collection_env import Bayesian0DataCollectionEnv, ADDITIONAL_ENV_PARAMS
 from flow.networks import Bayesian0Network
 from flow.core.params import PedestrianParams
 import argparse
@@ -88,7 +89,7 @@ def get_non_flow_params(enter_speed, add_net_params, pedestrians=False):
     return initial, net
 
 
-def bayesian_0_example(render=None, pedestrians=False):
+def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
     """
     Perform a simulation of vehicles on a traffic light grid.
 
@@ -146,7 +147,7 @@ def bayesian_0_example(render=None, pedestrians=False):
              depart_time='0.00',
              start='(1.2)--(1.1)',
              end='(1.1)--(1.0)',
-             depart_pos='30')
+             depart_pos='43')
 
     vehicles = VehicleParams()
 
@@ -161,27 +162,30 @@ def bayesian_0_example(render=None, pedestrians=False):
         lane_change_params=lane_change_params,
         num_vehicles=num_cars_left)
 
-    vehicles.add(
-        veh_id="obstacle",
-        routing_controller=(GridRouter, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        lane_change_params=lane_change_params,
-        num_vehicles=num_cars_top)
+    # For now, just have the one human car and one pedestrian
 
-    vehicles.add(
-        veh_id="rl",
-        routing_controller=(GridRouter, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        lane_change_params=lane_change_params,
-        num_vehicles=num_cars_right)
+    # vehicles.add(
+    #     veh_id="obstacle",
+    #     routing_controller=(GridRouter, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #         max_speed=0.000001
+    #     ),
+    #     lane_change_params=lane_change_params,
+    #     num_vehicles=num_cars_top)
+
+    # vehicles.add(
+    #     veh_id="rl",
+    #     routing_controller=(GridRouter, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #     ),
+    #     lane_change_params=lane_change_params,
+    #     num_vehicles=num_cars_right)
 
     env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
 
@@ -204,10 +208,13 @@ def bayesian_0_example(render=None, pedestrians=False):
         pedestrians=pedestrian_params,
         initial_config=initial_config)
 
-    env = AccelEnv(env_params, sim_params, network)
-
-    return Experiment(env)
-
+    
+    if not collect_data:
+        env = AccelEnv(env_params, sim_params, network)
+        return Experiment(env)
+    else:
+        env = Bayesian0DataCollectionEnv(env_params, sim_params, network)
+        return Bayesian0Experiment(env)
 
 if __name__ == "__main__":
     # check for pedestrians
@@ -215,11 +222,20 @@ if __name__ == "__main__":
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
+    # wonder if it's better to call the argument the actual experiment file ... I'll be using Bayesian0Experiement.py
+    parser.add_argument("--collect_data",
+                        help="collect training data from this experiment by using bayesian 0 experiment rather than Experiment",
+                        action="store_true")
+
+    parser.add_argument("--render",
+                        help="render the SUMO simulation",
+                        action="store_true")
 
     args = parser.parse_args()
     pedestrians = args.pedestrians
-
+    collect_data = args.collect_data
+    render = args.render
     # import the experiment variable
-    exp = bayesian_0_example(pedestrians=pedestrians)
+    exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
-    exp.run(1, 1500)
+    exp.run(1, 150)

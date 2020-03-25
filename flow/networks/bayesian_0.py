@@ -110,8 +110,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
     def _nodes(self):
         """See parent class"""
         node_type = "traffic_light" if self.use_traffic_lights else "allway_stop"
-        print("use traffic lights: {}".format(self.use_traffic_lights))
-        print(node_type)
         x_max = self.col_num + 1
         y_max = self.row_num + 1
 
@@ -126,7 +124,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
                         "type": node_type,
                         "radius": self.nodes_radius
                     })
-        print(f'inner length is {self.inner_length}')
         return nodes
 
     def specify_nodes(self, net_params):
@@ -230,18 +227,20 @@ class Bayesian0Network(TrafficLightGridNetwork):
         car_1_end_edge = "(1.1)--(2.1)"
         car_1_start_pos = 30
 
-        # let the top car say here forever as an obstacle
-        car_2_start_edge = "(1.2)--(1.1)"
-        car_2_end_edge = "(1.2)--(1.1)"
-        car_2_start_pos = 49.9
+        # # let the top car say here forever as an obstacle
+        # car_2_start_edge = "(1.2)--(1.1)"
+        # car_2_end_edge = "(1.2)--(1.1)"
+        # car_2_start_pos = 49
 
-        # 'thinking' car
-        car_3_start_edge = "(2.1)--(1.1)"
-        car_3_end_edge = "(1.1)--(1.0)"
-        car_3_start_pos = 0
+        # # 'thinking' car
+        # car_3_start_edge = "(2.1)--(1.1)"
+        # car_3_end_edge = "(1.1)--(1.0)"
+        # car_3_start_pos = 0
 
-        start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
-        # In SUMO, lanes are zero-indexed starting from the right-most lane
-        start_lanes = [0, 0, 0]
+        # start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
+        # # In SUMO, lanes are zero-indexed starting from the right-most lane
+        # start_lanes = [0, 0, 0]
+        start_pos = [(car_1_start_edge, car_1_start_pos)]
+        start_lanes = [0]
 
         return start_pos, start_lanes

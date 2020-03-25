@@ -124,17 +124,18 @@ class Experiment:
                 state, reward, done, _ = self.env.step(rl_actions(state))
                 vel[j] = np.mean(
                     self.env.k.vehicle.get_speed(self.env.k.vehicle.get_ids()))     # TODO(KL) Check w Eugene what the point of that the mean is?
-                ret += reward
+                # import ipdb;ipdb.set_trace()
+                # ret += reward
                 ret_list.append(reward)
 
                 if done:
                     break
             rets.append(ret)
             vels.append(vel)
-            mean_rets.append(np.mean(ret_list))
+            # mean_rets.append(np.mean(ret_list))
             ret_lists.append(ret_list)
-            mean_vels.append(np.mean(vel))
-            std_vels.append(np.std(vel))
+            # mean_vels.append(np.mean(vel))
+            # std_vels.append(np.std(vel))
             outflows.append(self.env.k.vehicle.get_outflow_rate(int(500)))
             print("Round {0}, return: {1}".format(i, ret))
 

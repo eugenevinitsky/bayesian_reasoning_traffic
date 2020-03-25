@@ -200,8 +200,6 @@ class Bayesian1Env(MultiEnv):
                     observation[(index * 4) + 10: 4 * (index + 1) + 10] = \
                             [observed_yaw, observed_speed, rel_x, rel_y]
 
-
-            # print(rl_id, observation)
             obs.update({rl_id: observation})
 
         return obs
