@@ -363,7 +363,7 @@ class PedestrianParams:
 
         self.__pedestrians = collections.OrderedDict()
 
-    def add(self, ped_id, depart_time, start, end, depart_pos='random'):
+    def add(self, ped_id, depart_time, start, end, depart_pos='random', arrival_pos='random'):
         """Add a pedestrian to the list of pedestrians in the network.
 
         Parameters
@@ -388,7 +388,7 @@ class PedestrianParams:
                 'departPos': depart_pos,
                 'from': start,
                 'to': end,
-                'arrivalPos': 'random'
+                'arrivalPos': arrival_pos
                 }
 
 class SimParams(object):

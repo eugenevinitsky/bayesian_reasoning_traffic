@@ -188,7 +188,7 @@ def get_blocked_segments(position, target_position, target_orientation, target_l
 
     return(max_angle, min_angle)
 
-def get_corners(x, y, orientation, corner_angle, corner_dist, center_offset=2):
+def get_corners(x, y, orientation, corner_angle, corner_dist, center_offset=2.5):
     corners = []
 
     adjusted_x = x - center_offset * math.cos(math.radians(orientation))
