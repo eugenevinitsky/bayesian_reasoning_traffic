@@ -178,7 +178,6 @@ def run_env(env, agent, config, flow_params):
                         probs_ped_given_action_fixed_priors.append(prob_ped_given_action_fixed_prior)
                         probs_no_ped_given_action_fixed_priors.append(prob_no_ped_given_action_fixed_prior)
 
-
             else:
                 action = agent.compute_action(state)
             state, reward, done, _ = env.step(action)
