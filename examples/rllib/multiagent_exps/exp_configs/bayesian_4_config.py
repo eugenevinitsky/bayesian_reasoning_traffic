@@ -1,6 +1,6 @@
 """Check if the AV learns to slow down and not hit a pedestrian that is invisible."""
 
-from flow.networks import Bayesian3Network
+from flow.networks import Bayesian4Network
 from flow.controllers.velocity_controllers import FullStop
 from flow.controllers import GridRouter, RLController
 from flow.core.params import SumoCarFollowingParams, VehicleParams
@@ -56,14 +56,20 @@ def make_flow_params():
         start='(1.2)--(1.1)',
         end='(2.1)--(1.1)',
         depart_pos='43')
-    pedestrian_params.add(
-        ped_id='ped_1',
-        depart_time='0.00',
-        start='(1.2)--(1.1)',
-        end='(2.1)--(1.1)',
-        depart_pos='45')
 
     vehicles = VehicleParams()
+
+    vehicles.add(
+        veh_id="obstacle",
+        routing_controller=(GridRouter, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="right_of_way",
+            max_speed=0.0000000000001
+        ),
+        acceleration_controller=(FullStop, {}),
+        num_vehicles=1)
 
     vehicles.add(
         veh_id="av",
@@ -76,23 +82,11 @@ def make_flow_params():
         acceleration_controller=(RLController, {}),
         num_vehicles=1)
 
-    vehicles.add(
-        veh_id="obstacle",
-        routing_controller=(GridRouter, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-            max_speed=0.0000000000001
-        ),
-        acceleration_controller=(FullStop, {}),
-        num_vehicles=3)
-
     additional_net_params = {
         "grid_array": grid_array,
         "speed_limit": 35,
-        "horizontal_lanes": 2,
-        "vertical_lanes": 2
+        "horizontal_lanes": 1,
+        "vertical_lanes": 1
     }
 
     initial = InitialConfig(
@@ -101,13 +95,13 @@ def make_flow_params():
 
     flow_params = dict(
         # name of the experiment
-        exp_tag="why_are_they_stopped",
+        exp_tag="hidden_pedestrian",
 
         # name of the flow environment the experiment is running on
         env_name=Bayesian1Env,
 
         # name of the network class the experiment is running on
-        network=Bayesian3Network,
+        network=Bayesian4Network,
 
         # simulator that is used by the experiment
         simulator='traci',

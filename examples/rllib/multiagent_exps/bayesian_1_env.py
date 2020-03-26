@@ -7,6 +7,7 @@ try:
     from ray.rllib.agents.agent import get_agent_class
 except ImportError:
     from ray.rllib.agents.registry import get_agent_class
+from ray.rllib.agents.ddpg.td3 import TD3Trainer
 from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
 from ray import tune
 from ray.tune.registry import register_env
@@ -53,16 +54,16 @@ def make_flow_params(pedestrians=False):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-
         for i in range(1):
             name = "ped_" + str(i)
             time = str(i * 5) + '.00'
             pedestrian_params.add(
                 ped_id=name,
                 depart_time=time,
-                start='(1.0)--(1.1)',
-                end='(1.1)--(1.2)',
-                depart_pos='30')
+                start='(1.1)--(2.1)',
+                end='(2.1)--(1.1)',
+                depart_pos='5',
+                arrival_pos='43')
 
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -71,15 +72,6 @@ def make_flow_params(pedestrians=False):
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
 
-    vehicles.add(
-        veh_id='rl',
-        acceleration_controller=(RLController, {}),
-        car_following_params=SumoCarFollowingParams(
-            speed_mode='aggressive',
-        ),
-        routing_controller=(GridRouter, {}),
-        num_vehicles=3)
-    '''
     vehicles.add(
         veh_id="human",
         acceleration_controller=(SimCarFollowingController, {}),
@@ -90,7 +82,18 @@ def make_flow_params(pedestrians=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        num_vehicles=1)
+        num_vehicles=0)
+
+    vehicles.add(
+        veh_id='rl',
+        acceleration_controller=(RLController, {}),
+        car_following_params=SumoCarFollowingParams(
+            speed_mode='aggressive',
+        ),
+        routing_controller=(GridRouter, {}),
+        num_vehicles=3)
+
+    '''
     vehicles.add(
         veh_id="human_1",
         acceleration_controller=(SimCarFollowingController, {}),
@@ -172,6 +175,7 @@ def make_flow_params(pedestrians=False):
                 },
                 "horizontal_lanes": 1,
                 "vertical_lanes": 1,
+                "randomize_routes": True,
             },
         ),
 
@@ -187,6 +191,126 @@ def make_flow_params(pedestrians=False):
     )
 
     return flow_params
+def setup_exps_TD3(flow_params):
+    """
+    Experiment setup with TD3 using RLlib.
+
+    Parameters
+    ----------
+    flow_params : dictionary of flow parameters
+
+    Returns
+    -------
+    str
+        name of the training algorithm
+    str
+        name of the gym environment to be trained
+    dict
+        training configuration parameters
+    """
+    alg_run = 'TD3'
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
+    config["num_workers"] = min(N_CPUS, N_ROLLOUTS)
+    config['train_batch_size'] = HORIZON * N_ROLLOUTS
+    # config['simple_optimizer'] = True
+    config['gamma'] = 0.999  # discount rate
+    config['model'].update({'fcnet_hiddens': [32, 32]})
+    config['lr'] = tune.grid_search([1e-5, 1e-4, 1e-3])
+    config['horizon'] = HORIZON
+    config['observation_filter'] = 'NoFilter'
+
+    # define callbacks for tensorboard
+
+    def on_episode_start(info):
+        env = info['env'].get_unwrapped()[0]
+        episode = info['episode']
+        episode.user_data['num_ped_collisions'] = 0
+        episode.user_data['num_veh_collisions'] = 0
+        episode.user_data['avg_speed'] = []
+
+        episode.user_data['steps_elapsed'] = 0
+        episode.user_data['vehicle_leaving_time'] = []
+        episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
+
+    def on_episode_step(info):
+        env = info['env'].get_unwrapped()[0]
+        episode = info['episode']
+        for v_id in env.k.vehicle.get_rl_ids():
+            if len(env.k.vehicle.get_pedestrian_crash(v_id, env.k.pedestrian)) > 0:
+                episode.user_data['num_ped_collisions'] += 1
+
+        if env.k.simulation.check_collision():
+            episode.user_data['num_veh_collisions'] += 1
+
+        avg_speed = env.k.vehicle.get_speed(env.k.vehicle.get_rl_ids())
+        if len(avg_speed) > 0:
+            avg_speed = np.mean(avg_speed)
+            if avg_speed > 0:
+                episode.user_data['avg_speed'].append(avg_speed)
+
+        episode.user_data['steps_elapsed'] += 1
+        num_veh_left = episode.user_data['num_rl_veh_active'] - len(env.k.vehicle.get_rl_ids())
+        if num_veh_left > 0:
+            episode.user_data['vehicle_leaving_time'] += \
+                    [episode.user_data['steps_elapsed']] * num_veh_left
+            episode.user_data['num_rl_veh_active'] -= num_veh_left
+
+    def on_episode_end(info):
+        env = info['env'].get_unwrapped()[0]
+        episode = info['episode']
+        episode.custom_metrics['num_ped_collisions'] = episode.user_data['num_ped_collisions']
+        episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
+        episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
+
+        if episode.user_data['num_ped_collisions'] + episode.user_data['num_ped_collisions'] == 0:
+            episode.user_data['vehicle_leaving_time'] += \
+                    [episode.user_data['steps_elapsed']] * episode.user_data['num_rl_veh_active']
+            episode.custom_metrics['avg_rl_veh_arrival'] = \
+                np.mean(episode.user_data['vehicle_leaving_time'])
+        else:
+            episode.custom_metrics['avg_rl_veh_arrival'] = 500
+
+
+    config['callbacks'] = {
+            "on_episode_start":tune.function(on_episode_start),
+            "on_episode_step":tune.function(on_episode_step),
+            "on_episode_end":tune.function(on_episode_end)}
+
+    # save the flow params for replay
+    flow_json = json.dumps(
+        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
+    config['env_config']['flow_params'] = flow_json
+    config['env_config']['run'] = alg_run
+
+    create_env, env_name = make_create_env(params=flow_params, version=0)
+
+    # Register as rllib env
+    register_env(env_name, create_env)
+
+    test_env = create_env()
+    obs_space = test_env.observation_space
+    act_space = test_env.action_space
+
+    def gen_policy():
+        return None, obs_space, act_space, {}
+
+    # Setup PG with a single policy graph for all agents
+    policy_graphs = {'av': gen_policy()}
+
+    def policy_mapping_fn(_):
+        return 'av'
+
+    config.update({
+        'multiagent': {
+            'policies': policy_graphs,
+            'policy_mapping_fn': tune.function(policy_mapping_fn),
+            'policies_to_train': ['av']
+        }
+    })
+
+    return alg_run, env_name, config
+
 
 
 def setup_exps_PPO(flow_params):
@@ -221,24 +345,54 @@ def setup_exps_PPO(flow_params):
     # define callbacks for tensorboard
 
     def on_episode_start(info):
+        env = info['env'].get_unwrapped()[0]
         episode = info['episode']
         episode.user_data['num_ped_collisions'] = 0
+        episode.user_data['num_veh_collisions'] = 0
         episode.user_data['avg_speed'] = []
 
+        episode.user_data['steps_elapsed'] = 0
+        episode.user_data['vehicle_leaving_time'] = []
+        episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
+
     def on_episode_step(info):
-        episode = info['episode']
         env = info['env'].get_unwrapped()[0]
+        episode = info['episode']
         for v_id in env.k.vehicle.get_rl_ids():
             if len(env.k.vehicle.get_pedestrian_crash(v_id, env.k.pedestrian)) > 0:
                 episode.user_data['num_ped_collisions'] += 1
 
-        avg_speed = np.mean(env.k.vehicle.get_speed(env.k.vehicle.get_rl_ids()))
-        episode.user_data['avg_speed'].append(avg_speed)
+        if env.k.simulation.check_collision():
+            episode.user_data['num_veh_collisions'] += 1
+
+        avg_speed = env.k.vehicle.get_speed(env.k.vehicle.get_rl_ids())
+        if len(avg_speed) > 0:
+            avg_speed = np.mean(avg_speed)
+            if avg_speed > 0:
+                episode.user_data['avg_speed'].append(avg_speed)
+
+        episode.user_data['steps_elapsed'] += 1
+        num_veh_left = episode.user_data['num_rl_veh_active'] - len(env.k.vehicle.get_rl_ids())
+        if num_veh_left > 0:
+            episode.user_data['vehicle_leaving_time'] += \
+                    [episode.user_data['steps_elapsed']] * num_veh_left
+            episode.user_data['num_rl_veh_active'] -= num_veh_left
 
     def on_episode_end(info):
+        env = info['env'].get_unwrapped()[0]
         episode = info['episode']
         episode.custom_metrics['num_ped_collisions'] = episode.user_data['num_ped_collisions']
+        episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
         episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
+
+        if episode.user_data['num_ped_collisions'] + episode.user_data['num_ped_collisions'] == 0:
+            episode.user_data['vehicle_leaving_time'] += \
+                    [episode.user_data['steps_elapsed']] * episode.user_data['num_rl_veh_active']
+            episode.custom_metrics['avg_rl_veh_arrival'] = \
+                np.mean(episode.user_data['vehicle_leaving_time'])
+        else:
+            episode.custom_metrics['avg_rl_veh_arrival'] = 500
+
 
     config['callbacks'] = {
             "on_episode_start":tune.function(on_episode_start),
@@ -299,7 +453,7 @@ if __name__ == '__main__':
     parser.add_argument('--run_mode', type=str, default='local',
                         help="Experiment run mode (local | cluster)")
     parser.add_argument('--algo', type=str, default='PPO',
-                        help="RL method to use (PPO)")
+                        help="RL method to use (PPO, TD3)")
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
@@ -314,6 +468,8 @@ if __name__ == '__main__':
 
     if ALGO == 'PPO':
         alg_run, env_name, config = setup_exps_PPO(flow_params)
+    elif ALGO == 'TD3':
+        alg_run, env_name, config = setup_exps_TD3(flow_params)
     else:
         raise NotImplementedError
 

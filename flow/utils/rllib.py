@@ -136,14 +136,16 @@ def get_flow_params(config):
             **veh_params)
 
     # reinitialize the pedestrians class from stored data
-    ped = PedestrianParams()
-    for pedestrians in flow_params["ped"].params.keys():
-        ped_params = flow_params["ped"].params[pedestrians]
-        ped.add(ped_id=ped_params["id"],
-                depart_time=ped_params["depart"],
-                start=ped_params["from"],
-                end=ped_params["to"],
-                depart_pos=ped_params["departPos"])
+    ped = None
+    if flow_params["ped"]:
+        ped = PedestrianParams()
+        for pedestrians in flow_params["ped"]["params"]:
+            ped_params = flow_params["ped"]["params"][pedestrians]
+            ped.add(ped_id=ped_params["id"],
+                    depart_time=ped_params["depart"],
+                    start=ped_params["from"],
+                    end=ped_params["to"],
+                    depart_pos=ped_params["departPos"])
 
     # convert all parameters from dict to their object form
     sim = SumoParams()  # TODO: add check for simulation type
