@@ -1,192 +1,84 @@
 """Sets up and runs the basic bayesian example. This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
-from flow.core.bayesian_experiment import BayesianExperiment
-from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, SumoLaneChangeParams
-from flow.envs.multiagent.bayesian_0_env import Bayesian0Env, ADDITIONAL_ENV_PARAMS
-from flow.core.params import SumoCarFollowingParams, VehicleParams
-from flow.controllers import SimCarFollowingController, GridRouter, RLController
-
-from flow.networks import Bayesian0Network
-from flow.core.params import PedestrianParams
+import json
 import argparse
 
+import ray
+try:
+    from ray.rllib.agents.agent import get_agent_class
+except ImportError:
+    from ray.rllib.agents.registry import get_agent_class
+from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
+from ray import tune
+from ray.tune.registry import register_env
+from ray.tune import run_experiments
 
-def gen_edges(col_num, row_num):
-    """Generate the names of the outer edges in the traffic light grid network.
+from flow.envs.multiagent import Bayesian1Env
+from flow.networks import Bayesian0Network
+from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
+from flow.core.params import SumoCarFollowingParams, VehicleParams
+from flow.core.params import PedestrianParams
+
+from flow.controllers import SimCarFollowingController, GridRouter, RLController
+
+
+from flow.utils.registry import make_create_env
+from flow.utils.rllib import FlowParamsEncoder
+
+# Experiment parameters
+N_ROLLOUTS = 10  # number of rollouts per training iteration
+N_CPUS = 1  # number of parallel workers
+
+# Environment parameters
+HORIZON = 400  # time horizon of a single rollout
+# TODO(@klin) make sure these parameters match what you've set up in the SUMO version here
+V_ENTER = 30  # enter speed for departing vehicles
+INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
+# number of vehicles originating in the left, right, top, and bottom edges
+N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 1, 0, 0, 0
+
+
+def make_flow_params(pedestrians=False, render=False):
+    """
+    Generate the flow params for the experiment.
 
     Parameters
     ----------
-    col_num : int
-        number of columns in the traffic light grid
-    row_num : int
-        number of rows in the traffic light grid
 
     Returns
     -------
-    list of str
-        names of all the outer edges
+    dict
+        flow_params object
     """
-    edges = []
-
-    x_max = col_num + 1
-    y_max = row_num + 1
-
-    def new_edge(from_node, to_node):
-        return str(from_node) + "--" + str(to_node)
-
-    # Build the horizontal edges
-    for y in range(1, y_max):
-        for x in [0, x_max - 1]:
-            left_node = "({}.{})".format(x, y)
-            right_node = "({}.{})".format(x + 1, y)
-            edges += new_edge(left_node, right_node)
-            edges += new_edge(right_node, left_node)
-
-    # Build the vertical edges
-    for x in range(1, x_max):
-        for y in [0, y_max - 1]:
-            bottom_node = "({}.{})".format(x, y)
-            top_node = "({}.{})".format(x, y + 1)
-            edges += new_edge(bottom_node, top_node)
-            edges += new_edge(top_node, bottom_node)
-
-    return edges
-
-
-def get_non_flow_params(enter_speed, add_net_params, pedestrians=False):
-    """Define the network and initial params in the absence of inflows.
-
-    Note that when a vehicle leaves a network in this case, it is immediately #TODO(KLin) Does this actually happen?
-    returns to the start of the row/column it was traversing, and in the same
-    direction as it was before.
-
-    Parameters
-    ----------
-    enter_speed : float
-        initial speed of vehicles as they enter the network.
-    add_net_params: dict
-        additional network-specific parameters (unique to the traffic light grid)
-
-    Returns
-    -------
-    flow.core.params.InitialConfig
-        parameters specifying the initial configuration of vehicles in the
-        network
-    flow.core.params.NetParams
-        network-specific parameters used to generate the network
-    """
-    additional_init_params = {'enter_speed': enter_speed}
-    initial = InitialConfig(
-        spacing='custom', additional_params=additional_init_params, shuffle=False)
-    if pedestrians:
-        initial = InitialConfig(
-            spacing='custom', sidewalks=True, lanes_distribution=float('inf'), shuffle=False)
-    net = NetParams(additional_params=add_net_params)
-
-    return initial, net
-
-def bayesian_0_example(render=None, pedestrians=False):
-    """
-    Perform a simulation of vehicles on a traffic light grid.
-
-    Parameters
-    ----------
-    render: bool, optional
-        specifies whether to use the gui during execution
-
-    Returns
-    -------
-    exp: flow.core.experiment.Experiment
-        A non-rl experiment demonstrating the performance of human-driven
-        vehicles and balanced traffic lights on a traffic light grid.
-    """
-    # Experiment parameters
-    N_ROLLOUTS = 10  # number of rollouts per training iteration
-    N_CPUS = 1  # number of parallel workers
-
-    # Environment parameters
-    HORIZON = 400  # time horizon of a single rollout
-
-    v_enter = 10
-    inner_length = 50
-    n_rows = 1
-    n_columns = 1
-    # TODO(@nliu) add the pedestrian in
-    num_cars_left = 1
-    num_cars_right = 1
-    num_cars_top = 1
-    num_cars_bot = 0
-    tot_cars = (num_cars_left + num_cars_right) * n_columns \
-        + (num_cars_top + num_cars_bot) * n_rows              # Why's this * n_rows and not n_cols?
-
-    grid_array = {
-        "inner_length": inner_length,
-        "row_num": n_rows,
-        "col_num": n_columns,
-        "cars_left": num_cars_left,
-        "cars_right": num_cars_right,
-        "cars_top": num_cars_top,
-        "cars_bot": num_cars_bot
-    }
-
-    sim_params = SumoParams(
-                        sim_step=0.1,
-                        render=True,
-                        emission_path="./data/")
-
-    if render is not None:
-        sim_params.render = render
-
-    lane_change_params = SumoLaneChangeParams(
-        lc_assertive=20,
-        lc_pushy=0.8,
-        lc_speed_gain=4.0,
-        model="LC2013",
-        lane_change_mode="strategic",   # TODO: check-is there a better way to change lanes?
-        lc_keep_right=0.8
-    )
 
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
         pedestrian_params.add(
-             ped_id='ped_0',
-             depart_time='0.00',
-             start='(1.2)--(1.1)',
-             end='(1.1)--(1.0)',
-             depart_pos='43')
-        pedestrian_params.add(
-             ped_id='ped_1',
-             depart_time='0.00',
-             start='(1.2)--(1.1)',
-             end='(1.1)--(1.0)',
-             depart_pos='45')
+            ped_id='ped_0',
+            depart_time='0.00',
+            start='(1.2)--(1.1)',
+            end='(1.1)--(1.0)',
+            depart_pos='43')
 
+    # we place a sufficient number of vehicles to ensure they confirm with the
+    # total number specified above. We also use a "right_of_way" speed mode to
+    # support traffic light compliance
     vehicles = VehicleParams()
-    vehicles.add(
-        veh_id="human",
-        routing_controller=(GridRouter, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        lane_change_params=lane_change_params,
-        num_vehicles=num_cars_left)
+    # vehicles.add(
+    #     veh_id="human",
+    #     acceleration_controller=(SimCarFollowingController, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         max_speed=V_ENTER,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #     ),
+    #     routing_controller=(GridRouter, {}),
+    #     num_vehicles=1)
 
-    vehicles.add(
-        veh_id="obstacle",
-        routing_controller=(GridRouter, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-            max_speed=0.0000000000001
-        ),
-        lane_change_params=lane_change_params,
-        num_vehicles=num_cars_top)
-
+    #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
         veh_id='rl',
         acceleration_controller=(RLController, {}),
@@ -194,50 +86,235 @@ def bayesian_0_example(render=None, pedestrians=False):
             speed_mode='right_of_way',
         ),
         routing_controller=(GridRouter, {}),
-        lane_change_params=lane_change_params,
         num_vehicles=1)
 
+    # vehicles.add(
+    #     veh_id="human_1",
+    #     acceleration_controller=(SimCarFollowingController, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         max_speed=V_ENTER,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #     ),
+    #     routing_controller=(GridRouter, {}),
+    #     num_vehicles=1)
+
+    n_rows = 1
+    n_columns = 1
+
+    # define initial configs to pass into dict
+    if pedestrians:
+        initial_config = InitialConfig(
+            spacing='custom',
+            shuffle=False, 
+            sidewalks=True, 
+            lanes_distribution=float('inf'))
+    else:
+        initial_config = InitialConfig(
+            spacing='custom',
+            shuffle=False)
+
+    flow_params = dict(
+        # name of the experiment
+        exp_tag="bayesian_0_env",
+
+        # name of the flow environment the experiment is running on
+        env_name=Bayesian1Env,
+
+        # name of the network class the experiment is running on 
+        network=Bayesian0Network,
+
+        # simulator that is used by the experiment
+        simulator='traci',
+
+        # sumo-related parameters (see flow.core.params.SumoParams)
+        sim=SumoParams(
+            restart_instance=True,
+            sim_step=0.1,
+            render=render,
+        ),
+
+        # environment related parameters (see flow.core.params.EnvParams)
+        env=EnvParams(
+            horizon=HORIZON,
+            additional_params={
+                # maximum acceleration of autonomous vehicles
+                'max_accel': 1,
+                # maximum deceleration of autonomous vehicles
+                'max_decel': 1,
+                # desired velocity for all vehicles in the network, in m/s
+                "target_velocity": 25,
+                # how many objects in our local radius we want to return
+                "max_num_objects": 3,
+                # how large of a radius to search in for a given vehicle in meters
+                "search_radius": 3000
+            },
+        ),
+
+        # network-related parameters (see flow.core.params.NetParams and the
+        # network's documentation or ADDITIONAL_NET_PARAMS component)
+        net=NetParams(
+            additional_params={
+                "speed_limit": V_ENTER + 5,  # inherited from grid0 benchmark
+                "grid_array": {
+                    "inner_length": INNER_LENGTH,
+                    "row_num": n_rows,
+                    "col_num": n_columns,
+                    "cars_left": N_LEFT,
+                    "cars_right": N_RIGHT,
+                    "cars_top": N_TOP,
+                    "cars_bot": N_BOTTOM,
+                },
+                "horizontal_lanes": 1,
+                "vertical_lanes": 1,
+            },
+        ),
+
+        # vehicles to be placed in the network at the start of a rollout (see
+        # flow.core.params.VehicleParams)
+        veh=vehicles,
+
+        ped=pedestrian_params,
+
+        # parameters specifying the positioning of vehicles upon initialization
+        # or reset (see flow.core.params.InitialConfig)
+        initial = initial_config
+    )
+
+    return flow_params
 
 
-    env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
+def setup_exps_PPO(flow_params):
+    """
+    Experiment setup with PPO using RLlib.
 
-    additional_net_params = {
-        "grid_array": grid_array,
-        "speed_limit": 35,
-        "horizontal_lanes": 1,
-        "vertical_lanes": 1
-    }
+    Parameters
+    ----------
+    flow_params : dictionary of flow parameters
 
-    initial_config, net_params = get_non_flow_params(
-        enter_speed=v_enter,
-        add_net_params=additional_net_params,
-        pedestrians=pedestrians)
+    Returns
+    -------
+    str
+        name of the training algorithm
+    str
+        name of the gym environment to be trained
+    dict
+        training configuration parameters
+    """
+    alg_run = 'PPO'
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
+    config["num_workers"] = min(N_CPUS, N_ROLLOUTS)
+    config['train_batch_size'] = HORIZON * N_ROLLOUTS
+    config['simple_optimizer'] = True
+    config['gamma'] = 0.999  # discount rate
+    config['model'].update({'fcnet_hiddens': [32, 32]})
+    config['lr'] = tune.grid_search([1e-5, 1e-4, 1e-3])
+    config['horizon'] = HORIZON
+    config['observation_filter'] = 'NoFilter'
 
-    network = Bayesian0Network(
-        name="bayesian_0",
-        vehicles=vehicles,
-        net_params=net_params,
-        pedestrians=pedestrian_params,
-        initial_config=initial_config)
+    # save the flow params for replay
+    flow_json = json.dumps(
+        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
+    config['env_config']['flow_params'] = flow_json
+    config['env_config']['run'] = alg_run
 
-    env = Bayesian0Env(env_params, sim_params, network)
+    create_env, env_name = make_create_env(params=flow_params, version=0)
 
-    return BayesianExperiment(env)
+    # Register as rllib env
+    register_env(env_name, create_env)
+
+    test_env = create_env()
+    obs_space = test_env.observation_space
+    act_space = test_env.action_space
+
+    def gen_policy():
+        return PPOTFPolicy, obs_space, act_space, {}
+
+    # Setup PG with a single policy graph for all agents
+    policy_graphs = {'av': gen_policy()}
+
+    def policy_mapping_fn(_):
+        return 'av'
+
+    config.update({
+        'multiagent': {
+            'policies': policy_graphs,
+            'policy_mapping_fn': tune.function(policy_mapping_fn),
+            'policies_to_train': ['av']
+        }
+    })
+
+    return alg_run, env_name, config
 
 
-if __name__ == "__main__":
-    # check for pedestrians
-    parser = argparse.ArgumentParser()
+if __name__ == '__main__':
+    EXAMPLE_USAGE = """
+    example usage:
+        python multiagent_traffic_light_grid.py --upload_dir=<S3 bucket>
+    """
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="[Flow] Issues multi-agent traffic light grid experiment",
+        epilog=EXAMPLE_USAGE)
+
+    # required input parameters
+    parser.add_argument("--upload_dir", type=str,
+                        help="S3 Bucket for uploading results.")
+
+    # optional input parameters
+    parser.add_argument('--run_mode', type=str, default='local',
+                        help="Experiment run mode (local | cluster)")
+    parser.add_argument('--algo', type=str, default='PPO',
+                        help="RL method to use (PPO)")
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
-
+    parser.add_argument("--render",
+                        help="render SUMO simulation",
+                        action="store_true")                        
     args = parser.parse_args()
+
     pedestrians = args.pedestrians
+    render = args.render
 
-    # import the experiment variable
-    exp = bayesian_0_example(pedestrians=pedestrians)
-    # run for a set number of rollouts / time steps
-    # import ipdb;ipdb.set_trace()
-    exp.run(1, 250, convert_to_csv=True)
+    flow_params = make_flow_params(pedestrians, render)
+    
+    upload_dir = args.upload_dir
+    RUN_MODE = args.run_mode
+    ALGO = args.algo
 
+    if ALGO == 'PPO':
+        alg_run, env_name, config = setup_exps_PPO(flow_params)
+    else:
+        raise NotImplementedError
+
+    if RUN_MODE == 'local':
+        ray.init(num_cpus=N_CPUS + 1)
+        N_ITER = 1
+    elif RUN_MODE == 'cluster':
+        ray.init(redis_address="localhost:6379")
+        N_ITER = 2000
+
+    exp_tag = {
+        'run': alg_run,
+        'env': env_name,
+        'checkpoint_freq': 25,
+        "max_failures": 10,
+        'stop': {
+            'training_iteration': 1000
+        },
+        'config': config,
+        "num_samples": 1,
+    }
+
+    if upload_dir:
+        exp_tag["upload_dir"] = "s3://{}".format(upload_dir)
+
+    run_experiments(
+        {
+            flow_params["exp_tag"]: exp_tag
+         },
+    )

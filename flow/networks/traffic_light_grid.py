@@ -143,11 +143,10 @@ class TrafficLightGridNetwork(Network):
         #     "traffic_lights", True)
 
         # radius of the inner nodes (ie of the intersections)
-        if nodes_radius is not None:
-            self.nodes_radius = nodes_radius
+        if nodes_radius == None:
+            self.nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes, self.horizontal_lanes)
         else:
-            self.nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
-                                            self.horizontal_lanes)
+            self.nodes_radius = nodes_radius
 
         # total number of edges in the network
         self.num_edges = 4 * ((self.col_num + 1) * self.row_num + self.col_num)
@@ -407,8 +406,7 @@ class TrafficLightGridNetwork(Network):
             List of all the nodes in the network
         """
 
-        node_type = "traffic_light" if self.use_traffic_lights else "priority"
-        print(node_type, 111)
+        node_type = "traffic_light" if self.use_traffic_lights else "allway_stop"
         x_max = self.col_num + 1
         y_max = self.row_num + 1
 

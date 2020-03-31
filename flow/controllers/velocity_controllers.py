@@ -4,6 +4,18 @@ from flow.controllers.base_controller import BaseController
 import numpy as np
 
 
+class FullStop(BaseController):
+    def __init__(self,
+                 veh_id,
+                 car_following_params):
+        """Instantiate FollowerStopper."""
+        BaseController.__init__(
+            self, veh_id, car_following_params, delay=1.0)
+
+    def get_accel(self, env):
+        return -3.0
+
+
 class FollowerStopper(BaseController):
     """Inspired by Dan Work's... work.
 
