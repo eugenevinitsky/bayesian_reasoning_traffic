@@ -390,4 +390,5 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
     ray.init(num_cpus=1)
-    visualizer_rllib(args)
+    for _ in range(10):
+        visualizer_rllib(args)
