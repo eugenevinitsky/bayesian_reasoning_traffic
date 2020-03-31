@@ -6,6 +6,10 @@ from gym.spaces.box import Box
 from flow.core.rewards import desired_velocity
 from flow.envs.multiagent.base import MultiEnv
 
+from traci.exceptions import FatalTraCIError
+from traci.exceptions import TraCIException
+from flow.utils.exceptions import FatalFlowError
+
 # TODO(KL) means KL's reminder for KL
 
 ADDITIONAL_ENV_PARAMS = {
@@ -58,10 +62,12 @@ class Bayesian1Env(MultiEnv):
                     'Environment parameter "{}" not supplied'.format(p))
 
         super().__init__(env_params, sim_params, network, simulator)
-        self.observation_names = ["rel_x", "rel_y", "speed", "yaw"]
+        self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         self.search_radius = self.env_params.additional_params["search_radius"]
 
+        self.speed_reward_coefficient = 1
         self.rl_set = set()
+        self.arrival_order = {}
 
     @property
     def observation_space(self):
@@ -84,8 +90,18 @@ class Bayesian1Env(MultiEnv):
         # in the warmup steps, rl_actions is None
         if rl_actions:
             for rl_id, actions in rl_actions.items():
+                if not self.arrived_intersection(rl_id):
+                    continue
+                if rl_id in self.k.vehicle.get_rl_ids():
+                    self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
                 accel = actions[0]
                 self.k.vehicle.apply_acceleration(rl_id, accel)
+
+    def arrived_intersection(self, veh_id):
+        if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
+            return True
+        return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
+                self.k.vehicle.get_position(veh_id) < 49)
 
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
@@ -112,99 +128,128 @@ class Bayesian1Env(MultiEnv):
             if rl_id in self.k.vehicle.get_arrived_ids():
                 obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
 
+        for veh_id in self.k.vehicle.get_ids():
+            if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
+                self.arrival_order[veh_id] = len(self.arrival_order)
+
         for rl_id in self.k.vehicle.get_rl_ids():
-            self.rl_set.add(rl_id)
+            if self.arrived_intersection(rl_id):
+                self.rl_set.add(rl_id)
 
-            observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
-            visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
+                assert rl_id in self.arrival_order
 
-            # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
-            visible_vehicles = sorted(visible_vehicles, key=lambda v: \
-                    (self.k.vehicle.get_relative_angle(rl_id, \
-                    self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
+                observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
+                visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
 
-            # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-            veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
-            yaw = self.k.vehicle.get_yaw(rl_id)
-            speed = self.k.vehicle.get_speed(rl_id)
-            edge_pos = self.k.vehicle.get_position(rl_id)
-            if self.k.vehicle.get_edge(rl_id) in in_edges:
-                edge_pos = 50 - edge_pos
+                # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
+                visible_vehicles = sorted(visible_vehicles, key=lambda v: \
+                        (self.k.vehicle.get_relative_angle(rl_id, \
+                        self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
-            start, end = self.k.vehicle.get_route(rl_id)
-            start = edge_to_int[start]
-            end = edge_to_int[end]
-            turn_num = (end - start) % 8
-            if turn_num == 1:
-                turn_num = 0 # turn right
-            elif turn_num == 3:
-                turn_num = 1 # go straight
-            else:
-                turn_num = 2 # turn left
+                # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+                veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
+                yaw = self.k.vehicle.get_yaw(rl_id)
+                speed = self.k.vehicle.get_speed(rl_id)
+                edge_pos = self.k.vehicle.get_position(rl_id)
+                if self.k.vehicle.get_edge(rl_id) in in_edges:
+                    edge_pos = 50 - edge_pos
 
-            observation[:4] = [yaw, speed, turn_num, edge_pos]
-
-            '''
-            pedestrian_in_view = 0
-            if len(visible_pedestrians) > 0:
-                pedestrian_in_view = 1
-            observation[4] = pedestrian_in_view
-
-            if len(visible_pedestrians) > 0:
-                ped_x, ped_y = self.k.pedestrian.get_position(visible_pedestrians[0])
-                ped_orientation = self.k.pedestrian.get_yaw(visible_pedestrians[0])
-                rel_x = ped_x - veh_x
-                rel_y = ped_y - veh_y
-                observation[4:7] = [rel_x, rel_y, ped_orientation]
-            else:
-                observation[4:7] = [0, 0, 0]
-            '''
-            ped_param = [0, 0, 0, 0, 0, 0]
-            if len(visible_pedestrians) > 0:
-                ped_x, ped_y = self.k.pedestrian.get_position(visible_pedestrians[0])
-                rel_x = ped_x - veh_x
-                rel_y = ped_y - veh_y
-                rel_angle = self.k.vehicle.get_relative_angle(rl_id, (ped_x, ped_y))
-                rel_angle = (rel_angle + 90) % 360
-                dist = math.sqrt((rel_x ** 2) + (rel_y ** 2))
-                if rel_angle < 60:
-                    if dist < 15:
-                        ped_param[0] = 1
-                    else:
-                        ped_param[1] = 1
-                elif rel_angle < 120:
-                    if dist < 15:
-                        ped_param[2] = 1
-                    else:
-                        ped_param[3] = 1
-                elif rel_angle < 180:
-                    if dist < 15:
-                        ped_param[4] = 1
-                    else:
-                        ped_param[5] = 1
+                start, end = self.k.vehicle.get_route(rl_id)
+                start = edge_to_int[start]
+                end = edge_to_int[end]
+                turn_num = (end - start) % 8
+                if turn_num == 1:
+                    turn_num = 0 # turn right
+                elif turn_num == 3:
+                    turn_num = 1 # go straight
                 else:
-                    raise RuntimeError("Relative Angle is Invalid")
-            observation[4:10] = ped_param
+                    turn_num = 2 # turn left
 
-            #TODO(@nliu) sort by angle
-            for index, veh_id in enumerate(visible_vehicles):
-                observed_yaw = self.k.vehicle.get_yaw(veh_id)
-                observed_speed = self.k.vehicle.get_speed(veh_id)
-                observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
-                rel_x = observed_x - veh_x
-                rel_y = observed_y - veh_y
+                observation[:4] = [yaw, speed, turn_num, edge_pos]
 
-                if index <= 2:
-                    # observation[(index * 4) + 5: 4 * (index + 1) + 5] = \
-                    #         [observed_yaw, observed_speed, rel_x, rel_y]
-                    observation[(index * 4) + 10: 4 * (index + 1) + 10] = \
-                            [observed_yaw, observed_speed, rel_x, rel_y]
+                ped_param = [0, 0, 0, 0, 0, 0]
+                if len(visible_pedestrians) > 0:
+                    ped_x, ped_y = self.k.pedestrian.get_position(visible_pedestrians[0])
+                    rel_x = ped_x - veh_x
+                    rel_y = ped_y - veh_y
+                    rel_angle = self.k.vehicle.get_relative_angle(rl_id, (ped_x, ped_y))
+                    rel_angle = (rel_angle + 90) % 360
+                    dist = math.sqrt((rel_x ** 2) + (rel_y ** 2))
+                    if rel_angle < 60:
+                        if dist < 15:
+                            ped_param[0] = 1
+                        else:
+                            ped_param[1] = 1
+                    elif rel_angle < 120:
+                        if dist < 15:
+                            ped_param[2] = 1
+                        else:
+                            ped_param[3] = 1
+                    elif rel_angle < 180:
+                        if dist < 15:
+                            ped_param[4] = 1
+                        else:
+                            ped_param[5] = 1
+                    else:
+                        raise RuntimeError("Relative Angle is Invalid")
+                observation[4:10] = ped_param
 
+                for index, veh_id in enumerate(visible_vehicles):
 
-            # print(rl_id, observation)
-            obs.update({rl_id: observation})
+                    if veh_id not in self.arrival_order:
+                        before = 1
+                    elif self.arrival_order[rl_id] < self.arrival_order[veh_id]:
+                        before = 1
+                    else:
+                        before = 0
 
+                    observed_yaw = self.k.vehicle.get_yaw(veh_id)
+                    observed_speed = self.k.vehicle.get_speed(veh_id)
+                    observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
+                    rel_x = observed_x - veh_x
+                    rel_y = observed_y - veh_y
+
+                    if index <= 2:
+                        observation[(index * 5) + 10: 5 * (index + 1) + 10] = \
+                                [observed_yaw, observed_speed, rel_x, rel_y, before]
+
+                obs[rl_id] = observation
         return obs
+
+    def compute_reward(self, rl_actions, **kwargs):
+        """See class definition."""
+        # in the warmup steps
+        if rl_actions is None:
+            return {}
+
+        rewards = {}
+
+        for rl_id in self.k.vehicle.get_rl_ids():
+            if self.arrived_intersection(rl_id):
+                # TODO(@evinitsky) pick the right reward
+                reward = 0
+
+                collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
+                collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
+
+                if len(collision_pedestrians) > 0:
+                    reward = -300
+                elif rl_id in collision_vehicles:
+                    reward = -100
+                else:
+                    # TODO(@nliu & evinitsky) positive reward?
+                    # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                    reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
+
+                rewards[rl_id] = reward
+
+        for rl_id in self.rl_set:
+            if self.arrived_intersection(rl_id):
+                if rl_id in self.k.vehicle.get_arrived_ids():
+                    rewards[rl_id] = 25
+
+        return rewards
+
 
     def reset(self, new_inflow_rate=None):
         """Reset the environment.
@@ -232,6 +277,8 @@ class Bayesian1Env(MultiEnv):
 
         # reset the time counter
         self.time_counter = 0
+
+        self.arrival_order = {}
 
         # warn about not using restart_instance when using inflows
         if len(self.net_params.inflows.get()) > 0 and \
@@ -284,11 +331,7 @@ class Bayesian1Env(MultiEnv):
                 print("Error during start: {}".format(traceback.format_exc()))
 
         # reintroduce the initial vehicles to the network
-        '''
-        for veh_id in self.initial_ids:
-            type_id, edge, lane_index, pos, speed = \
-                self.initial_state[veh_id]
-        '''
+        num_rl, num_human = 0, 0
         rl_index = np.random.randint(len(self.initial_ids))
         for i in range(len(self.initial_ids)):
             veh_id = self.initial_ids[i]
@@ -300,9 +343,16 @@ class Bayesian1Env(MultiEnv):
                 else:
                     type_id = np.random.choice(['rl', 'human'])
 
+            if type_id == 'rl':
+                veh_name = 'rl_' + str(num_rl)
+                num_rl += 1
+            else:
+                veh_name = 'human_' + str(num_human)
+                num_human += 1
+
             try:
                 self.k.vehicle.add(
-                    veh_id=veh_id,
+                    veh_id=veh_name,
                     type_id=type_id,
                     edge=edge,
                     lane=lane_index,
@@ -311,11 +361,11 @@ class Bayesian1Env(MultiEnv):
             except (FatalTraCIError, TraCIException):
                 # if a vehicle was not removed in the first attempt, remove it
                 # now and then reintroduce it
-                self.k.vehicle.remove(veh_id)
+                self.k.vehicle.remove(veh_name)
                 if self.simulator == 'traci':
-                    self.k.kernel_api.vehicle.remove(veh_id)  # FIXME: hack
+                    self.k.kernel_api.vehicle.remove(veh_name)  # FIXME: hack
                 self.k.vehicle.add(
-                    veh_id=veh_id,
+                    veh_id=veh_name,
                     type_id=type_id,
                     edge=edge,
                     lane=lane_index,
@@ -351,42 +401,11 @@ class Bayesian1Env(MultiEnv):
 
         return self.get_state()
 
-
-    def compute_reward(self, rl_actions, **kwargs):
-        """See class definition."""
-        # in the warmup steps
-        if rl_actions is None:
-            return {}
-
-        rewards = {}
-
-        for rl_id in self.rl_set:
-            if rl_id in self.k.vehicle.get_arrived_ids():
-                rewards[rl_id] = 0
-
-        for rl_id in self.k.vehicle.get_rl_ids():
-
-
-            # TODO(@evinitsky) pick the right reward
-            reward = 0
-
-            collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
-            collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
-
-            if len(collision_pedestrians) > 0:
-                reward = -300
-            elif rl_id in collision_vehicles:
-                reward = -100
-            else:
-                # TODO(@nliu & evinitsky) positive reward?
-                # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                reward = self.k.vehicle.get_speed(rl_id) / 10.0 #speed may be better for no braking randomly
-                # reward = -1
-
-            rewards[rl_id] = reward #/ 100.0 #TODO only for TD3
-
-        return rewards
-
+    def update_curriculum(self, training_iter):
+        if training_iter > 30:
+            self.speed_reward_coefficient = 0
+        else:
+            self.speed_reward_coefficient = 1
 
     def find_visible_objects(self, veh_id, radius):
         """For a given vehicle ID, find the IDs of all the objects that are within a radius of them

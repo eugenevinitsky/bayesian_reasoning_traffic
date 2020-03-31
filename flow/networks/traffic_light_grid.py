@@ -99,7 +99,8 @@ class TrafficLightGridNetwork(Network):
                  initial_config=InitialConfig(),
                  traffic_lights=TrafficLightParams(),
                  pedestrians=None,
-                 use_traffic_lights=True):
+                 use_traffic_lights=True,
+                 nodes_radius=None):
         """Initialize an n*m traffic light grid network."""
         optional = ["tl_logic"]
         for p in ADDITIONAL_NET_PARAMS.keys():
@@ -142,7 +143,10 @@ class TrafficLightGridNetwork(Network):
         #     "traffic_lights", True)
 
         # radius of the inner nodes (ie of the intersections)
-        self.nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
+        if nodes_radius is not None:
+            self.nodes_radius = nodes_radius
+        else:
+            self.nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
                                             self.horizontal_lanes)
 
         # total number of edges in the network

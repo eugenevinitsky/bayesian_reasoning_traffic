@@ -91,7 +91,7 @@ def make_flow_params(pedestrians=False):
         veh_id='rl',
         acceleration_controller=(RLController, {}),
         car_following_params=SumoCarFollowingParams(
-            speed_mode='aggressive',
+            speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
         num_vehicles=3)
@@ -396,11 +396,20 @@ def setup_exps_PPO(flow_params):
         else:
             episode.custom_metrics['avg_rl_veh_arrival'] = 500
 
+    def on_train_result(info):
+        result = info['result']
+        trainer = info['trainer']
+        trainer.workers.foreach_worker(
+                lambda ev: ev.foreach_env(
+                    lambda env: env.update_curriculum(result['training_iteration'])
+                )
+        )
 
     config['callbacks'] = {
             "on_episode_start":tune.function(on_episode_start),
             "on_episode_step":tune.function(on_episode_step),
-            "on_episode_end":tune.function(on_episode_end)}
+            "on_episode_end":tune.function(on_episode_end),
+            "on_train_result":tune.function(on_train_result)}
 
     # save the flow params for replay
     flow_json = json.dumps(
@@ -489,7 +498,7 @@ if __name__ == '__main__':
         'checkpoint_freq': 25,
         "max_failures": 10,
         'stop': {
-            'training_iteration': 100
+            'training_iteration': 250
         },
         'config': config,
         "num_samples": 1,

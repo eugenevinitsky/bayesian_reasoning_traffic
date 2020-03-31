@@ -423,6 +423,18 @@ class TraCIVehicle(KernelVehicle):
         """Return the initial speed of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["initial_speed"]
 
+    def set_speed_mode(self, veh_id, speed_mode):
+        SPEED_MODES = {
+                "aggressive" : 0,
+                "obey_safe_speed" : 1,
+                "no_collide" : 7,
+                "right_of_way" : 25,
+                "all_checks" : 31
+        }
+        if type(speed_mode) == str:
+            speed_mode = SPEED_MODES[speed_mode]
+        self.kernel_api.vehicle.setSpeedMode(veh_id, speed_mode)
+
     def get_relative_angle(self, veh_id, position):
         """Return the relative angle between veh_id and another position."""
         #TODO(@nliu) no magic numbers
