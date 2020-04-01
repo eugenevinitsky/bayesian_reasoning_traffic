@@ -27,7 +27,7 @@ from flow.utils.rllib import FlowParamsEncoder
 
 # Experiment parameters
 N_ROLLOUTS = 20  # number of rollouts per training iteration
-N_CPUS = 8 # number of parallel workers
+N_CPUS = 1 # number of parallel workers
 
 # Environment parameters
 HORIZON = 500  # time horizon of a single rollout
@@ -82,7 +82,7 @@ def make_flow_params(pedestrians=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        num_vehicles=0)
+        num_vehicles=2)
 
     vehicles.add(
         veh_id='rl',
@@ -91,7 +91,7 @@ def make_flow_params(pedestrians=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        num_vehicles=3)
+        num_vehicles=1)
 
     '''
     vehicles.add(
@@ -139,7 +139,7 @@ def make_flow_params(pedestrians=False):
         sim=SumoParams(
             restart_instance=True,
             sim_step=0.1,
-            render=False,
+            render=True,
         ),
 
         # environment related parameters (see flow.core.params.EnvParams)
@@ -216,7 +216,7 @@ def setup_exps_TD3(flow_params):
     # config['simple_optimizer'] = True
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [32, 32]})
-    config['lr'] = tune.grid_search([1e-5, 1e-4, 1e-3])
+    config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
     config['horizon'] = HORIZON
     config['observation_filter'] = 'NoFilter'
 

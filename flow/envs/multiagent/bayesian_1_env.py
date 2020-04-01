@@ -334,7 +334,7 @@ class Bayesian1Env(MultiEnv):
                 print("Error during start: {}".format(traceback.format_exc()))
 
         # reintroduce the initial vehicles to the network
-        randomize_drivers = True
+        randomize_drivers = False
         if randomize_drivers:
             num_rl, num_human = 0, 0
             rl_index = np.random.randint(len(self.initial_ids))
