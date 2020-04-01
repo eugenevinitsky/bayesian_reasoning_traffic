@@ -14,9 +14,9 @@ from flow.utils.exceptions import FatalFlowError
 
 ADDITIONAL_ENV_PARAMS = {
     # maximum acceleration of autonomous vehicles
-    'max_accel': 1,
+    'max_accel': 4.5,
     # maximum deceleration of autonomous vehicles
-    'max_decel': 1,
+    'max_decel': -2.6,
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
     # how many objects in our local radius we want to return
@@ -237,9 +237,12 @@ class Bayesian1Env(MultiEnv):
                 elif rl_id in collision_vehicles:
                     reward = -100
                 else:
+                    reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
+                    if self.k.vehicle.get_edge(rl_id) != self.k.vehicle.get_route(rl_id)[0]:
+                        if rl_actions[rl_id] < 0:
+                            reward += rl_actions[rl_id][0] / 10
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                    reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
 
                 rewards[rl_id] = reward
 
@@ -331,46 +334,75 @@ class Bayesian1Env(MultiEnv):
                 print("Error during start: {}".format(traceback.format_exc()))
 
         # reintroduce the initial vehicles to the network
-        num_rl, num_human = 0, 0
-        rl_index = np.random.randint(len(self.initial_ids))
-        for i in range(len(self.initial_ids)):
-            veh_id = self.initial_ids[i]
-            type_id, edge, lane_index, pos, speed = \
-                self.initial_state[veh_id]
-            if self.net_params.additional_params.get("randomize_routes", False):
-                if i == rl_index:
-                    type_id = 'rl'
+        randomize_drivers = True
+        if randomize_drivers:
+            num_rl, num_human = 0, 0
+            rl_index = np.random.randint(len(self.initial_ids))
+            for i in range(len(self.initial_ids)):
+                veh_id = self.initial_ids[i]
+                type_id, edge, lane_index, pos, speed = \
+                    self.initial_state[veh_id]
+                if self.net_params.additional_params.get("randomize_routes", False):
+                    if i == rl_index:
+                        type_id = 'rl'
+                    else:
+                        type_id = np.random.choice(['rl', 'human'])
+
+                if type_id == 'rl':
+                    veh_name = 'rl_' + str(num_rl)
+                    num_rl += 1
                 else:
-                    type_id = np.random.choice(['rl', 'human'])
+                    veh_name = 'human_' + str(num_human)
+                    num_human += 1
 
-            if type_id == 'rl':
-                veh_name = 'rl_' + str(num_rl)
-                num_rl += 1
-            else:
-                veh_name = 'human_' + str(num_human)
-                num_human += 1
+                try:
+                    self.k.vehicle.add(
+                        veh_id=veh_name,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+                except (FatalTraCIError, TraCIException):
+                    # if a vehicle was not removed in the first attempt, remove it
+                    # now and then reintroduce it
+                    self.k.vehicle.remove(veh_name)
+                    if self.simulator == 'traci':
+                        self.k.kernel_api.vehicle.remove(veh_name)  # FIXME: hack
+                    self.k.vehicle.add(
+                        veh_id=veh_name,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+        else:
+            for veh_id in self.initial_ids:
+                type_id, edge, lane_index, pos, speed = \
+                    self.initial_state[veh_id]
 
-            try:
-                self.k.vehicle.add(
-                    veh_id=veh_name,
-                    type_id=type_id,
-                    edge=edge,
-                    lane=lane_index,
-                    pos=pos,
-                    speed=speed)
-            except (FatalTraCIError, TraCIException):
-                # if a vehicle was not removed in the first attempt, remove it
-                # now and then reintroduce it
-                self.k.vehicle.remove(veh_name)
-                if self.simulator == 'traci':
-                    self.k.kernel_api.vehicle.remove(veh_name)  # FIXME: hack
-                self.k.vehicle.add(
-                    veh_id=veh_name,
-                    type_id=type_id,
-                    edge=edge,
-                    lane=lane_index,
-                    pos=pos,
-                    speed=speed)
+                try:
+                    self.k.vehicle.add(
+                        veh_id=veh_id,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+                except (FatalTraCIError, TraCIException):
+                    # if a vehicle was not removed in the first attempt, remove it
+                    # now and then reintroduce it
+                    self.k.vehicle.remove(veh_id)
+                    if self.simulator == 'traci':
+                        self.k.kernel_api.vehicle.remove(veh_id)  # FIXME: hack
+                    self.k.vehicle.add(
+                        veh_id=veh_id,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+
 
         # advance the simulation in the simulator by one step
         self.k.simulation.simulation_step()
