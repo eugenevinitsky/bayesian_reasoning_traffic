@@ -244,12 +244,12 @@ class Bayesian1Env(MultiEnv):
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
 
-                rewards[rl_id] = reward
+                rewards[rl_id] = reward / 100
 
         for rl_id in self.rl_set:
             if self.arrived_intersection(rl_id):
                 if rl_id in self.k.vehicle.get_arrived_ids():
-                    rewards[rl_id] = 25
+                    rewards[rl_id] = 50 / 100
 
         return rewards
 
