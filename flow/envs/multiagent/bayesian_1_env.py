@@ -70,8 +70,10 @@ class Bayesian1Env(MultiEnv):
             self.num_actions = 5
             self.action_values = np.linspace(start=-np.abs(self.env_params.additional_params['max_decel']),
                                              stop=self.env_params.additional_params['max_accel'], num=self.num_actions)
-            self.default_state = {idx: {"obs": np.zeros(self.observation_space.spaces['obs'].shape[0]),
-                                        "action_mask": self.get_action_mask(valid_agent=False)}
+            # self.default_state = {idx: {"obs": np.zeros(self.observation_space.spaces['obs'].shape[0]),
+            #                             "action_mask": self.get_action_mask(valid_agent=False)}
+            #                       for idx in range(self.max_num_agents)}
+            self.default_state = {idx: np.zeros(self.observation_space.shape[0])
                                   for idx in range(self.max_num_agents)}
 
         self.speed_reward_coefficient = 1
@@ -90,48 +92,48 @@ class Bayesian1Env(MultiEnv):
         # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
         obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
         if self.qmix:
-            return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
+            # TODO(@evinitsky) put back the action mask
+            # return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
+            return obs_space
         else:
             return obs_space
 
     @property
     def action_space(self):
         """See class definition."""
-        if self.qmix:
-            return Discrete(self.num_actions + 1)
-        else:
-            return Box(
-                low=-np.abs(self.env_params.additional_params['max_decel']),
-                high=self.env_params.additional_params['max_accel'],
-                shape=(1,),  # (4,),
-                dtype=np.float32)
+        return Box(
+            low=-np.abs(self.env_params.additional_params['max_decel']),
+            high=self.env_params.additional_params['max_accel'],
+            shape=(1,),  # (4,),
+            dtype=np.float32)
 
     def _apply_rl_actions(self, rl_actions):
         """See class definition."""
         # in the warmup steps, rl_actions is None
         if rl_actions:
-            if self.qmix:
-                accel_list = []
-                rl_ids = []
-                for rl_id, action in rl_actions.items():
-                    # 0 is the no-op
-                    if action > 0:
-                        accel = self.action_values[action - 1]
-                        accel_list.append(accel)
-                        rl_ids.append(self.idx_to_av_id[rl_id])
-                self.k.vehicle.apply_acceleration(rl_ids, accel_list)
-            else:
-                rl_ids = []
-                accels = []
-                for rl_id, actions in rl_actions.items():
-                    if not self.arrived_intersection(rl_id):
-                        continue
-                    if rl_id in self.k.vehicle.get_rl_ids():
-                        self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
-                    accel = actions[0]
-                    rl_ids.append(rl_id)
-                    accels.append(accel)
-                self.k.vehicle.apply_acceleration(rl_ids, accels)
+            # if self.qmix:
+            #     accel_list = []
+            #     rl_ids = []
+            #     for rl_id, action in rl_actions.items():
+            #         # 0 is the no-op
+            #         import ipdb; ipdb.set_trace()
+            #         if action > 0:
+            #             accel = self.action_values[action]
+            #             accel_list.append(accel)
+            #             rl_ids.append(self.idx_to_av_id[rl_id])
+            #     self.k.vehicle.apply_acceleration(rl_ids, accel_list)
+            # else:
+            rl_ids = []
+            accels = []
+            for rl_id, actions in rl_actions.items():
+                if not self.arrived_intersection(rl_id):
+                    continue
+                if rl_id in self.k.vehicle.get_rl_ids():
+                    self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
+                accel = actions[0]
+                rl_ids.append(rl_id)
+                accels.append(accel)
+            self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
         if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
@@ -164,7 +166,7 @@ class Bayesian1Env(MultiEnv):
             if rl_id in self.k.vehicle.get_arrived_ids():
                 if isinstance(self.observation_space, Dict):
                     temp_dict = {}
-                    for k, space in self.observation_space.items():
+                    for k, space in self.observation_space.spaces.items():
                         if isinstance(space, Discrete):
                             temp_dict.update({k: 0})
                         else:
@@ -267,9 +269,10 @@ class Bayesian1Env(MultiEnv):
 
             # TODO(@evinitsky) think this doesn't have to be a deepcopy
             veh_info_copy = deepcopy(self.default_state)
-            veh_info_copy.update({self.av_id_to_idx[rl_id]: {"obs": obs[rl_id],
-                                              "action_mask": self.get_action_mask(valid_agent=True)}
-                                  for rl_id in obs.keys()})
+            # veh_info_copy.update({self.av_id_to_idx[rl_id]: {"obs": obs[rl_id],
+            #                                   "action_mask": self.get_action_mask(valid_agent=True)}
+            #                       for rl_id in obs.keys()})
+            veh_info_copy.update({self.av_id_to_idx[rl_id]: obs[rl_id] for rl_id in obs.keys()})
             obs = veh_info_copy
 
         return obs

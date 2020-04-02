@@ -419,33 +419,23 @@ def setup_exps_QMIX(args, flow_params):
     dict
         training configuration parameters
     """
-    alg_run = 'QMIX'
+    alg_run = 'contrib/MADDPG'
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     config['no_done_at_end'] = True
     config['gamma'] = 0.999  # discount rate
-    if args.grid_search:
-        config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-        config['buffer_size'] = tune.grid_search[10000, 100000]
+    # if args.grid_search:
+    #     config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
+    #     config['buffer_size'] = tune.grid_search([10000, 100000])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
     # define callbacks for tensorboard
 
-    def on_train_result(info):
-        result = info['result']
-        trainer = info['trainer']
-        trainer.workers.foreach_worker(
-                lambda ev: ev.foreach_env(
-                    lambda env: env.update_curriculum(result['training_iteration'])
-                )
-        )
-
     config['callbacks'] = {
             "on_episode_start":tune.function(on_episode_start),
             "on_episode_step":tune.function(on_episode_step),
-            "on_episode_end":tune.function(on_episode_end),
-            "on_train_result":tune.function(on_train_result)}
+            "on_episode_end":tune.function(on_episode_end)}
 
     # save the flow params for replay
     flow_json = json.dumps(
@@ -458,16 +448,32 @@ def setup_exps_QMIX(args, flow_params):
     # Register as rllib env
     register_env(env_name, create_env)
 
-    test_env = create_env()
-    obs_space = test_env.observation_space
-    act_space = test_env.action_space
-    max_num_agents_qmix = 3
-    config['env_config']['max_num_agents'] = max_num_agents_qmix
-    grouping = {"AVs": list(np.arange(max_num_agents_qmix))}
-    obs_space = Tuple([obs_space] * max_num_agents_qmix)
-    act_space = Tuple([act_space] * max_num_agents_qmix)
-    register_env(env_name, lambda config: create_env(config).with_agent_groups(
-        grouping, obs_space=obs_space, act_space=act_space))
+    env = create_env()
+    observation_space_dict = {i: env.observation_space for i in range(env.max_num_agents)}
+    action_space_dict = {i: env.action_space for i in range(env.max_num_agents)}
+
+    def gen_policy(i):
+        return (
+            None,
+            env.observation_space,
+            env.action_space,
+            {
+                "agent_id": i,
+                "use_local_critic": True,
+                "obs_space_dict": observation_space_dict,
+                "act_space_dict": action_space_dict,
+            }
+        )
+
+    policies = {"policy_%d" %i: gen_policy(i) for i in range(env.max_num_agents)}
+    policy_ids = list(policies.keys())
+    config.update({"multiagent": {
+                    "policies": policies,
+                    "policy_mapping_fn": ray.tune.function(
+                        lambda i: policy_ids[i]
+                    )
+                }
+    })
 
     return alg_run, env_name, config
 
