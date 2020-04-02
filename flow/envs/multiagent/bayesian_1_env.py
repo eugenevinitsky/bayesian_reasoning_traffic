@@ -299,9 +299,11 @@ class Bayesian1Env(MultiEnv):
                     reward = -100
                 else:
                     reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
+                    '''
                     if self.k.vehicle.get_edge(rl_id) != self.k.vehicle.get_route(rl_id)[0]:
                         if rl_actions[rl_id] < 0:
                             reward += rl_actions[rl_id][0] / 10
+                    '''
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
 
@@ -405,7 +407,7 @@ class Bayesian1Env(MultiEnv):
                 print("Error during start: {}".format(traceback.format_exc()))
 
         # reintroduce the initial vehicles to the network
-        randomize_drivers = False
+        randomize_drivers = True
         if randomize_drivers:
             num_rl, num_human = 0, 0
             rl_index = np.random.randint(len(self.initial_ids))

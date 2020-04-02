@@ -5,11 +5,11 @@ cluster_name: nliu_bayesian_1 #<YOUR NAME>
 
 # The minimum number of workers nodes to launch in addition to the head
 # node. This number should be >= 0.
-min_workers: 16 #<NUM WORKERS IN CLUSTER>
+min_workers: 0 #<NUM WORKERS IN CLUSTER>
 
 # The maximum number of workers nodes to launch in addition to the head
 # node. This takes precedence over min_workers.
-max_workers: 16
+max_workers: 0
 
 # The autoscaler will scale up the cluster to this target fraction of resource
 # usage. For example, if a cluster of 10 nodes is 100% busy and
@@ -70,6 +70,7 @@ setup_commands:
     - cd bayesian_reasoning_traffic && git fetch && git checkout origin/nliu/training
     - pip install gym-0.17.1
     - pip install torch==1.4.0
+    - pip install tensorflow_probability
 
 head_setup_commands: []
 
