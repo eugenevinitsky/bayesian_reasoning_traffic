@@ -64,8 +64,8 @@ class Bayesian1Env(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         self.search_radius = self.env_params.additional_params["search_radius"]
-        self.qmix = self.env_params.additional_params["qmix"]
-        if self.qmix:
+        self.maddpg = self.env_params.additional_params["maddpg"]
+        if self.maddpg:
             self.max_num_agents = 3
             self.num_actions = 5
             self.action_values = np.linspace(start=-np.abs(self.env_params.additional_params['max_decel']),
@@ -81,7 +81,7 @@ class Bayesian1Env(MultiEnv):
         self.arrival_order = {}
 
         # TODO hardcoding
-        # this is used for qmix
+        # this is used for maddpg
         self.idx_to_av_id = {i: 'rl_{}'.format(i) for i in range(self.max_num_agents)}
         self.av_id_to_idx = {'rl_{}'.format(i): i for i in range(self.max_num_agents)}
 
@@ -91,7 +91,7 @@ class Bayesian1Env(MultiEnv):
         max_objects = self.env_params.additional_params["max_num_objects"]
         # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
         obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
-        if self.qmix:
+        if self.maddpg:
             # TODO(@evinitsky) put back the action mask
             # return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
             return obs_space
@@ -111,7 +111,7 @@ class Bayesian1Env(MultiEnv):
         """See class definition."""
         # in the warmup steps, rl_actions is None
         if rl_actions:
-            # if self.qmix:
+            # if self.maddpg:
             #     accel_list = []
             #     rl_ids = []
             #     for rl_id, action in rl_actions.items():
@@ -265,7 +265,7 @@ class Bayesian1Env(MultiEnv):
 
                 obs.update({rl_id: observation})
 
-        if self.qmix and len(self.rl_set) > 0:
+        if self.maddpg and len(self.rl_set) > 0:
 
             # TODO(@evinitsky) think this doesn't have to be a deepcopy
             veh_info_copy = deepcopy(self.default_state)
@@ -308,7 +308,7 @@ class Bayesian1Env(MultiEnv):
             if rl_id in self.k.vehicle.get_arrived_ids():
                 rewards[rl_id] = 25
 
-        if self.qmix:
+        if self.maddpg:
             if len(self.rl_set) > 0:
                 temp_rewards = {self.av_id_to_idx[rl_id]: 0 for rl_id in self.av_id_to_idx.keys()}
                 temp_rewards.update({self.av_id_to_idx[rl_id]: reward for rl_id, reward in rewards.items()})
