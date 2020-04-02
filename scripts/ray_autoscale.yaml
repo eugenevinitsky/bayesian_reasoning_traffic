@@ -68,8 +68,10 @@ worker_nodes:
 
 setup_commands:
     - cd bayesian_reasoning_traffic && git fetch && git checkout origin/evinitsky/training
-    - pip install gym-0.17.1
+    - pip install gym==0.17.1
     - pip install torch==1.4.0
+    - pip install tensorflow_probability
+    - pip install tensorflow==2.1.0
 
 head_setup_commands: []
 

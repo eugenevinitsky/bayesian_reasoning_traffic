@@ -73,7 +73,7 @@ class Bayesian1Env(MultiEnv):
             # self.default_state = {idx: {"obs": np.zeros(self.observation_space.spaces['obs'].shape[0]),
             #                             "action_mask": self.get_action_mask(valid_agent=False)}
             #                       for idx in range(self.max_num_agents)}
-            self.default_state = {idx: np.zeros(self.observation_space.shape[0])
+            self.default_state = {idx: -1 * np.ones(self.observation_space.shape[0])
                                   for idx in range(self.max_num_agents)}
 
         self.speed_reward_coefficient = 1
