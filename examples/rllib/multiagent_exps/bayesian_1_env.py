@@ -81,7 +81,7 @@ def make_flow_params(pedestrians=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        num_vehicles=0)
+        num_vehicles=2)
 
     vehicles.add(
         veh_id='rl',
@@ -90,7 +90,7 @@ def make_flow_params(pedestrians=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        num_vehicles=3)
+        num_vehicles=1)
 
     '''
     vehicles.add(
