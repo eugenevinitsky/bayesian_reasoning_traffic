@@ -1,13 +1,15 @@
-import json
 import argparse
+import json
 import numpy as np
 
+from gym.spaces import Tuple
 import ray
 try:
     from ray.rllib.agents.agent import get_agent_class
 except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.agents.ddpg.td3 import TD3Trainer
+from ray.rllib.env.group_agents_wrapper import _GroupAgentsWrapper
 from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
 from ray import tune
 from ray.tune.registry import register_env
@@ -37,7 +39,7 @@ INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 
 
-def make_flow_params(pedestrians=False):
+def make_flow_params(args, pedestrians=False):
     """
     Generate the flow params for the experiment.
 
@@ -154,7 +156,9 @@ def make_flow_params(pedestrians=False):
                 # how many objects in our local radius we want to return
                 "max_num_objects": 3,
                 # how large of a radius to search in for a given vehicle in meters
-                "search_radius": 50
+                "search_radius": 50,
+                # whether we use the multi-agent algorithm QMIX
+                "qmix": args.algo == "QMIX"
             },
         ),
 
@@ -196,6 +200,8 @@ def make_flow_params(pedestrians=False):
 
 def on_episode_start(info):
     env = info['env'].get_unwrapped()[0]
+    if isinstance(env, _GroupAgentsWrapper):
+        env = env.env
     episode = info['episode']
     episode.user_data['num_ped_collisions'] = 0
     episode.user_data['num_veh_collisions'] = 0
@@ -207,6 +213,8 @@ def on_episode_start(info):
 
 def on_episode_step(info):
     env = info['env'].get_unwrapped()[0]
+    if isinstance(env, _GroupAgentsWrapper):
+        env = env.env
     episode = info['episode']
     for v_id in env.k.vehicle.get_rl_ids():
         if len(env.k.vehicle.get_pedestrian_crash(v_id, env.k.pedestrian)) > 0:
@@ -229,7 +237,6 @@ def on_episode_step(info):
         episode.user_data['num_rl_veh_active'] -= num_veh_left
 
 def on_episode_end(info):
-    env = info['env'].get_unwrapped()[0]
     episode = info['episode']
     episode.custom_metrics['num_ped_collisions'] = episode.user_data['num_ped_collisions']
     episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
@@ -398,6 +405,82 @@ def setup_exps_PPO(args, flow_params):
     return alg_run, env_name, config
 
 
+def setup_exps_QMIX(args, flow_params):
+    """
+    Experiment setup with PPO using RLlib.
+
+    Parameters
+    ----------
+    flow_params : dictionary of flow parameters
+
+    Returns
+    -------
+    str
+        name of the training algorithm
+    str
+        name of the gym environment to be trained
+    dict
+        training configuration parameters
+    """
+    alg_run = 'contrib/MADDPG'
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
+    config['no_done_at_end'] = True
+    config['gamma'] = 0.999  # discount rate
+    # if args.grid_search:
+    #     config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
+    #     config['buffer_size'] = tune.grid_search([10000, 100000])
+    config['horizon'] = args.horizon
+    config['observation_filter'] = 'NoFilter'
+
+    # define callbacks for tensorboard
+
+    config['callbacks'] = {
+            "on_episode_start":tune.function(on_episode_start),
+            "on_episode_step":tune.function(on_episode_step),
+            "on_episode_end":tune.function(on_episode_end)}
+
+    # save the flow params for replay
+    flow_json = json.dumps(
+        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
+    config['env_config']['flow_params'] = flow_json
+    config['env_config']['run'] = alg_run
+
+    create_env, env_name = make_create_env(params=flow_params, version=0)
+
+    # Register as rllib env
+    register_env(env_name, create_env)
+
+    env = create_env()
+    observation_space_dict = {i: env.observation_space for i in range(env.max_num_agents)}
+    action_space_dict = {i: env.action_space for i in range(env.max_num_agents)}
+
+    def gen_policy(i):
+        return (
+            None,
+            env.observation_space,
+            env.action_space,
+            {
+                "agent_id": i,
+                "use_local_critic": True,
+                "obs_space_dict": observation_space_dict,
+                "act_space_dict": action_space_dict,
+            }
+        )
+
+    policies = {"policy_%d" %i: gen_policy(i) for i in range(env.max_num_agents)}
+    policy_ids = list(policies.keys())
+    config.update({"multiagent": {
+                    "policies": policies,
+                    "policy_mapping_fn": ray.tune.function(
+                        lambda i: policy_ids[i]
+                    )
+                }
+    })
+
+    return alg_run, env_name, config
+
+
 if __name__ == '__main__':
     EXAMPLE_USAGE = """
     example usage:
@@ -434,7 +517,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     pedestrians = args.pedestrians
-    flow_params = make_flow_params(pedestrians)
+    flow_params = make_flow_params(args, pedestrians)
 
     upload_dir = args.upload_dir
     RUN_MODE = args.run_mode
@@ -444,6 +527,8 @@ if __name__ == '__main__':
         alg_run, env_name, config = setup_exps_PPO(args, flow_params)
     elif ALGO == 'TD3':
         alg_run, env_name, config = setup_exps_TD3(args, flow_params)
+    elif ALGO == 'QMIX':
+        alg_run, env_name, config = setup_exps_QMIX(args, flow_params)
     else:
         raise NotImplementedError
 
