@@ -2,7 +2,7 @@
 from copy import deepcopy
 import math
 import numpy as np
-from gym.spaces.box import Box
+from gym.spaces import Box, Dict, Discrete
 from flow.core.rewards import desired_velocity
 from flow.envs.multiagent.base import MultiEnv
 
@@ -64,38 +64,74 @@ class Bayesian1Env(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         self.search_radius = self.env_params.additional_params["search_radius"]
+        self.qmix = self.env_params.additional_params["qmix"]
+        if self.qmix:
+            self.max_num_agents = 3
+            self.num_actions = 5
+            self.action_values = np.linspace(start=-np.abs(self.env_params.additional_params['max_decel']),
+                                             stop=self.env_params.additional_params['max_accel'], num=self.num_actions)
+            self.default_state = {idx: {"obs": np.zeros(self.observation_space.spaces['obs'].shape[0]),
+                                        "action_mask": self.get_action_mask(valid_agent=False)}
+                                  for idx in range(self.max_num_agents)}
 
         self.speed_reward_coefficient = 1
         self.rl_set = set()
         self.arrival_order = {}
+
+        # TODO hardcoding
+        # this is used for qmix
+        self.idx_to_av_id = {i: 'rl_{}'.format(i) for i in range(self.max_num_agents)}
+        self.av_id_to_idx = {'rl_{}'.format(i): i for i in range(self.max_num_agents)}
 
     @property
     def observation_space(self):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
         # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
-        return Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
+        obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
+        if self.qmix:
+            return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
+        else:
+            return obs_space
 
     @property
     def action_space(self):
         """See class definition."""
-        return Box(
-            low=-np.abs(self.env_params.additional_params['max_decel']),
-            high=self.env_params.additional_params['max_accel'],
-            shape=(1,),  # (4,),
-            dtype=np.float32)
+        if self.qmix:
+            return Discrete(self.num_actions + 1)
+        else:
+            return Box(
+                low=-np.abs(self.env_params.additional_params['max_decel']),
+                high=self.env_params.additional_params['max_accel'],
+                shape=(1,),  # (4,),
+                dtype=np.float32)
 
     def _apply_rl_actions(self, rl_actions):
         """See class definition."""
         # in the warmup steps, rl_actions is None
         if rl_actions:
-            for rl_id, actions in rl_actions.items():
-                if not self.arrived_intersection(rl_id):
-                    continue
-                if rl_id in self.k.vehicle.get_rl_ids():
-                    self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
-                accel = actions[0]
-                self.k.vehicle.apply_acceleration(rl_id, accel)
+            if self.qmix:
+                accel_list = []
+                rl_ids = []
+                for rl_id, action in rl_actions.items():
+                    # 0 is the no-op
+                    if action > 0:
+                        accel = self.action_values[action - 1]
+                        accel_list.append(accel)
+                        rl_ids.append(self.idx_to_av_id[rl_id])
+                self.k.vehicle.apply_acceleration(rl_ids, accel_list)
+            else:
+                rl_ids = []
+                accels = []
+                for rl_id, actions in rl_actions.items():
+                    if not self.arrived_intersection(rl_id):
+                        continue
+                    if rl_id in self.k.vehicle.get_rl_ids():
+                        self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
+                    accel = actions[0]
+                    rl_ids.append(rl_id)
+                    accels.append(accel)
+                self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
         if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
@@ -126,7 +162,16 @@ class Bayesian1Env(MultiEnv):
 
         for rl_id in self.rl_set:
             if rl_id in self.k.vehicle.get_arrived_ids():
-                obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+                if isinstance(self.observation_space, Dict):
+                    temp_dict = {}
+                    for k, space in self.observation_space.items():
+                        if isinstance(space, Discrete):
+                            temp_dict.update({k: 0})
+                        else:
+                            temp_dict.update({k: np.zeros(space.shape[0])})
+
+                else:
+                    obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
 
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
@@ -138,7 +183,10 @@ class Bayesian1Env(MultiEnv):
 
                 assert rl_id in self.arrival_order
 
-                observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
+                if isinstance(self.observation_space, Dict):
+                    observation = np.zeros(self.observation_space["obs"].shape[0])
+                else:
+                    observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
                 visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
 
                 # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
@@ -214,6 +262,16 @@ class Bayesian1Env(MultiEnv):
                                 [observed_yaw, observed_speed, rel_x, rel_y, before]
 
                 obs.update({rl_id: observation})
+
+        if self.qmix and len(self.rl_set) > 0:
+
+            # TODO(@evinitsky) think this doesn't have to be a deepcopy
+            veh_info_copy = deepcopy(self.default_state)
+            veh_info_copy.update({self.av_id_to_idx[rl_id]: {"obs": obs[rl_id],
+                                              "action_mask": self.get_action_mask(valid_agent=True)}
+                                  for rl_id in obs.keys()})
+            obs = veh_info_copy
+
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -244,9 +302,14 @@ class Bayesian1Env(MultiEnv):
                 rewards[rl_id] = reward
 
         for rl_id in self.rl_set:
-            if self.arrived_intersection(rl_id):
-                if rl_id in self.k.vehicle.get_arrived_ids():
-                    rewards[rl_id] = 25
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                rewards[rl_id] = 25
+
+        if self.qmix:
+            if len(self.rl_set) > 0:
+                temp_rewards = {self.av_id_to_idx[rl_id]: 0 for rl_id in self.av_id_to_idx.keys()}
+                temp_rewards.update({self.av_id_to_idx[rl_id]: reward for rl_id, reward in rewards.items()})
+                rewards = temp_rewards
 
         return rewards
 
@@ -429,3 +492,14 @@ class Bayesian1Env(MultiEnv):
                 radius)
 
         return visible_vehicles, visible_pedestrians
+
+    def get_action_mask(self, valid_agent):
+        """If a valid agent, return a 0 in the position of the no-op action. If not, return a 1 in that position
+        and a zero everywhere else."""
+        if valid_agent:
+            temp_list = np.array([1 for _ in range(self.action_space.n)])
+            temp_list[0] = 0
+        else:
+            temp_list = np.array([0 for _ in range(self.action_space.n)])
+            temp_list[0] = 1
+        return temp_list
