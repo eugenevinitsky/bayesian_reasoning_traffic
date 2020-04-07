@@ -424,6 +424,80 @@ def setup_exps_PPO(flow_params):
 
     return alg_run, env_name, config
 
+def setup_exps_QMIX(args, flow_params):
+    """
+    Experiment setup with PPO using RLlib.
+
+    Parameters
+    ----------
+    flow_params : dictionary of flow parameters
+
+    Returns
+    -------
+    str
+        name of the training algorithm
+    str
+        name of the gym environment to be trained
+    dict
+        training configuration parameters
+    """
+    alg_run = 'contrib/MADDPG'
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
+    config['no_done_at_end'] = True
+    config['gamma'] = 0.999  # discount rate
+    # if args.grid_search:
+    #     config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
+    #     config['buffer_size'] = tune.grid_search([10000, 100000])
+    config['horizon'] = args.horizon
+    config['observation_filter'] = 'NoFilter'
+
+    # define callbacks for tensorboard
+
+    config['callbacks'] = {
+            "on_episode_start":tune.function(on_episode_start),
+            "on_episode_step":tune.function(on_episode_step),
+            "on_episode_end":tune.function(on_episode_end)}
+
+    # save the flow params for replay
+    flow_json = json.dumps(
+        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
+    config['env_config']['flow_params'] = flow_json
+    config['env_config']['run'] = alg_run
+
+    create_env, env_name = make_create_env(params=flow_params, version=0)
+
+    # Register as rllib env
+    register_env(env_name, create_env)
+
+    env = create_env()
+    observation_space_dict = {i: env.observation_space for i in range(env.max_num_agents)}
+    action_space_dict = {i: env.action_space for i in range(env.max_num_agents)}
+
+    def gen_policy(i):
+        return (
+            None,
+            env.observation_space,
+            env.action_space,
+            {
+                "agent_id": i,
+                "use_local_critic": True,
+                "obs_space_dict": observation_space_dict,
+                "act_space_dict": action_space_dict,
+            }
+        )
+
+    policies = {"policy_%d" %i: gen_policy(i) for i in range(env.max_num_agents)}
+    policy_ids = list(policies.keys())
+    config.update({"multiagent": {
+                    "policies": policies,
+                    "policy_mapping_fn": ray.tune.function(
+                        lambda i: policy_ids[i]
+                    )
+                }
+    })
+
+    return alg_run, env_name, config
 
 if __name__ == '__main__':
     EXAMPLE_USAGE = """
@@ -441,15 +515,14 @@ if __name__ == '__main__':
                         help="S3 Bucket for uploading results.")
 
     # optional input parameters
+    parser.add_argument('--grid_search', action='store_true', default=False,
+                        help='If true, a grid search is run')
     parser.add_argument('--run_mode', type=str, default='local',
                         help="Experiment run mode (local | cluster)")
-    parser.add_argument('--algo', type=str, default='PPO',
-                        help="RL method to use (PPO, TD3)")
+    parser.add_argument('--algo', type=str, default='QMIX',
+                        help="RL method to use (PPO, TD3, QMIX)")
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
-                        action="store_true")
-    parser.add_argument("--render",
-                        help="render SUMO simulation",
                         action="store_true")
     args = parser.parse_args()
 
@@ -463,9 +536,11 @@ if __name__ == '__main__':
     ALGO = args.algo
 
     if ALGO == 'PPO':
-        alg_run, env_name, config = setup_exps_PPO(flow_params)
+        alg_run, env_name, config = setup_exps_PPO(args, flow_params)
     elif ALGO == 'TD3':
-        alg_run, env_name, config = setup_exps_TD3(flow_params)
+        alg_run, env_name, config = setup_exps_TD3(args, flow_params)
+    elif ALGO == 'QMIX':
+        alg_run, env_name, config = setup_exps_QMIX(args, flow_params)
     else:
         raise NotImplementedError
 

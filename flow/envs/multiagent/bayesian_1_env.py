@@ -2,7 +2,7 @@
 from copy import deepcopy
 import math
 import numpy as np
-from gym.spaces.box import Box
+from gym.spaces import Box, Dict, Discrete
 from flow.core.rewards import desired_velocity
 from flow.envs.multiagent.base import MultiEnv
 
@@ -14,9 +14,9 @@ from flow.utils.exceptions import FatalFlowError
 
 ADDITIONAL_ENV_PARAMS = {
     # maximum acceleration of autonomous vehicles
-    'max_accel': 1,
+    'max_accel': 4.5,
     # maximum deceleration of autonomous vehicles
-    'max_decel': 1,
+    'max_decel': -2.6,
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
     # how many objects in our local radius we want to return
@@ -64,17 +64,39 @@ class Bayesian1Env(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         self.search_radius = self.env_params.additional_params["search_radius"]
+        self.qmix = self.env_params.additional_params["qmix"]
+        if self.qmix:
+            self.max_num_agents = 3
+            self.num_actions = 5
+            self.action_values = np.linspace(start=-np.abs(self.env_params.additional_params['max_decel']),
+                                             stop=self.env_params.additional_params['max_accel'], num=self.num_actions)
+            # self.default_state = {idx: {"obs": np.zeros(self.observation_space.spaces['obs'].shape[0]),
+            #                             "action_mask": self.get_action_mask(valid_agent=False)}
+            #                       for idx in range(self.max_num_agents)}
+            self.default_state = {idx: np.zeros(self.observation_space.shape[0])
+                                  for idx in range(self.max_num_agents)}
 
         self.speed_reward_coefficient = 1
         self.rl_set = set()
         self.arrival_order = {}
+
+        # TODO hardcoding
+        # this is used for qmix
+        self.idx_to_av_id = {i: 'rl_{}'.format(i) for i in range(self.max_num_agents)}
+        self.av_id_to_idx = {'rl_{}'.format(i): i for i in range(self.max_num_agents)}
 
     @property
     def observation_space(self):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
         # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
-        return Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
+        obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
+        if self.qmix:
+            # TODO(@evinitsky) put back the action mask
+            # return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
+            return obs_space
+        else:
+            return obs_space
 
     @property
     def action_space(self):
@@ -89,13 +111,29 @@ class Bayesian1Env(MultiEnv):
         """See class definition."""
         # in the warmup steps, rl_actions is None
         if rl_actions:
+            # if self.qmix:
+            #     accel_list = []
+            #     rl_ids = []
+            #     for rl_id, action in rl_actions.items():
+            #         # 0 is the no-op
+            #         import ipdb; ipdb.set_trace()
+            #         if action > 0:
+            #             accel = self.action_values[action]
+            #             accel_list.append(accel)
+            #             rl_ids.append(self.idx_to_av_id[rl_id])
+            #     self.k.vehicle.apply_acceleration(rl_ids, accel_list)
+            # else:
+            rl_ids = []
+            accels = []
             for rl_id, actions in rl_actions.items():
                 if not self.arrived_intersection(rl_id):
                     continue
                 if rl_id in self.k.vehicle.get_rl_ids():
                     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
                 accel = actions[0]
-                self.k.vehicle.apply_acceleration(rl_id, accel)
+                rl_ids.append(rl_id)
+                accels.append(accel)
+            self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
         if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
@@ -126,7 +164,16 @@ class Bayesian1Env(MultiEnv):
 
         for rl_id in self.rl_set:
             if rl_id in self.k.vehicle.get_arrived_ids():
-                obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+                if isinstance(self.observation_space, Dict):
+                    temp_dict = {}
+                    for k, space in self.observation_space.spaces.items():
+                        if isinstance(space, Discrete):
+                            temp_dict.update({k: 0})
+                        else:
+                            temp_dict.update({k: np.zeros(space.shape[0])})
+
+                else:
+                    obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
 
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
@@ -138,7 +185,10 @@ class Bayesian1Env(MultiEnv):
 
                 assert rl_id in self.arrival_order
 
-                observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
+                if isinstance(self.observation_space, Dict):
+                    observation = np.zeros(self.observation_space["obs"].shape[0])
+                else:
+                    observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
                 visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
 
                 # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
@@ -214,6 +264,17 @@ class Bayesian1Env(MultiEnv):
                                 [observed_yaw, observed_speed, rel_x, rel_y, before]
 
                 obs.update({rl_id: observation})
+
+        if self.qmix and len(self.rl_set) > 0:
+
+            # TODO(@evinitsky) think this doesn't have to be a deepcopy
+            veh_info_copy = deepcopy(self.default_state)
+            # veh_info_copy.update({self.av_id_to_idx[rl_id]: {"obs": obs[rl_id],
+            #                                   "action_mask": self.get_action_mask(valid_agent=True)}
+            #                       for rl_id in obs.keys()})
+            veh_info_copy.update({self.av_id_to_idx[rl_id]: obs[rl_id] for rl_id in obs.keys()})
+            obs = veh_info_copy
+
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -237,16 +298,31 @@ class Bayesian1Env(MultiEnv):
                 elif rl_id in collision_vehicles:
                     reward = -100
                 else:
+                    reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
+                    '''
+                    if self.k.vehicle.get_edge(rl_id) != self.k.vehicle.get_route(rl_id)[0]:
+                        if rl_actions[rl_id] < 0:
+                            reward += rl_actions[rl_id][0] / 10
+                    '''
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                    reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
 
-                rewards[rl_id] = reward
+                rewards[rl_id] = reward / 100
 
         for rl_id in self.rl_set:
+            '''
             if self.arrived_intersection(rl_id):
                 if rl_id in self.k.vehicle.get_arrived_ids():
-                    rewards[rl_id] = 25
+                    rewards[rl_id] = 50 / 100
+            '''
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                rewards[rl_id] = 25
+
+        if self.qmix:
+            if len(self.rl_set) > 0:
+                temp_rewards = {self.av_id_to_idx[rl_id]: 0 for rl_id in self.av_id_to_idx.keys()}
+                temp_rewards.update({self.av_id_to_idx[rl_id]: reward for rl_id, reward in rewards.items()})
+                rewards = temp_rewards
 
         return rewards
 
@@ -331,46 +407,75 @@ class Bayesian1Env(MultiEnv):
                 print("Error during start: {}".format(traceback.format_exc()))
 
         # reintroduce the initial vehicles to the network
-        num_rl, num_human = 0, 0
-        rl_index = np.random.randint(len(self.initial_ids))
-        for i in range(len(self.initial_ids)):
-            veh_id = self.initial_ids[i]
-            type_id, edge, lane_index, pos, speed = \
-                self.initial_state[veh_id]
-            if self.net_params.additional_params.get("randomize_routes", False):
-                if i == rl_index:
-                    type_id = 'rl'
+        randomize_drivers = True
+        if randomize_drivers:
+            num_rl, num_human = 0, 0
+            rl_index = np.random.randint(len(self.initial_ids))
+            for i in range(len(self.initial_ids)):
+                veh_id = self.initial_ids[i]
+                type_id, edge, lane_index, pos, speed = \
+                    self.initial_state[veh_id]
+                if self.net_params.additional_params.get("randomize_routes", False):
+                    if i == rl_index:
+                        type_id = 'rl'
+                    else:
+                        type_id = np.random.choice(['rl', 'human'])
+
+                if type_id == 'rl':
+                    veh_name = 'rl_' + str(num_rl)
+                    num_rl += 1
                 else:
-                    type_id = np.random.choice(['rl', 'human'])
+                    veh_name = 'human_' + str(num_human)
+                    num_human += 1
 
-            if type_id == 'rl':
-                veh_name = 'rl_' + str(num_rl)
-                num_rl += 1
-            else:
-                veh_name = 'human_' + str(num_human)
-                num_human += 1
+                try:
+                    self.k.vehicle.add(
+                        veh_id=veh_name,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+                except (FatalTraCIError, TraCIException):
+                    # if a vehicle was not removed in the first attempt, remove it
+                    # now and then reintroduce it
+                    self.k.vehicle.remove(veh_name)
+                    if self.simulator == 'traci':
+                        self.k.kernel_api.vehicle.remove(veh_name)  # FIXME: hack
+                    self.k.vehicle.add(
+                        veh_id=veh_name,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+        else:
+            for veh_id in self.initial_ids:
+                type_id, edge, lane_index, pos, speed = \
+                    self.initial_state[veh_id]
 
-            try:
-                self.k.vehicle.add(
-                    veh_id=veh_name,
-                    type_id=type_id,
-                    edge=edge,
-                    lane=lane_index,
-                    pos=pos,
-                    speed=speed)
-            except (FatalTraCIError, TraCIException):
-                # if a vehicle was not removed in the first attempt, remove it
-                # now and then reintroduce it
-                self.k.vehicle.remove(veh_name)
-                if self.simulator == 'traci':
-                    self.k.kernel_api.vehicle.remove(veh_name)  # FIXME: hack
-                self.k.vehicle.add(
-                    veh_id=veh_name,
-                    type_id=type_id,
-                    edge=edge,
-                    lane=lane_index,
-                    pos=pos,
-                    speed=speed)
+                try:
+                    self.k.vehicle.add(
+                        veh_id=veh_id,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+                except (FatalTraCIError, TraCIException):
+                    # if a vehicle was not removed in the first attempt, remove it
+                    # now and then reintroduce it
+                    self.k.vehicle.remove(veh_id)
+                    if self.simulator == 'traci':
+                        self.k.kernel_api.vehicle.remove(veh_id)  # FIXME: hack
+                    self.k.vehicle.add(
+                        veh_id=veh_id,
+                        type_id=type_id,
+                        edge=edge,
+                        lane=lane_index,
+                        pos=pos,
+                        speed=speed)
+
 
         # advance the simulation in the simulator by one step
         self.k.simulation.simulation_step()
@@ -429,3 +534,14 @@ class Bayesian1Env(MultiEnv):
                 radius)
 
         return visible_vehicles, visible_pedestrians
+
+    def get_action_mask(self, valid_agent):
+        """If a valid agent, return a 0 in the position of the no-op action. If not, return a 1 in that position
+        and a zero everywhere else."""
+        if valid_agent:
+            temp_list = np.array([1 for _ in range(self.action_space.n)])
+            temp_list[0] = 0
+        else:
+            temp_list = np.array([0 for _ in range(self.action_space.n)])
+            temp_list[0] = 1
+        return temp_list
