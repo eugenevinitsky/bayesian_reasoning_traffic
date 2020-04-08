@@ -158,7 +158,7 @@ def make_flow_params(args, pedestrians=False, render=False):
                 # how large of a radius to search in for a given vehicle in meters
                 "search_radius": 50,
                 # whether we use the multi-agent algorithm QMIX
-                "qmix": args.algo == "QMIX"
+                "maddpg": args.algo == "MADDPG"
             },
         ),
 
@@ -405,7 +405,7 @@ def setup_exps_PPO(args, flow_params):
     return alg_run, env_name, config
 
 
-def setup_exps_QMIX(args, flow_params):
+def setup_exps_MADDPG(args, flow_params):
     """
     Experiment setup with PPO using RLlib.
 
@@ -422,16 +422,19 @@ def setup_exps_QMIX(args, flow_params):
     dict
         training configuration parameters
     """
-    alg_run = 'contrib/MADDPG'
-    agent_cls = get_agent_class(alg_run)
-    config = agent_cls._default_config.copy()
+
+    from flow.algorithms.maddpg.maddpg import DEFAULT_CONFIG as MADDPG_DEFAULT_CONFIG, MADDPGTrainer
+    alg_run = MADDPGTrainer
+    config = MADDPG_DEFAULT_CONFIG.copy()
     config['no_done_at_end'] = True
-    config['gamma'] = 0.999  # discount rate
-    # if args.grid_search:
-    #     config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-    #     config['buffer_size'] = tune.grid_search([10000, 100000])
+    config['gamma'] = 0.95  # discount rate
+    if args.grid_search:
+        config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
+        config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
+        config['n_step'] = tune.grid_search([1, 10])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
+
 
     # define callbacks for tensorboard
 
@@ -462,7 +465,7 @@ def setup_exps_QMIX(args, flow_params):
             env.action_space,
             {
                 "agent_id": i,
-                "use_local_critic": True,
+                "use_local_critic": False,
                 "obs_space_dict": observation_space_dict,
                 "act_space_dict": action_space_dict,
             }
@@ -499,6 +502,8 @@ if __name__ == '__main__':
                         help="Number of training iterations")
     parser.add_argument("--n_rollouts", type=int, default=20,
                         help="Number of rollouts per iteration")
+    parser.add_argument("--checkpoint_freq", type=int, default=25,
+                        help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
     parser.add_argument("--horizon", type=int, default=500,
@@ -522,13 +527,15 @@ if __name__ == '__main__':
     upload_dir = args.upload_dir
     RUN_MODE = args.run_mode
     ALGO = args.algo
+    CHECKPOINT_FREQ = args.checkpoint_freq
 
     if ALGO == 'PPO':
         alg_run, env_name, config = setup_exps_PPO(args, flow_params)
     elif ALGO == 'TD3':
         alg_run, env_name, config = setup_exps_TD3(args, flow_params)
-    elif ALGO == 'QMIX':
-        alg_run, env_name, config = setup_exps_QMIX(args, flow_params)
+    elif ALGO == 'MADDPG':
+        alg_run, env_name, config = setup_exps_MADDPG(args, flow_params)
+        CHECKPOINT_FREQ *= 10
     else:
         raise NotImplementedError
 
@@ -540,7 +547,7 @@ if __name__ == '__main__':
     exp_tag = {
         'run': alg_run,
         'env': env_name,
-        'checkpoint_freq': 25,
+        'checkpoint_freq': CHECKPOINT_FREQ,
         "max_failures": 1,
         'stop': {
             'training_iteration': args.n_iterations
