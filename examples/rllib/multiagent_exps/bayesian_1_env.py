@@ -419,9 +419,10 @@ def setup_exps_MADDPG(args, flow_params):
     dict
         training configuration parameters
     """
-    alg_run = 'contrib/MADDPG'
-    agent_cls = get_agent_class(alg_run)
-    config = agent_cls._default_config.copy()
+
+    from flow.algorithms.maddpg.maddpg import DEFAULT_CONFIG as MADDPG_DEFAULT_CONFIG, MADDPGTrainer
+    alg_run = MADDPGTrainer
+    config = MADDPG_DEFAULT_CONFIG.copy()
     config['no_done_at_end'] = True
     config['gamma'] = 0.95  # discount rate
     if args.grid_search:
