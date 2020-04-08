@@ -281,17 +281,23 @@ def create_agent(args, flow_params):
                   + 'differs from the one stored in params.json '
                   + '\'{}\''.format(config_run))
             sys.exit(1)
-    if args.run:
-        agent_cls = get_agent_class(args.run)
-    elif config_run:
-        agent_cls = get_agent_class(config_run)
-    else:
-        print('visualizer_rllib.py: error: could not find flow parameter '
-              '\'run\' in params.json, '
-              'add argument --run to provide the algorithm or model used '
-              'to train the results\n e.g. '
-              'python ./visualizer_rllib.py /tmp/ray/result_dir 1 --run PPO')
-        sys.exit(1)
+    
+    from flow.algorithms.maddpg import maddpg
+    agent_cls = maddpg.MADDPGTrainer
+    
+    # if args.run:
+    #     agent_cls = get_agent_class(args.run)
+    # elif config_run:
+    #     agent_cls = get_agent_class(config_run)
+
+
+    # else:
+    #     print('visualizer_rllib.py: error: could not find flow parameter '
+    #           '\'run\' in params.json, '
+    #           'add argument --run to provide the algorithm or model used '
+    #           'to train the results\n e.g. '
+    #           'python ./visualizer_rllib.py /tmp/ray/result_dir 1 --run PPO')
+    #     sys.exit(1)
 
     # TODO(@evinitsky) duplication
     env, env_name = create_env(args, flow_params)
