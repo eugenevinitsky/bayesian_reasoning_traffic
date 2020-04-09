@@ -83,7 +83,7 @@ def make_flow_params(args, pedestrians=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        num_vehicles=2)
+        num_vehicles=1)
 
     vehicles.add(
         veh_id='rl',
@@ -92,7 +92,7 @@ def make_flow_params(args, pedestrians=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        num_vehicles=1)
+        num_vehicles=2)
 
     '''
     vehicles.add(
@@ -427,9 +427,13 @@ def setup_exps_QMIX(args, flow_params):
     config = agent_cls._default_config.copy()
     config['no_done_at_end'] = True
     config['gamma'] = 0.999  # discount rate
-    # if args.grid_search:
-    #     config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-    #     config['buffer_size'] = tune.grid_search([10000, 100000])
+
+    config['lr'] = 1e-5
+    config['buffer_size'] = 10000
+    if args.grid_search:
+        # config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
+        # config['buffer_size'] = tune.grid_search([10000, 100000])
+        config['n_step'] = tune.grid_search([1, 10, 100, 1000])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
@@ -495,7 +499,7 @@ if __name__ == '__main__':
     # required input parameters
     parser.add_argument("--upload_dir", type=str,
                         help="S3 Bucket for uploading results.")
-    parser.add_argument("--n_iterations", type=int, default=250,
+    parser.add_argument("--n_iterations", type=int, default=1000,
                         help="Number of training iterations")
     parser.add_argument("--n_rollouts", type=int, default=20,
                         help="Number of rollouts per iteration")
