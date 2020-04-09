@@ -49,7 +49,7 @@ def run_env(env, agent, config, flow_params):
         multiagent = True
         rets = {}
         # map the agent id to its policy
-        policy_map_fn = config['multiagent']['policy_mapping_fn'].func
+        policy_map_fn = config['multiagent']['policy_mapping_fn']
         for key in config['multiagent']['policies'].keys():
             rets[key] = []
     else:
@@ -61,7 +61,7 @@ def run_env(env, agent, config, flow_params):
         if multiagent:
             state_init = {}
             # map the agent id to its policy
-            policy_map_fn = config['multiagent']['policy_mapping_fn'].func
+            policy_map_fn = config['multiagent']['policy_mapping_fn']
             size = config['model']['lstm_cell_size']
             for key in config['multiagent']['policies'].keys():
                 state_init[key] = [np.zeros(size, np.float32),
@@ -250,6 +250,12 @@ def create_env(args, flow_params):
     return env, env_name
 
 
+def get_config(args):
+    result_dir = args.result_dir if args.result_dir[-1] != '/' \
+        else args.result_dir[:-1]
+
+    return get_rllib_config(result_dir)
+
 def create_agent(args, flow_params):
     """Visualizer for RLlib experiments.
 
@@ -307,22 +313,31 @@ def create_agent(args, flow_params):
 
 def run_transfer(args):
     # run transfer on the bayesian 1 env first
-    from examples.rllib.multiagent_exps.bayesian_1_env import make_flow_params as bayesian_1_flow_params
-    bayesian_1_params = bayesian_1_flow_params(pedestrians=True)
-    env, env_name = create_env(args, bayesian_1_params)
-    agent, config = create_agent(args, flow_params=bayesian_1_params)
-    run_env(env, agent, config, bayesian_1_params)
+    # from examples.rllib.multiagent_exps.bayesian_1_env import make_flow_params as bayesian_1_flow_params
+    # bayesian_1_params = bayesian_1_flow_params(pedestrians=True)
+    # config = get_config(args)
+    # if config['env_config']['run'] == 'contrib/MADDPG':
+    #     bayesian_1_params['env'].additional_params.update({'maddpg': True})
+    # env, env_name = create_env(args, bayesian_1_params)
+    # agent, config = create_agent(args, flow_params=bayesian_1_params)
+    # run_env(env, agent, config, bayesian_1_params)
 
     # run transfer on the bayesian 3 env
-    from examples.rllib.multiagent_exps.exp_configs.bayesian_3_config import make_flow_params as bayesian_3_flow_params
-    bayesian_3_params = bayesian_3_flow_params()
-    env, env_name = create_env(args, bayesian_3_params)
-    agent, config = create_agent(args, flow_params=bayesian_3_params)
-    run_env(env, agent, config, bayesian_3_params)
+    # from examples.rllib.multiagent_exps.exp_configs.bayesian_3_config import make_flow_params as bayesian_3_flow_params
+    # bayesian_3_params = bayesian_3_flow_params()
+    # config = get_config(args)
+    # if config['env_config']['run'] == 'contrib/MADDPG':
+    #     bayesian_3_params['env'].additional_params.update({'maddpg': True})
+    # env, env_name = create_env(args, bayesian_3_params)
+    # agent, config = create_agent(args, flow_params=bayesian_3_params)
+    # run_env(env, agent, config, bayesian_3_params)
 
-    # run transfer on the bayesian 3 env
+    # run transfer on the bayesian 4 env
     from examples.rllib.multiagent_exps.exp_configs.bayesian_4_config import make_flow_params as bayesian_4_flow_params
     bayesian_4_params = bayesian_4_flow_params()
+    config = get_config(args)
+    if config['env_config']['run'] == 'contrib/MADDPG':
+        bayesian_4_params['env'].additional_params.update({'maddpg': True})
     env, env_name = create_env(args, bayesian_4_params)
     agent, config = create_agent(args, flow_params=bayesian_4_params)
     run_env(env, agent, config, bayesian_4_params)
