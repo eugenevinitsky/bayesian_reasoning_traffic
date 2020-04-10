@@ -280,6 +280,7 @@ def setup_exps_TD3(args, flow_params):
     config['lr'] = 1e-5
     if args.grid_search:
         config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
+        config['gamma'] = tune.grid_search([0.99, 0.999, 0.9999])
         #config['actor_lr'] = tune.grid_search([1e-5, 1e-4])
         #config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
         #config['prioritized_replay'] = tune.grid_search([True, False])
