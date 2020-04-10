@@ -177,7 +177,6 @@ class Bayesian1Env(MultiEnv):
 
                 else:
                     obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
-
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)

@@ -225,7 +225,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
         # pos = 0 starts from the starting node of the edge
         car_1_start_edge = "(0.1)--(1.1)"
         car_1_end_edge = "(1.1)--(2.1)"
-        car_1_start_pos = 30
+        car_1_start_pos = 0
 
         # # let the top car say here forever as an obstacle
         # car_2_start_edge = "(1.2)--(1.1)"
