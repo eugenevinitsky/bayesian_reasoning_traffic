@@ -84,8 +84,8 @@ class Bayesian1Env(MultiEnv):
 
         # TODO hardcoding
         # this is used for maddpg
-        self.idx_to_av_id = {i: 'rl_{}'.format(i) for i in range(self.max_num_agents)}
-        self.av_id_to_idx = {'rl_{}'.format(i): i for i in range(self.max_num_agents)}
+        # self.idx_to_av_id = {i: 'rl_{}'.format(i) for i in range(self.max_num_agents)}
+        # self.av_id_to_idx = {'rl_{}'.format(i): i for i in range(self.max_num_agents)}
 
     @property
     def observation_space(self):

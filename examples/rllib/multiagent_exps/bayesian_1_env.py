@@ -29,7 +29,7 @@ from flow.utils.rllib import FlowParamsEncoder
 
 # Experiment parameters
 N_ROLLOUTS = 20  # number of rollouts per training iteration
-N_CPUS = 1 # number of parallel workers
+N_CPUS = 8 # number of parallel workers
 
 # Environment parameters
 # TODO(@klin) make sure these parameters match what you've set up in the SUMO version here
@@ -272,12 +272,17 @@ def setup_exps_TD3(args, flow_params):
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     # config['simple_optimizer'] = True
+
+    config["num_workers"] = min(args.n_cpus, args.n_rollouts)
+    config['train_batch_size'] = args.horizon * args.n_rollouts
     config['gamma'] = 0.999  # discount rate
-    config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['model'].update({'fcnet_hiddens': [32, 32]})
+    config['lr'] = 1e-5
     if args.grid_search:
-        config['actor_lr'] = tune.grid_search([1e-5, 1e-4])
-        config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
-        config['prioritized_replay'] = tune.grid_search([True, False])
+        config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
+        #config['actor_lr'] = tune.grid_search([1e-5, 1e-4])
+        #config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
+        #config['prioritized_replay'] = tune.grid_search([True, False])
     config['horizon'] = args.horizon
     config['no_done_at_end'] = True
     config['observation_filter'] = 'NoFilter'
@@ -429,13 +434,14 @@ def setup_exps_MADDPG(args, flow_params):
     config['no_done_at_end'] = True
     config['gamma'] = 0.999  # discount rate
 
-    # config['lr'] = 1e-5
     config['buffer_size'] = 10000
+    config['actor_lr'] = 1e-3
+    config['critic_lr'] = 1e-3
     if args.grid_search:
         # config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-        # config['buffer_size'] = tune.grid_search([10000, 100000])
-        config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
-        config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
+        # config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
+        # config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
+        config['lr'] = tune.grid_search([1e-4, 1e-5])
         config['n_step'] = tune.grid_search([1, 10, 100])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
