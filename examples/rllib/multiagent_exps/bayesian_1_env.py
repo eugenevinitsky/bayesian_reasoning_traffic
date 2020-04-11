@@ -285,7 +285,7 @@ def setup_exps_TD3(args, flow_params):
         #config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
         #config['prioritized_replay'] = tune.grid_search([True, False])
     config['horizon'] = args.horizon
-    config['no_done_at_end'] = True
+    # config['no_done_at_end'] = True
     config['observation_filter'] = 'NoFilter'
 
     config['callbacks'] = {
@@ -351,7 +351,7 @@ def setup_exps_PPO(args, flow_params):
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = True
-    config['no_done_at_end'] = True
+    # config['no_done_at_end'] = True
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
@@ -510,7 +510,7 @@ if __name__ == '__main__':
     # required input parameters
     parser.add_argument("--upload_dir", type=str,
                         help="S3 Bucket for uploading results.")
-    parser.add_argument("--n_iterations", type=int, default=1000,
+    parser.add_argument("--n_iterations", type=int, default=100,
                         help="Number of training iterations")
     parser.add_argument("--n_rollouts", type=int, default=20,
                         help="Number of rollouts per iteration")
