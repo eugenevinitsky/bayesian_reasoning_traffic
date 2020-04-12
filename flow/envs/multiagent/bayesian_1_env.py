@@ -415,7 +415,7 @@ class Bayesian1Env(MultiEnv):
             rl_index = np.random.randint(len(self.initial_ids))
             for i in range(len(self.initial_ids)):
                 veh_id = self.initial_ids[i]
-                type_id, edge, lane_index, pos, speed = \
+                type_id, edge, lane_index, pos, speed, depart_time = \
                     self.initial_state[veh_id]
                 if self.net_params.additional_params.get("randomize_routes", False):
                     if i == rl_index:
@@ -437,7 +437,10 @@ class Bayesian1Env(MultiEnv):
                         edge=edge,
                         lane=lane_index,
                         pos=pos,
-                        speed=speed)
+                        speed=speed,
+                        depart_time=depart_time)
+                        
+
                 except (FatalTraCIError, TraCIException):
                     # if a vehicle was not removed in the first attempt, remove it
                     # now and then reintroduce it
@@ -450,12 +453,13 @@ class Bayesian1Env(MultiEnv):
                         edge=edge,
                         lane=lane_index,
                         pos=pos,
-                        speed=speed)
+                        speed=speed,
+                        depart_time=depart_time)
+
         else:
             for veh_id in self.initial_ids:
-                type_id, edge, lane_index, pos, speed = \
+                type_id, edge, lane_index, pos, speed, depart_time = \
                     self.initial_state[veh_id]
-
                 try:
                     self.k.vehicle.add(
                         veh_id=veh_id,
@@ -463,7 +467,8 @@ class Bayesian1Env(MultiEnv):
                         edge=edge,
                         lane=lane_index,
                         pos=pos,
-                        speed=speed)
+                        speed=speed,
+                        depart_time=depart_time)
                 except (FatalTraCIError, TraCIException):
                     # if a vehicle was not removed in the first attempt, remove it
                     # now and then reintroduce it
@@ -476,8 +481,8 @@ class Bayesian1Env(MultiEnv):
                         edge=edge,
                         lane=lane_index,
                         pos=pos,
-                        speed=speed)
-
+                        speed=speed,
+                        depart_time=depart_time)
 
         # advance the simulation in the simulator by one step
         self.k.simulation.simulation_step()

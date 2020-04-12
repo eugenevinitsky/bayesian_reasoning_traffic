@@ -196,7 +196,6 @@ def run_env(env, agent, config, flow_params):
                 num_pedestrian_crash += num_collision
         
         # plot_2_licnes(prob_action_given_ped, prob_action_given_no_ped)
-        import ipdb; ipdb.set_trace()
         plot_2_lines(probs_ped_given_action, probs_no_ped_given_action, updated_priors=True, viewable_ped=visible_pedestrian)
         plot_2_lines(probs_ped_given_action_fixed_priors, probs_no_ped_given_action_fixed_priors, updated_priors=False, viewable_ped=visible_pedestrian)
 

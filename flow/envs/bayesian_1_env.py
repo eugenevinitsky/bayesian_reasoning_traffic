@@ -38,5 +38,6 @@ class Bayesian1Env(AccelEnv):
             lane = start_lanes[i]
             speed = self.k.vehicle.get_initial_speed(veh_id)
             edge = start_pos[i][0]
-            self.initial_state[veh_id] = (type_id, edge, lane, pos, speed)
+            depart_time = self.k.vehicle.get_depart_time(veh_id)    # don't think this is being used..., yeah, it's not lol
+            self.initial_state[veh_id] = (type_id, edge, lane, pos, speed, depart_time)
 

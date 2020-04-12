@@ -241,7 +241,8 @@ class VehicleParams:
             initial_speed=0,
             num_vehicles=0,
             car_following_params=None,
-            lane_change_params=None):
+            lane_change_params=None,
+            depart_time=None):
         """Add a sequence of vehicles to the list of vehicles in the network.
 
         Parameters
@@ -290,7 +291,8 @@ class VehicleParams:
              "routing_controller": routing_controller,
              "initial_speed": initial_speed,
              "car_following_params": car_following_params,
-             "lane_change_params": lane_change_params}
+             "lane_change_params": lane_change_params,
+             "depart_time": depart_time}
 
         # TODO: delete?
         self.initial.append({
@@ -309,7 +311,9 @@ class VehicleParams:
             "car_following_params":
                 car_following_params,
             "lane_change_params":
-                lane_change_params
+                lane_change_params,
+            "depart_time":
+                depart_time
         })
 
         # This is used to return the actual headways from the vehicles class.
