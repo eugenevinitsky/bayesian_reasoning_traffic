@@ -60,7 +60,7 @@ def make_flow_params(args, pedestrians=False, render=False):
             depart_time='0.00',
             start='(1.2)--(1.1)',
             end='(1.1)--(1.0)',
-            depart_pos='96')
+            depart_pos='50')
 
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -75,7 +75,7 @@ def make_flow_params(args, pedestrians=False, render=False):
             speed_mode='right_of_way',
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='10.00',
+        depart_time='5.00',
         num_vehicles=1,
         )
     '''
