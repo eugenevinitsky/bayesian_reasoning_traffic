@@ -1158,7 +1158,9 @@ class TraCIVehicle(KernelVehicle):
             route_id = 'route{}_{}'.format(edge, np.random.choice(
                 
                 [i for i in range(num_routes)], size=1, p=frac)[0])
+        depart_time = str(depart_time) if depart_time != None else None
         print(f'departtime is {depart_time}')
+
         self.kernel_api.vehicle.addFull(
             veh_id,
             route_id,

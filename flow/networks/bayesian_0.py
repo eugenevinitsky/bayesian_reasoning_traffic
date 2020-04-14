@@ -142,6 +142,10 @@ class Bayesian0Network(TrafficLightGridNetwork):
         car_2_start_edge = "(1.2)--(1.1)"
         car_2_end_edge = "(1.2)--(1.1)"
 
+        if 2 == 2:
+            car_2_start_edge = "(1.2)--(1.1)"
+            car_2_end_edge = "(1.1)--(2.1)"
+
         car_3_start_edge = "(2.1)--(1.1)"
         car_3_end_edge = "(1.1)--(1.0)"
 
@@ -227,10 +231,10 @@ class Bayesian0Network(TrafficLightGridNetwork):
         car_1_end_edge = "(1.1)--(2.1)"
         car_1_start_pos = 0
 
-        # # let the top car say here forever as an obstacle
-        # car_2_start_edge = "(1.2)--(1.1)"
-        # car_2_end_edge = "(1.2)--(1.1)"
-        # car_2_start_pos = 49
+        # let the top car say here forever as an obstacle
+        car_2_start_edge = "(1.2)--(1.1)"
+        car_2_end_edge = "(1.1)--(2.1)"
+        car_2_start_pos = 0
 
         # # 'thinking' car
         # car_3_start_edge = "(2.1)--(1.1)"
@@ -240,7 +244,13 @@ class Bayesian0Network(TrafficLightGridNetwork):
         # start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
         # # In SUMO, lanes are zero-indexed starting from the right-most lane
         # start_lanes = [0, 0, 0]
+
+        
         start_pos = [(car_1_start_edge, car_1_start_pos)]
         start_lanes = [0]
+
+        if 2 == 2:
+            start_pos = [(car_2_start_edge, car_2_start_pos), (car_1_start_edge, car_1_start_pos)]
+            start_lanes = [0, 0]
 
         return start_pos, start_lanes

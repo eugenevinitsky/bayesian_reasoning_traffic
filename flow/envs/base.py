@@ -290,7 +290,7 @@ class Env(gym.Env):
             edge = start_pos[i][0]
             depart_time = self.k.vehicle.get_depart_time(veh_id)
             self.initial_state[veh_id] = (type_id, edge, lane, pos, speed, depart_time)
-
+            print(self.initial_state[veh_id], self.initial_config.shuffle)
     def step(self, rl_actions):
         """Advance the environment by one step.
 

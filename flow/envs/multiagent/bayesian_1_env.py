@@ -205,7 +205,6 @@ class Bayesian1Env(MultiEnv):
                 edge_pos = self.k.vehicle.get_position(rl_id)
                 if self.k.vehicle.get_edge(rl_id) in in_edges:
                     edge_pos = 50 - edge_pos
-
                 start, end = self.k.vehicle.get_route(rl_id)
                 start = edge_to_int[start]
                 end = edge_to_int[end]
@@ -348,7 +347,6 @@ class Bayesian1Env(MultiEnv):
 	    # Now that we've passed the possibly fake init steps some rl libraries
         # do, we can feel free to actually render things
         if self.should_render:
-            # import ipdb; ipdb.set_trace()
             self.sim_params.render = True
             # got to restart the simulation to make it actually display anything
             # self.restart_simulation(self.sim_params)

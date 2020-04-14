@@ -34,6 +34,7 @@ N_CPUS = 1 # number of parallel workers
 # Environment parameters
 # TODO(@klin) make sure these parameters match what you've set up in the SUMO version here
 V_ENTER = 0  # enter speed for departing vehicles
+MAX_SPEED = 30
 INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 # number of vehicles originating in the left, right, top, and bottom edges
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
@@ -60,12 +61,24 @@ def make_flow_params(args, pedestrians=False, render=False):
             depart_time='0.00',
             start='(1.2)--(1.1)',
             end='(1.1)--(1.0)',
-            depart_pos='50')
+            depart_pos='49')
 
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
     # support traffic light compliance
     vehicles = VehicleParams()
+
+    vehicles.add(
+        veh_id="human",
+        acceleration_controller=(SimCarFollowingController, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="right_of_way",
+        ),
+        routing_controller=(GridRouter, {}),
+        depart_time='1.00',
+        num_vehicles=1)
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
@@ -75,22 +88,24 @@ def make_flow_params(args, pedestrians=False, render=False):
             speed_mode='right_of_way',
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='5.00',
+        depart_time='3.00',
         num_vehicles=1,
         )
-    '''
-    vehicles.add(
-        veh_id="human_1",
-        acceleration_controller=(SimCarFollowingController, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            max_speed=V_ENTER,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        routing_controller=(GridRouter, {}),
-        num_vehicles=1)
-    '''
+
+
+    # vehicles.add(
+    #     veh_id="human_1",
+    #     acceleration_controller=(SimCarFollowingController, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         max_speed=V_ENTER,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #     ),
+    #     routing_controller=(GridRouter, {}),
+    #     depart_time='0.01',
+    #     num_vehicles=1)
+    
 
     n_rows = 1
     n_columns = 1
