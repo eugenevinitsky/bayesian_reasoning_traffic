@@ -272,15 +272,14 @@ def setup_exps_TD3(args, flow_params):
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     # config['simple_optimizer'] = True
-
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['gamma'] = 0.999  # discount rate
-    config['model'].update({'fcnet_hiddens': [32, 32]})
+    config['model'].update({'fcnet_hiddens': [256, 256]})
     config['lr'] = 1e-5
     if args.grid_search:
         config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-        config['gamma'] = tune.grid_search([0.99, 0.999, 0.9999])
+        #config['gamma'] = tune.grid_search([0.99, 0.999, 0.9999])
         #config['actor_lr'] = tune.grid_search([1e-5, 1e-4])
         #config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
         #config['prioritized_replay'] = tune.grid_search([True, False])
