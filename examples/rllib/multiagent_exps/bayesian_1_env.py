@@ -277,6 +277,7 @@ def setup_exps_TD3(args, flow_params):
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     config['lr'] = 1e-5
+    config['sample_batch_size'] = 30
     if args.grid_search:
         config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
         #config['gamma'] = tune.grid_search([0.99, 0.999, 0.9999])
