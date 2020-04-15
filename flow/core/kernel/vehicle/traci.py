@@ -1146,7 +1146,7 @@ class TraCIVehicle(KernelVehicle):
             self.kernel_api.vehicle.setColor(
                 vehID=veh_id, color=(r, g, b, 255))
 
-    def add(self, veh_id, type_id, edge, pos, lane, speed, depart_time=None):
+    def add(self, veh_id, type_id, edge, pos, lane, speed, depart_time="now"):
         """See parent class."""
         if veh_id in self.master_kernel.network.rts:
             # If the vehicle has its own route, use that route. This is used in
@@ -1158,8 +1158,6 @@ class TraCIVehicle(KernelVehicle):
             route_id = 'route{}_{}'.format(edge, np.random.choice(
                 
                 [i for i in range(num_routes)], size=1, p=frac)[0])
-        depart_time = str(depart_time) if depart_time != None else None
-        print(f'departtime is {depart_time}')
 
         self.kernel_api.vehicle.addFull(
             veh_id,
@@ -1184,3 +1182,7 @@ class TraCIVehicle(KernelVehicle):
     def set_length(self, veh_id, length):
         """See parent class."""
         self.kernel_api.vehicle.setLength(veh_id, length)
+
+    def get_acceleration(self, veh_id):
+        """See parent class"""
+        return self.kernel_api.vehicle.getAcceleration(veh_id)

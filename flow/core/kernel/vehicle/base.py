@@ -693,3 +693,17 @@ class KernelVehicle(object):
         float
         """
         raise NotImplementedError
+
+    def get_acceleration(self, veh_id):
+        """Return the acceleration in m/s^2 of the named vehicle within the last step.
+
+        Parameters
+        ----------
+        veh_id : str
+        vehicle id
+
+        Returns
+        -------
+        float
+        """
+        raise NotImplementedError
