@@ -92,9 +92,11 @@ class Bayesian1InferenceEnv(MultiEnv):
             self.default_state = {idx: -1 * np.ones(self.observation_space.shape[0])
                                   for idx in range(self.max_num_agents)}
 
+        # variable to encourage vehicle to move in curriculum training
         self.speed_reward_coefficient = 1
+        # track all rl_vehicles: hack to compute the last reward of an rl vehicle (reward for arriving, set states to 0)
         self.rl_set = set()
-        # TODO KL @nliu what's arrival order?
+        # feature for arrival
         self.arrival_order = {}
 
         # TODO hardcoding
@@ -155,14 +157,15 @@ class Bayesian1InferenceEnv(MultiEnv):
                 accels.append(accel)
             self.k.vehicle.apply_acceleration(rl_ids, accels)
 
-    # TODO(KL) @nliu can you explain this function? If NOT true that the vehicle is at its starting edge and within 5 meters
-    # then, it hasn't arrived - new var for distance to intersection?
     def arrived_intersection(self, veh_id):
+        """Return True if vehicle is at or past the intersection and false if not."""
+        # When vehicle exits, route is []
         if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
             return True
-        return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
+        return not 
+                (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
                 self.k.vehicle.get_position(veh_id) < 49)
-
+                
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
@@ -183,7 +186,7 @@ class Bayesian1InferenceEnv(MultiEnv):
                 "(0.1)--(1.1)",
                 "(1.0)--(1.1)"]
 
-        # TODO(KL) what does loop do? Looks like it's initializing something?
+        # TODO(KL) MADDPG hack
         for rl_id in self.rl_set:
             if rl_id in self.k.vehicle.get_arrived_ids():
                 if isinstance(self.observation_space, Dict):
@@ -197,7 +200,6 @@ class Bayesian1InferenceEnv(MultiEnv):
                 else:
                     obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
 
-
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
@@ -208,6 +210,7 @@ class Bayesian1InferenceEnv(MultiEnv):
 
                 assert rl_id in self.arrival_order
 
+                # MADDPG hack
                 if isinstance(self.observation_space, Dict):
                     observation = np.zeros(self.observation_space["obs"].shape[0])
                 else:
@@ -223,52 +226,8 @@ class Bayesian1InferenceEnv(MultiEnv):
                 # TODO(KL) @nliu can we add a helper function to do this stuff?
                 observation[:10] = self.get_self_obs(veh_id, visible_pedestrians, edge_to_int, in_edges)
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
-                # yaw = self.k.vehicle.get_yaw(rl_id)
-                # speed = self.k.vehicle.get_speed(rl_id)
-                # edge_pos = self.k.vehicle.get_position(rl_id)
-                # if self.k.vehicle.get_edge(rl_id) in in_edges:
-                #     edge_pos = 50 - edge_pos
-                # start, end = self.k.vehicle.get_route(rl_id)
-                # start = edge_to_int[start]
-                # end = edge_to_int[end]
-                # turn_num = (end - start) % 8
-                # if turn_num == 1:
-                #     turn_num = 0 # turn right
-                # elif turn_num == 3:
-                #     turn_num = 1 # go straight
-                # else:
-                #     turn_num = 2 # turn left
 
-                # observation[:4] = [yaw, speed, turn_num, edge_pos]
-
-                # ped_param = [0, 0, 0, 0, 0, 0]
-                # # TODO(KL) @nliu no for loop here? Are we assuming there's only 1 ped?
-                # if len(visible_pedestrians) > 0:
-                #     ped_x, ped_y = self.k.pedestrian.get_position(visible_pedestrians[0])
-                #     rel_x = ped_x - veh_x
-                #     rel_y = ped_y - veh_y
-                #     rel_angle = self.k.vehicle.get_relative_angle(rl_id, (ped_x, ped_y))
-                #     rel_angle = (rel_angle + 90) % 360
-                #     dist = math.sqrt((rel_x ** 2) + (rel_y ** 2))
-                #     if rel_angle < 60:
-                #         if dist < 15:
-                #             ped_param[0] = 1
-                #         else:
-                #             ped_param[1] = 1
-                #     elif rel_angle < 120:
-                #         if dist < 15:
-                #             ped_param[2] = 1
-                #         else:
-                #             ped_param[3] = 1
-                #     elif rel_angle < 180:
-                #         if dist < 15:
-                #             ped_param[4] = 1
-                #         else:
-                #             ped_param[5] = 1
-                #     else:
-                #         raise RuntimeError("Relative Angle is Invalid")
-                # observation[4:10] = ped_param
-
+                # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
                 for index, veh_id in enumerate(visible_vehicles):
 
                     if veh_id not in self.arrival_order:
@@ -283,7 +242,8 @@ class Bayesian1InferenceEnv(MultiEnv):
                     observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
                     rel_x = observed_x - veh_x
                     rel_y = observed_y - veh_y
-                    # TODO(KL) @nliu what's the purpose of checking for index <= 2??
+
+                    # Consider the first 3 visible vehicles
                     if index <= 2:
                         observation[(index * 5) + 10: 5 * (index + 1) + 10] = \
                                 [observed_yaw, observed_speed, rel_x, rel_y, before]
@@ -625,7 +585,7 @@ class Bayesian1InferenceEnv(MultiEnv):
         observation[:4] = [yaw, speed, turn_num, edge_pos]
 
         ped_param = [0, 0, 0, 0, 0, 0]
-        # TODO(KL) @nliu no for loop here? Are we assuming there's only 1 ped?
+        # we assuming there's only 1 ped?
         if len(visible_peds) > 0:
             ped_x, ped_y = self.k.pedestrian.get_position(visible_peds[0])
             rel_x = ped_x - veh_x
