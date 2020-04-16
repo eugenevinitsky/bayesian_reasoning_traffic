@@ -9,7 +9,7 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-
+from examples.rllib.multiagent_exps.test_predictor.pedestrian_policy_1 import test
 # TODO(KL) means KL's reminder for KL
 
 ADDITIONAL_ENV_PARAMS = {
@@ -406,8 +406,8 @@ class Bayesian1Env(MultiEnv):
             except (FatalTraCIError, TraCIException):
                 print("Error during start: {}".format(traceback.format_exc()))
 
-        # reintroduce the initial vehicles to the network
-        randomize_drivers = True
+        # reintroduce the initial vehicles to the network # TODO(KL) I've set randomize_drivers to false - need to subclass
+        randomize_drivers = False
         if randomize_drivers:
             num_rl, num_human = 0, 0
             rl_index = np.random.randint(len(self.initial_ids))
@@ -512,6 +512,7 @@ class Bayesian1Env(MultiEnv):
         return self.get_state()
 
     def update_curriculum(self, training_iter):
+        """Update i.e. remove the speed reward coefficient"""
         if training_iter > 30:
             self.speed_reward_coefficient = 0
         else:

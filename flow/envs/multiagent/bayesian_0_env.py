@@ -48,7 +48,6 @@ class Bayesian0Env(MultiEnv):
         A rollout is terminated if the time horizon is reached or if two
         vehicles collide into one another.
     """
-
     def __init__(self, env_params, sim_params, network, simulator='traci'):
         for p in ADDITIONAL_ENV_PARAMS.keys():
             if p not in env_params.additional_params:
@@ -58,6 +57,7 @@ class Bayesian0Env(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw"]
         self.search_radius = self.env_params.additional_params["search_radius"]
+
 
     @property
     def observation_space(self):
@@ -110,8 +110,6 @@ class Bayesian0Env(MultiEnv):
 
             observation[:4] = [yaw, speed, edge_hash, edge_pos]
             observation[4] = 0 # TODO(@nliu) pedestrians implementation later
-
-            print(visible_pedestrians)
             # #TODO(@nliu) sort by angle
             # for index, ped_id in enumerate(visible_pedestrians):
             #     observed_yaw = self.k.vehicle.get_yaw(veh_id)
