@@ -15,7 +15,7 @@ from ray import tune
 from ray.tune.registry import register_env
 from ray.tune import run_experiments
 
-from flow.envs.multiagent import Bayesian1InferenceEnv
+from flow.envs.multiagent.bayesian_1_inference_env import Bayesian1InferenceEnv
 from flow.networks import Bayesian1Network
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import SumoCarFollowingParams, VehicleParams

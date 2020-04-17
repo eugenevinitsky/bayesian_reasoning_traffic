@@ -9,7 +9,8 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-# from bayesian_inference.bayesian_inference_PPO import create_black_box
+from bayesian_inference.get_agent import get_agent
+from bayesian_inference.inference import get_updated_priors
 
 # TODO(KL) means KL's reminder for KL
 
@@ -20,7 +21,7 @@ ADDITIONAL_ENV_PARAMS = {
     'max_decel': -2.6,
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
-    # how many objects in our local radius we want to return
+    # how many objects in our local radius we want to return # TODO(KL) 'max_num_*vehicles*'?, objects is vague, unless we're super humane and consider cars as definitely objects and people as non-objects
     "max_num_objects": 3,
     # how large of a radius to search in for a given vehicle in meters
     "search_radius": 50,
@@ -36,20 +37,15 @@ class Bayesian1InferenceEnv(MultiEnv):
 
     Attributes
     ----------
-    updated_ped_probs: function
-        black-box policy the updated probabilities of pedestrians being in grid i
-        inputs: action, the acceleration of vehicle
-        six previous probabilities of pedestrian being in grid i
-        
-        (veh_id, action, non_ped_states, prev_probs) 
-    
+    agent: ray.rllib object
+        agent object used to model the behaviour of vehicles and perform inference on pedestrian existence
+            
     speed_reward_coefficient: int
         coeff for rewarding positive speed to encourage vehicle to move in curriculum training
 
     observation_names: list
         list of observations regarding visible vehicles within search_radius of rl car
     
-
     search_radius: float
         radius that the rl car searches on for visible objects
 
@@ -60,6 +56,11 @@ class Bayesian1InferenceEnv(MultiEnv):
         (key : value) = (veh_id : order of arrival)
         first car arriving at intersection gets value 0, 2nd car gets value 1, 3rd gets value 2, ...
         TODO(KL) handle case when there are more and more cars?
+
+    priors: dict (str: dict (str : float))
+        (veh_id : prior-prob-ped-obs-combo dict)
+            prior-prob-ped-obs-combo dict: (ped_obs : probability)
+        information used to get updated prior / posterior probabilities
 
     Required from env_params:
 
@@ -97,9 +98,9 @@ class Bayesian1InferenceEnv(MultiEnv):
 
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
         
-        # self.updated_ped_probs = create_black_box("PPO")
+        self.agent = get_agent("PPO")
         self.num_grid_cells = 6
-        self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] # + self.prob_ped_in_grid_names(self.num_grid_cells)
+        self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] + self.prob_ped_in_grid_names(self.num_grid_cells)
         self.search_radius = self.env_params.additional_params["search_radius"]
         self.maddpg = self.env_params.additional_params["maddpg"]
         if self.maddpg:
@@ -117,7 +118,7 @@ class Bayesian1InferenceEnv(MultiEnv):
         # track all rl_vehicles: hack to compute the last reward of an rl vehicle (reward for arriving, set states to 0)
         self.rl_set = set()
         self.arrival_order = {}
-
+        self.priors = {}
         # TODO hardcoding
         # this is used for maddpg
         if self.maddpg:
@@ -249,8 +250,7 @@ class Bayesian1InferenceEnv(MultiEnv):
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
                 for idx, veh_id in enumerate(visible_vehicles):
                     
-                    before = self.arrived_before(veh_id, rl_id)
-                    
+                    before = self.arrived_before(rl_id, veh_id)
 
                     observed_yaw = self.k.vehicle.get_yaw(veh_id)
                     observed_speed = self.k.vehicle.get_speed(veh_id)
@@ -261,13 +261,17 @@ class Bayesian1InferenceEnv(MultiEnv):
                     # Consider the first 3 visible vehicles
                     num = len(self.observation_names) # TODO(KL) How to describe these states? States from observing other vehicles / pedestrians.
                     if idx <= 2:
-                        # veh_id_non_ped_states = get_non_ped_states(veh_id)
-
+                        # only perform inference if the visible veh has arrived
+                        if self.arrived_intersection(veh_id):
+                            acceleration = self.k.vehicle.get_acceleration(veh_id)
+                            visible_veh_non_ped_obs= self.get_non_ped_obs(veh_id)
+                            updated_ped_probs, self.priors[veh_id] = self.get_updated_priors(acceleration, visible_veh_non_ped_obs, self.priors[veh_id], self.agent)
+                        else:
+                            # probabilities set to -1 if not performing inference
+                            updated_ped_probs = [-1 for _ in range(self.num_grid_cells)]
                         observation[(idx * num) + 10: num * (idx + 1) + 10] = \
-                                [observed_yaw, observed_speed, rel_x, rel_y, before] # + updated_ped_probs()
+                                [observed_yaw, observed_speed, rel_x, rel_y, before] + updated_ped_probs
                    
-                # updated_ped_probs(non ped_states of the car)
-
                 obs.update({rl_id: observation})
 
         if self.maddpg and len(self.rl_set) > 0:
@@ -521,6 +525,31 @@ class Bayesian1InferenceEnv(MultiEnv):
         else:
             self.speed_reward_coefficient = 1
 
+    def get_action_mask(self, valid_agent):
+        """If a valid agent, return a 0 in the position of the no-op action. If not, return a 1 in that position
+        and a zero everywhere else."""
+        if valid_agent:
+            temp_list = np.array([1 for _ in range(self.action_space.n)])
+            temp_list[0] = 0
+        else:
+            temp_list = np.array([0 for _ in range(self.action_space.n)])
+            temp_list[0] = 1
+        return temp_list
+
+    ################################
+    ## __init__() helper methods ##
+    ################################
+
+    def prob_ped_in_grid_names(self, num_cells_in_grid=6):
+        """Returns a list of names for state variables indicating the probability a ped is in grid i of a vehicle"""
+
+        return [f'prob_ped in grid{i}' for i in range(1, num_cells_in_grid + 1)]
+
+
+    ################################
+    ## get_state() helper methods ##
+    ################################
+
     def find_visible_objects(self, veh_id, radius):
         """For a given vehicle ID, find the IDs of all the objects that are within a radius of them
 
@@ -543,22 +572,7 @@ class Bayesian1InferenceEnv(MultiEnv):
                 radius)
 
         return visible_vehicles, visible_pedestrians
-
-    def get_action_mask(self, valid_agent):
-        """If a valid agent, return a 0 in the position of the no-op action. If not, return a 1 in that position
-        and a zero everywhere else."""
-        if valid_agent:
-            temp_list = np.array([1 for _ in range(self.action_space.n)])
-            temp_list[0] = 0
-        else:
-            temp_list = np.array([0 for _ in range(self.action_space.n)])
-            temp_list[0] = 1
-        return temp_list
-
-    ############################
-    # get_state() helper methods #
-    ############################
-
+        
     def get_self_obs(self, rl_id, visible_peds):
         """For a given vehicle ID, get the observation info related explicitly to the given vehicle itself
         
@@ -627,16 +641,56 @@ class Bayesian1InferenceEnv(MultiEnv):
 
         return observation
 
-    def arrived_before(self, veh_id, rl_id):
-        """Return 1 if vehicle veh_id arrived at the intersection before vehicle rl_id"""
-        if veh_id not in self.arrival_order:
+    def arrived_before(self, veh_1, veh_2):
+        """Return 1 if vehicle veh_1 arrived at the intersection before vehicle veh_2. Else, return 0."""
+        if veh_2 not in self.arrival_order:
             return 1
-        elif self.arrival_order[rl_id] < self.arrival_order[veh_id]:
+        elif self.arrival_order[veh_1] < self.arrival_order[veh_2]:
             return 1
         else:
             return 0
 
-    def prob_ped_in_grid_names(self, num_cells_in_grid=6):
-        """Returns a list of names for state variables indicating the probability a ped is in grid i of a vehicle"""
+    def get_non_ped_obs(self, veh_id):
+        """Return all the obs for vehicle veh_id aside from the updated probabilities and pedestrian grid visibilities
+        
+        Returns
+        -------
+        non_ped_obs : list
+            [yaw, speed, turn_num, edge_pos] + ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] x (max_num_objects - 1)
+        """
+        max_objects = self.env_params.additional_params["max_num_objects"]
+        num_self_no_ped_obs = len(self.observation_names) - self.num_grid_cells
+        num_other_no_ped_obs = len(self.observation_names) - self.num_grid_cells
+        non_ped_obs = np.zeros(num_self_no_ped_obs + num_other_no_ped_obs * max_objects)
 
-        return [f'prob_ped in grid{i}' for i in range(1, num_cells_in_grid + 1)]
+        visible_vehicles, visible_pedestrians = self.find_visible_objects(veh_id, self.search_radius)
+
+        # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
+        visible_vehicles = sorted(visible_vehicles, key=lambda v: \
+                (self.k.vehicle.get_relative_angle(veh_id, \
+                self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
+
+        # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+        num_self_no_ped_obs = len(self.observation_names) - self.num_grid_cells
+        non_ped_obs[:num_self_no_ped_obs] = self.get_self_obs(veh_id, visible_pedestrians)[:num_self_no_ped_obs]
+        veh_x, veh_y = self.k.vehicle.get_orientation(veh_id)[:2]
+
+        # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
+        for idx, obs_veh_id in enumerate(visible_vehicles):
+            
+            before = self.arrived_before(veh_id, obs_veh_id)
+
+            observed_yaw = self.k.vehicle.get_yaw(obs_veh_id)
+            observed_speed = self.k.vehicle.get_speed(obs_veh_id)
+            observed_x, observed_y = self.k.vehicle.get_orientation(obs_veh_id)[:2]
+            rel_x = observed_x - veh_x
+            rel_y = observed_y - veh_y
+
+            # Consider the first 3 visible vehicles
+            if idx <= 2:
+                non_ped_obs[(idx * num_other_no_ped_obs) + num_self_no_ped_obs: num_other_no_ped_obs * (idx + 1) + num_self_no_ped_obs] = \
+                        [observed_yaw, observed_speed, rel_x, rel_y, before]
+
+        return non_ped_obs
+
+        

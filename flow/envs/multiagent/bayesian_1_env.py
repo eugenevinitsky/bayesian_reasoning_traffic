@@ -9,7 +9,8 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-from examples.rllib.multiagent_exps.test_predictor.pedestrian_policy_1 import test
+# from bayesian_inference.bayesian_inference_PPO import create_black_box
+
 # TODO(KL) means KL's reminder for KL
 
 ADDITIONAL_ENV_PARAMS = {
@@ -42,6 +43,15 @@ class Bayesian1Env(MultiEnv):
     The following states, actions and rewards are considered for one autonomous
     vehicle only, as they will be computed in the same way for each of them.
 
+    Attributes
+    ----------
+    updated_probs_fn: function
+        black-box policy the updated probabilities of pedestrians being in grid i
+        inputs: action, the acceleration of vehicle
+        six previous probabilities of pedestrian being in grid i
+        
+        (veh_id, action, non_ped_states, prev_probs) 
+
     States
         TBD
 
@@ -56,14 +66,18 @@ class Bayesian1Env(MultiEnv):
         A rollout is terminated if the time horizon is reached or if two
         vehicles collide into one another.
     """
-
-    def __init__(self, env_params, sim_params, network, simulator='traci'):
+    # TODO(KL) Not sure how to feed in params to the _init_: the envs object is created in registry.py (??)  Hard 
+    def __init__(self, env_params, sim_params, network, simulator='traci', ):
         for p in ADDITIONAL_ENV_PARAMS.keys():
             if p not in env_params.additional_params:
                 raise KeyError(
                     'Environment parameter "{}" not supplied'.format(p))
 
         super().__init__(env_params, sim_params, network, simulator)
+
+        # wonder if it's better to specify the file path or the kind of policy (the latter?)
+        
+        # self.updated_probs_fn = create_black_box("PPO")
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         self.search_radius = self.env_params.additional_params["search_radius"]
         self.maddpg = self.env_params.additional_params["maddpg"]
@@ -78,8 +92,11 @@ class Bayesian1Env(MultiEnv):
             self.default_state = {idx: -1 * np.ones(self.observation_space.shape[0])
                                   for idx in range(self.max_num_agents)}
 
+        # variable to encourage vehicle to move in curriculum training
         self.speed_reward_coefficient = 1
+        # track all rl_vehicles: hack to compute the last reward of an rl vehicle (reward for arriving, set states to 0)
         self.rl_set = set()
+        # feature for arrival
         self.arrival_order = {}
 
         # TODO hardcoding
@@ -88,12 +105,30 @@ class Bayesian1Env(MultiEnv):
             self.idx_to_av_id = {i: 'rl_{}'.format(i) for i in range(self.max_num_agents)}
             self.av_id_to_idx = {'rl_{}'.format(i): i for i in range(self.max_num_agents)}
 
+        self.edge_to_int = {
+                "(1.1)--(2.1)" : 0,
+                "(2.1)--(1.1)" : 1,
+                "(1.1)--(1.2)" : 2,
+                "(1.2)--(1.1)" : 3,
+                "(1.1)--(0.1)" : 4,
+                "(0.1)--(1.1)" : 5,
+                "(1.1)--(1.0)" : 6,
+                "(1.0)--(1.1)" : 7
+        }
+
+        self.in_edges = ["(2.1)--(1.1)",
+                "(1.2)--(1.1)",
+                "(0.1)--(1.1)",
+                "(1.0)--(1.1)"]
+
     @property
     def observation_space(self):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
-        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
-        obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
+        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw, 
+        # + 6 comes from appending 6 posterior probabilities of there being pedestrians in grid i = 1, ..., 6 
+        # for visible car X
+        obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names) + 6 * max_objects,), dtype=np.float32)
         if self.maddpg:
             # TODO(@evinitsky) put back the action mask
             # return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
@@ -139,32 +174,19 @@ class Bayesian1Env(MultiEnv):
             self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
+        """Return True if vehicle is at or past the intersection and false if not."""
+        # When vehicle exits, route is []
         if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
             return True
         return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
                 self.k.vehicle.get_position(veh_id) < 49)
-
+                
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
-
         obs = {}
-        edge_to_int = {
-                "(1.1)--(2.1)" : 0,
-                "(2.1)--(1.1)" : 1,
-                "(1.1)--(1.2)" : 2,
-                "(1.2)--(1.1)" : 3,
-                "(1.1)--(0.1)" : 4,
-                "(0.1)--(1.1)" : 5,
-                "(1.1)--(1.0)" : 6,
-                "(1.0)--(1.1)" : 7
-        }
 
-        in_edges = ["(2.1)--(1.1)",
-                "(1.2)--(1.1)",
-                "(0.1)--(1.1)",
-                "(1.0)--(1.1)"]
-
+        # TODO(KL) MADDPG hack
         for rl_id in self.rl_set:
             if rl_id in self.k.vehicle.get_arrived_ids():
                 if isinstance(self.observation_space, Dict):
@@ -177,6 +199,7 @@ class Bayesian1Env(MultiEnv):
 
                 else:
                     obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
@@ -187,6 +210,7 @@ class Bayesian1Env(MultiEnv):
 
                 assert rl_id in self.arrival_order
 
+                # MADDPG hack
                 if isinstance(self.observation_space, Dict):
                     observation = np.zeros(self.observation_space["obs"].shape[0])
                 else:
@@ -199,52 +223,10 @@ class Bayesian1Env(MultiEnv):
                         self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+                observation[:10] = self.get_self_obs(veh_id, visible_pedestrians)
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
-                yaw = self.k.vehicle.get_yaw(rl_id)
-                speed = self.k.vehicle.get_speed(rl_id)
-                edge_pos = self.k.vehicle.get_position(rl_id)
-                if self.k.vehicle.get_edge(rl_id) in in_edges:
-                    edge_pos = 50 - edge_pos
-                start, end = self.k.vehicle.get_route(rl_id)
-                start = edge_to_int[start]
-                end = edge_to_int[end]
-                turn_num = (end - start) % 8
-                if turn_num == 1:
-                    turn_num = 0 # turn right
-                elif turn_num == 3:
-                    turn_num = 1 # go straight
-                else:
-                    turn_num = 2 # turn left
 
-                observation[:4] = [yaw, speed, turn_num, edge_pos]
-
-                ped_param = [0, 0, 0, 0, 0, 0]
-                if len(visible_pedestrians) > 0:
-                    ped_x, ped_y = self.k.pedestrian.get_position(visible_pedestrians[0])
-                    rel_x = ped_x - veh_x
-                    rel_y = ped_y - veh_y
-                    rel_angle = self.k.vehicle.get_relative_angle(rl_id, (ped_x, ped_y))
-                    rel_angle = (rel_angle + 90) % 360
-                    dist = math.sqrt((rel_x ** 2) + (rel_y ** 2))
-                    if rel_angle < 60:
-                        if dist < 15:
-                            ped_param[0] = 1
-                        else:
-                            ped_param[1] = 1
-                    elif rel_angle < 120:
-                        if dist < 15:
-                            ped_param[2] = 1
-                        else:
-                            ped_param[3] = 1
-                    elif rel_angle < 180:
-                        if dist < 15:
-                            ped_param[4] = 1
-                        else:
-                            ped_param[5] = 1
-                    else:
-                        raise RuntimeError("Relative Angle is Invalid")
-                observation[4:10] = ped_param
-
+                # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
                 for index, veh_id in enumerate(visible_vehicles):
 
                     if veh_id not in self.arrival_order:
@@ -260,9 +242,13 @@ class Bayesian1Env(MultiEnv):
                     rel_x = observed_x - veh_x
                     rel_y = observed_y - veh_y
 
+                    # Consider the first 3 visible vehicles
                     if index <= 2:
                         observation[(index * 5) + 10: 5 * (index + 1) + 10] = \
                                 [observed_yaw, observed_speed, rel_x, rel_y, before]
+
+                    # append updated prob of ped in grid i to state vector
+                    # self 
 
                 obs.update({rl_id: observation})
 
@@ -512,7 +498,6 @@ class Bayesian1Env(MultiEnv):
         return self.get_state()
 
     def update_curriculum(self, training_iter):
-        """Update i.e. remove the speed reward coefficient"""
         if training_iter > 30:
             self.speed_reward_coefficient = 0
         else:
@@ -551,3 +536,79 @@ class Bayesian1Env(MultiEnv):
             temp_list = np.array([0 for _ in range(self.action_space.n)])
             temp_list[0] = 1
         return temp_list
+
+    ############################
+    # get_state() helper methods #
+    ############################
+
+    def get_self_obs(self, rl_id, visible_peds):
+        """For a given vehicle ID, get the observation info related explicitly to the given vehicle itself
+        
+        Parameters
+        ----------
+        veh_id: str
+            vehicle id
+        visible_peds: [ped_obj, ped_obj, ...]
+            list of pedestrian objects visible to vehicle id
+        edge_to_int:
+            ...
+        in_edges:
+            ...
+
+        Returns
+        -------
+        observation : [int / float]
+            list of integer / float values [yaw, speed, turn_num, edge_pos, ped_1, ..., ped_6]
+            ped_i is a binary value indicating whether (1) or not (0) 
+            there's a pedestrian in grid cell i of veh in question
+        
+        """
+        observation = []
+        veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
+        yaw = self.k.vehicle.get_yaw(rl_id)
+        speed = self.k.vehicle.get_speed(rl_id)
+        edge_pos = self.k.vehicle.get_position(rl_id)
+        if self.k.vehicle.get_edge(rl_id) in self.in_edges:
+            edge_pos = 50 - edge_pos
+        start, end = self.k.vehicle.get_route(rl_id)
+        start = self.edge_to_int[start]
+        end = self.edge_to_int[end]
+        turn_num = (end - start) % 8
+        if turn_num == 1:
+            turn_num = 0 # turn right
+        elif turn_num == 3:
+            turn_num = 1 # go straight
+        else:
+            turn_num = 2 # turn left
+
+        observation[:4] = [yaw, speed, turn_num, edge_pos]
+
+        ped_param = [0, 0, 0, 0, 0, 0]
+        # we assuming there's only 1 ped?
+        if len(visible_peds) > 0:
+            ped_x, ped_y = self.k.pedestrian.get_position(visible_peds[0])
+            rel_x = ped_x - veh_x
+            rel_y = ped_y - veh_y
+            rel_angle = self.k.vehicle.get_relative_angle(rl_id, (ped_x, ped_y))
+            rel_angle = (rel_angle + 90) % 360
+            dist = math.sqrt((rel_x ** 2) + (rel_y ** 2))
+            if rel_angle < 60:
+                if dist < 15:
+                    ped_param[0] = 1
+                else:
+                    ped_param[1] = 1
+            elif rel_angle < 120:
+                if dist < 15:
+                    ped_param[2] = 1
+                else:
+                    ped_param[3] = 1
+            elif rel_angle < 180:
+                if dist < 15:
+                    ped_param[4] = 1
+                else:
+                    ped_param[5] = 1
+            else:
+                raise RuntimeError("Relative Angle is Invalid")
+        observation[4:10] = ped_param
+
+        return observation
