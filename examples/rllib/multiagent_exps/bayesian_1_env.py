@@ -39,7 +39,7 @@ INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 
 
-def make_flow_params(args, pedestrians=False, render=False):
+def make_flow_params(args, pedestrians=False, render=True):
     """
     Generate the flow params for the experiment.
 

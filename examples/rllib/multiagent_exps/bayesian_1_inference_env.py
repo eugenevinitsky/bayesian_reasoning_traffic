@@ -2,6 +2,7 @@ import argparse
 import json
 import numpy as np
 
+import gym
 from gym.spaces import Tuple
 import ray
 try:
@@ -15,7 +16,7 @@ from ray import tune
 from ray.tune.registry import register_env
 from ray.tune import run_experiments
 
-from flow.envs.multiagent.bayesian_1_inference_env import Bayesian1InferenceEnv
+from flow.envs.multiagent import Bayesian1InferenceEnv
 from flow.networks import Bayesian1Network
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import SumoCarFollowingParams, VehicleParams
@@ -540,8 +541,10 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     if RUN_MODE == 'local' and not args.grid_search:
+        ray.shutdown()
         ray.init(num_cpus=args.n_cpus + 1, local_mode=True)
     elif RUN_MODE == 'cluster':
+        ray.shutdown()
         ray.init(redis_address="localhost:6379")
 
     exp_tag = {

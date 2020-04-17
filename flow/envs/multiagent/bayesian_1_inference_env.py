@@ -97,7 +97,6 @@ class Bayesian1InferenceEnv(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
 
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
-        
         self.agent = get_agent("PPO")
         self.num_grid_cells = 6
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] + self.prob_ped_in_grid_names(self.num_grid_cells)
