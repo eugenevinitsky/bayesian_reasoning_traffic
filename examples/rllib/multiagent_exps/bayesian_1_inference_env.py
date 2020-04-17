@@ -40,7 +40,7 @@ INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 
 
-def make_flow_params(args, pedestrians=False, render=True):
+def make_flow_params(args, pedestrians=False, render=False):
     """
     Generate the flow params for the experiment.
 
@@ -541,10 +541,10 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     if RUN_MODE == 'local' and not args.grid_search:
-        ray.shutdown()
-        ray.init(num_cpus=args.n_cpus + 1, local_mode=True)
+        ray.init(ignore_reinit_error=True)
+
+        # ray.init(num_cpus=args.n_cpus + 1, local_mode=True)
     elif RUN_MODE == 'cluster':
-        ray.shutdown()
         ray.init(redis_address="localhost:6379")
 
     exp_tag = {

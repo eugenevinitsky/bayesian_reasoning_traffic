@@ -98,6 +98,7 @@ class Bayesian1InferenceEnv(MultiEnv):
 
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
         self.agent = get_agent("PPO")
+        self.num_self_no_ped_obs = 4
         self.num_grid_cells = 6
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] + self.prob_ped_in_grid_names(self.num_grid_cells)
         self.search_radius = self.env_params.additional_params["search_radius"]
@@ -264,7 +265,7 @@ class Bayesian1InferenceEnv(MultiEnv):
                         if self.arrived_intersection(veh_id):
                             acceleration = self.k.vehicle.get_acceleration(veh_id)
                             visible_veh_non_ped_obs= self.get_non_ped_obs(veh_id)
-                            updated_ped_probs, self.priors[veh_id] = self.get_updated_priors(acceleration, visible_veh_non_ped_obs, self.priors[veh_id], self.agent)
+                            updated_ped_probs, self.priors[veh_id] = get_updated_priors(acceleration, visible_veh_non_ped_obs, self.priors.get(veh_id, {}), self.agent)
                         else:
                             # probabilities set to -1 if not performing inference
                             updated_ped_probs = [-1 for _ in range(self.num_grid_cells)]
@@ -658,7 +659,7 @@ class Bayesian1InferenceEnv(MultiEnv):
             [yaw, speed, turn_num, edge_pos] + ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] x (max_num_objects - 1)
         """
         max_objects = self.env_params.additional_params["max_num_objects"]
-        num_self_no_ped_obs = len(self.observation_names) - self.num_grid_cells
+        num_self_no_ped_obs = self.num_self_no_ped_obs
         num_other_no_ped_obs = len(self.observation_names) - self.num_grid_cells
         non_ped_obs = np.zeros(num_self_no_ped_obs + num_other_no_ped_obs * max_objects)
 
@@ -670,7 +671,6 @@ class Bayesian1InferenceEnv(MultiEnv):
                 self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
         # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-        num_self_no_ped_obs = len(self.observation_names) - self.num_grid_cells
         non_ped_obs[:num_self_no_ped_obs] = self.get_self_obs(veh_id, visible_pedestrians)[:num_self_no_ped_obs]
         veh_x, veh_y = self.k.vehicle.get_orientation(veh_id)[:2]
 
