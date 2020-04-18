@@ -520,10 +520,14 @@ if __name__ == '__main__':
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
+    parser.add_argument("--render",
+                        help="render SUMO simulation",
+                        action="store_true")
     args = parser.parse_args()
 
     pedestrians = args.pedestrians
-    flow_params = make_flow_params(args, pedestrians)
+    render = args.render
+    flow_params = make_flow_params(args, pedestrians, render)
 
     upload_dir = args.upload_dir
     RUN_MODE = args.run_mode
@@ -541,7 +545,7 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     if RUN_MODE == 'local' and not args.grid_search:
-        ray.init(ignore_reinit_error=True)
+        ray.init(num_cpus=args.n_cpus + 1, ignore_reinit_error=True)
 
         # ray.init(num_cpus=args.n_cpus + 1, local_mode=True)
     elif RUN_MODE == 'cluster':
@@ -564,6 +568,6 @@ if __name__ == '__main__':
 
     run_experiments(
         {
-            flow_params["exp_tag"]: exp_tag
+            flow_params["exp_tag"]: exp_tag,
          },
     )

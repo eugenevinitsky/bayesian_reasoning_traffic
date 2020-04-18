@@ -51,8 +51,8 @@ def get_updated_priors(action, non_ped_obs, prev_priors, agent, policy_type="PPO
 
     len_6_bitstring_lst = make_permutations(num_digits=6, vals_per_dig=2)
     for ped_obs in len_6_bitstring_lst:
-        modified_state = self_obs + ped_obs + other_veh_obs
-        mu, sigma = self.get_accel_gaussian_params(agent, modified_state, policy_type)
+        modified_state = np.array(list(self_obs) + list(ped_obs) + list(other_veh_obs))
+        mu, sigma = get_accel_gaussian_params(agent, modified_state, policy_type)
         # 1
         pdf_a_given_joint_o = prob_density(mu, sigma, action)
         # 2
@@ -70,8 +70,8 @@ def get_updated_priors(action, non_ped_obs, prev_priors, agent, policy_type="PPO
     for grid_id in range(1, 7):
         # 5
         pr_o_given_a = 0
-        for ped_combo in ped_combos_for_single_cond_pr(grid_idx, 1):
-            pr_o_given_a += pr_joint_o_given_a[ped_combo]
+        for ped_combo in ped_combos_for_single_cond_pr(grid_id, 1):
+            pr_o_given_a += new_priors[ped_combo]
         
         updated_prob_ped.append(pr_o_given_a)
 
@@ -91,9 +91,35 @@ def prob_density(mu, sigma, acceleration):
     exp = -0.5 * ((acceleration - mu) / sigma)**2
     return coeff * np.exp(exp)
 
+def get_accel_gaussian_params(agent, modified_state, policy_type="PPO"):
+    """Assuming the policy samples the output acceleration from a gaussian distribution, return the params for that gaussian.
+
+    Parameters
+    ----------
+    agent: ray.rllib object
+    modified_state: list of floats
+        the state we're considering    
+    policy_type: str
+        the type of policy we're using to model vehicle behaviour
+    
+    Returns
+    -------
+    mu, sigma: float, float
+    """
+    if modified_state.dtype != 'float64':
+        modified_state = modified_state.astype('float64')
+    # TODO(KL) write this in a more general way ...
+    if policy_type == "PPO":
+        _, _, logit = agent.compute_action(modified_state, policy_id='av', full_fetch=True)
+    else:
+        raise NotImplementedError
+
+    mu, ln_sigma = logit['behaviour_logits']
+    sigma = np.exp(ln_sigma)
+    return mu, sigma
 
 # better name for this? 
-def ped_combos_for_single_cond_prob(grid_idx, val, output_len=6):
+def ped_combos_for_single_cond_pr(grid_idx, val, output_len=6):
     """Helper fn for computing a 'single' conditional probability e.g. p(o_3 = 1 | action)
     Returns a list of pedestrian combinations to sum over to get the single conditional probability.
     
