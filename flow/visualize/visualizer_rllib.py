@@ -162,7 +162,7 @@ def visualizer_rllib(args):
     if multiagent:
         rets = {}
         # map the agent id to its policy
-        policy_map_fn = config['multiagent']['policy_mapping_fn'].func
+        policy_map_fn = config['multiagent']['policy_mapping_fn']
         for key in config['multiagent']['policies'].keys():
             rets[key] = []
     else:
@@ -173,7 +173,7 @@ def visualizer_rllib(args):
         if multiagent:
             state_init = {}
             # map the agent id to its policy
-            policy_map_fn = config['multiagent']['policy_mapping_fn'].func
+            policy_map_fn = config['multiagent']['policy_mapping_fn']
             size = config['model']['lstm_cell_size']
             for key in config['multiagent']['policies'].keys():
                 state_init[key] = [np.zeros(size, np.float32),
@@ -390,4 +390,5 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
     ray.init(num_cpus=1)
-    visualizer_rllib(args)
+    for _ in range(10):
+        visualizer_rllib(args)

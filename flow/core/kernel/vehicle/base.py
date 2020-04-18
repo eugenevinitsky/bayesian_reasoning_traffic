@@ -235,6 +235,11 @@ class KernelVehicle(object):
         """Return the simulation time delta of the vehicle of veh_id."""
         raise NotImplementedError
 
+    def get_depart_time(self, veh_id):
+        """Return the departure time of the vehicle of veh_id, 
+        where 0.00 is the time when the simulation begins."""
+        raise NotImplementedError
+
     def get_type(self, veh_id):
         """Return the type of the vehicle of veh_id."""
         raise NotImplementedError
@@ -682,6 +687,20 @@ class KernelVehicle(object):
             vehicle id, or list of vehicle ids
         error : any, optional
             value that is returned if the vehicle is not found
+
+        Returns
+        -------
+        float
+        """
+        raise NotImplementedError
+
+    def get_acceleration(self, veh_id):
+        """Return the acceleration in m/s^2 of the named vehicle within the last step.
+
+        Parameters
+        ----------
+        veh_id : str
+        vehicle id
 
         Returns
         -------

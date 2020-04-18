@@ -103,7 +103,7 @@ class Bayesian1Network(TrafficLightGridNetwork):
                  pedestrians=None):
         """Initialize an n*m traffic light grid network."""
         super().__init__(name, vehicles, net_params, initial_config,
-                         traffic_lights, pedestrians, use_traffic_lights=False, nodes_radius=0.1)
+                         traffic_lights, pedestrians, use_traffic_lights=False, nodes_radius=None)
         self.nodes = self._nodes
 
     @property

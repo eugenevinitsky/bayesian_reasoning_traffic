@@ -147,7 +147,6 @@ class TrafficLightGridNetwork(Network):
             self.nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes, self.horizontal_lanes)
         else:
             self.nodes_radius = nodes_radius
-        
 
         # total number of edges in the network
         self.num_edges = 4 * ((self.col_num + 1) * self.row_num + self.col_num)

@@ -8,8 +8,9 @@ from flow.envs.multiagent.ring.accel import MultiAgentAccelEnv
 from flow.envs.multiagent.traffic_light_grid import MultiTrafficLightGridPOEnv
 from flow.envs.multiagent.highway import MultiAgentHighwayPOEnv
 from flow.envs.multiagent.bayesian_1_env import Bayesian1Env
+from flow.envs.multiagent.bayesian_1_inference_env import Bayesian1InferenceEnv
 from flow.envs.multiagent.bayesian_0_env import Bayesian0Env
 
 
 __all__ = ['MultiEnv', 'MultiAgentAccelEnv', 'MultiWaveAttenuationPOEnv',
-           'MultiTrafficLightGridPOEnv', 'MultiAgentHighwayPOEnv', 'Bayesian1Env', 'Bayesian0Env']
+           'MultiTrafficLightGridPOEnv', 'MultiAgentHighwayPOEnv', 'Bayesian1Env', 'Bayesian0Env', 'Bayesian1InferenceEnv']

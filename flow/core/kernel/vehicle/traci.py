@@ -100,6 +100,7 @@ class TraCIVehicle(KernelVehicle):
                 self.__vehicles[veh_id] = dict()
                 self.__vehicles[veh_id]['type'] = typ['veh_id']
                 self.__vehicles[veh_id]['initial_speed'] = typ['initial_speed']
+                self.__vehicles[veh_id]['depart_time'] = typ['depart_time']
                 self.num_vehicles += 1
                 if typ['acceleration_controller'][0] == RLController:
                     self.num_rl_vehicles += 1
@@ -179,7 +180,7 @@ class TraCIVehicle(KernelVehicle):
                     vals['depart'] = str(
                         float(vals['depart']) + 2 * self.sim_step)
                     self.kernel_api.vehicle.addFull(
-                        veh_id, 'route{}_0'.format(veh_id), **vals)
+                        veh_id, 'route{}_0'.format(veh_id), **vals) # TODO(KL) Check if this departtime breaks anything
         else:
             self.time_counter += 1
             # update the "last_lc" variable
@@ -325,6 +326,10 @@ class TraCIVehicle(KernelVehicle):
         self.__vehicles[veh_id]["initial_speed"] = \
             self.type_parameters[veh_type]["initial_speed"]
 
+        # specify the departure time
+        self.__vehicles[veh_id]["depart_time"] = \
+            self.type_parameters[veh_type]["depart_time"]
+
         # set the speed mode for the vehicle
         speed_mode = self.type_parameters[veh_type][
             "car_following_params"].speed_mode
@@ -415,6 +420,10 @@ class TraCIVehicle(KernelVehicle):
         """See parent class."""
         return self.__vehicles[veh_id]["timedelta"]
 
+    def get_depart_time(self, veh_id):
+        """See parent class."""
+        return self.__vehicles[veh_id]["depart_time"]
+
     def get_type(self, veh_id):
         """Return the type of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["type"]
@@ -422,6 +431,19 @@ class TraCIVehicle(KernelVehicle):
     def get_initial_speed(self, veh_id):
         """Return the initial speed of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["initial_speed"]
+
+
+    def set_speed_mode(self, veh_id, speed_mode):
+        SPEED_MODES = {
+                "aggressive" : 0,
+                "obey_safe_speed" : 1,
+                "no_collide" : 7,
+                "right_of_way" : 25,
+                "all_checks" : 31
+        }
+        if type(speed_mode) == str:
+            speed_mode = SPEED_MODES[speed_mode]
+        self.kernel_api.vehicle.setSpeedMode(veh_id, speed_mode)
 
     def get_relative_angle(self, veh_id, position):
         """Return the relative angle between veh_id and another position."""
@@ -1124,7 +1146,7 @@ class TraCIVehicle(KernelVehicle):
             self.kernel_api.vehicle.setColor(
                 vehID=veh_id, color=(r, g, b, 255))
 
-    def add(self, veh_id, type_id, edge, pos, lane, speed):
+    def add(self, veh_id, type_id, edge, pos, lane, speed, depart_time="now"):
         """See parent class."""
         if veh_id in self.master_kernel.network.rts:
             # If the vehicle has its own route, use that route. This is used in
@@ -1134,6 +1156,7 @@ class TraCIVehicle(KernelVehicle):
             num_routes = len(self.master_kernel.network.rts[edge])
             frac = [val[1] for val in self.master_kernel.network.rts[edge]]
             route_id = 'route{}_{}'.format(edge, np.random.choice(
+                
                 [i for i in range(num_routes)], size=1, p=frac)[0])
 
         self.kernel_api.vehicle.addFull(
@@ -1142,7 +1165,9 @@ class TraCIVehicle(KernelVehicle):
             typeID=str(type_id),
             departLane=str(lane),
             departPos=str(pos),
-            departSpeed=str(speed))
+            departSpeed=str(speed),
+            depart=str(depart_time))
+            
 
     def get_max_speed(self, veh_id, error=-1001):
         """See parent class."""
@@ -1157,3 +1182,7 @@ class TraCIVehicle(KernelVehicle):
     def set_length(self, veh_id, length):
         """See parent class."""
         self.kernel_api.vehicle.setLength(veh_id, length)
+
+    def get_acceleration(self, veh_id):
+        """See parent class"""
+        return self.kernel_api.vehicle.getAcceleration(veh_id)

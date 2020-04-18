@@ -255,7 +255,7 @@ class Env(gym.Env):
             ensure_dir(sim_params.emission_path)
             self.sim_params.emission_path = sim_params.emission_path
 
-        self.network.routes = self.network.specify_routes()
+        self.network.routes = self.network.specify_routes(self.net_params)
 
         self.k.network.generate_network(self.network)
         self.k.vehicle.initialize(deepcopy(self.network.vehicles))
@@ -288,8 +288,8 @@ class Env(gym.Env):
             lane = start_lanes[i]
             speed = self.k.vehicle.get_initial_speed(veh_id)
             edge = start_pos[i][0]
-
-            self.initial_state[veh_id] = (type_id, edge, lane, pos, speed)
+            depart_time = self.k.vehicle.get_depart_time(veh_id)
+            self.initial_state[veh_id] = (type_id, edge, lane, pos, speed, depart_time)
 
     def step(self, rl_actions):
         """Advance the environment by one step.

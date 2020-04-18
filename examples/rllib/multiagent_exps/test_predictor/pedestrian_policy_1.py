@@ -196,7 +196,6 @@ def run_env(env, agent, config, flow_params):
                 num_pedestrian_crash += num_collision
         
         # plot_2_licnes(prob_action_given_ped, prob_action_given_no_ped)
-        import ipdb; ipdb.set_trace()
         plot_2_lines(probs_ped_given_action, probs_no_ped_given_action, updated_priors=True, viewable_ped=visible_pedestrian)
         plot_2_lines(probs_ped_given_action_fixed_priors, probs_no_ped_given_action_fixed_priors, updated_priors=False, viewable_ped=visible_pedestrian)
 
@@ -281,17 +280,24 @@ def create_agent(args, flow_params):
                   + 'differs from the one stored in params.json '
                   + '\'{}\''.format(config_run))
             sys.exit(1)
-    if args.run:
-        agent_cls = get_agent_class(args.run)
-    elif config_run:
-        agent_cls = get_agent_class(config_run)
+    
+    if args.algo == 'MADDPG':
+        from flow.algorithms.maddpg import maddpg
+        agent_cls = maddpg.MADDPGTrainer
     else:
-        print('visualizer_rllib.py: error: could not find flow parameter '
-              '\'run\' in params.json, '
-              'add argument --run to provide the algorithm or model used '
-              'to train the results\n e.g. '
-              'python ./visualizer_rllib.py /tmp/ray/result_dir 1 --run PPO')
-        sys.exit(1)
+        if args.run:
+            agent_cls = get_agent_class(args.run)
+        elif config_run:
+            agent_cls = get_agent_class(config_run)
+
+
+        else:
+            print('visualizer_rllib.py: error: could not find flow parameter '
+                  '\'run\' in params.json, '
+                  'add argument --run to provide the algorithm or model used '
+                  'to train the results\n e.g. '
+                  'python ./visualizer_rllib.py /tmp/ray/result_dir 1 --run PPO')
+            sys.exit(1)
 
     # TODO(@evinitsky) duplication
     env, env_name = create_env(args, flow_params)
