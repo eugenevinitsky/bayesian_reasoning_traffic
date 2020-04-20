@@ -37,7 +37,7 @@ Here the arguments are:
 def get_agent(policy_type="PPO"):
     parser = create_parser()
     if policy_type == "PPO":
-        args = parser.parse_args(["/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/bayesian_inference/PPO_Bayesian1Env-v0_147ad4ee_2020-04-11_11-17-50y_jh0l53", "100"])
+        args = parser.parse_args(["./PPO_Bayesian1Env-v0_147ad4ee_2020-04-11_11-17-50y_jh0l53", "100"])
         # args = parser.parse_args(["./PPO_Bayesian1Env-v0_147ad4ee_2020-04-11_11-17-50y_jh0l53", "100"])
     else:
         raise NotImplementedError
