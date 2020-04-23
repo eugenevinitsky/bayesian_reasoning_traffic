@@ -92,7 +92,7 @@ class Bayesian1Env(MultiEnv):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
         # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
-        obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
+        obs_space = Box(-float('inf'), float('inf'), shape=(11 + max_objects * len(self.observation_names),), dtype=np.float32)
         if self.maddpg:
             # TODO(@evinitsky) put back the action mask
             # return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
@@ -202,6 +202,13 @@ class Bayesian1Env(MultiEnv):
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
                 yaw = self.k.vehicle.get_yaw(rl_id)
                 speed = self.k.vehicle.get_speed(rl_id)
+
+                curr_edge = self.k.vehicle.get_edge(rl_id)
+                if curr_edge in edge_to_int:
+                    curr_edge = edge_to_int[curr_edge]
+                else:
+                    curr_edge = -1
+
                 edge_pos = self.k.vehicle.get_position(rl_id)
                 if self.k.vehicle.get_edge(rl_id) in in_edges:
                     edge_pos = 50 - edge_pos
@@ -217,7 +224,7 @@ class Bayesian1Env(MultiEnv):
                 else:
                     turn_num = 2 # turn left
 
-                observation[:4] = [yaw, speed, turn_num, edge_pos]
+                observation[:5] = [yaw, speed, turn_num, curr_edge, edge_pos]
 
                 ped_param = [0, 0, 0, 0, 0, 0]
                 if len(visible_pedestrians) > 0:
@@ -244,7 +251,7 @@ class Bayesian1Env(MultiEnv):
                             ped_param[5] = 1
                     else:
                         raise RuntimeError("Relative Angle is Invalid")
-                observation[4:10] = ped_param
+                observation[5:11] = ped_param
 
                 for index, veh_id in enumerate(visible_vehicles):
 
@@ -262,7 +269,7 @@ class Bayesian1Env(MultiEnv):
                     rel_y = observed_y - veh_y
 
                     if index <= 2:
-                        observation[(index * 5) + 10: 5 * (index + 1) + 10] = \
+                        observation[(index * 5) + 11: 5 * (index + 1) + 11] = \
                                 [observed_yaw, observed_speed, rel_x, rel_y, before]
 
                 obs.update({rl_id: observation})
