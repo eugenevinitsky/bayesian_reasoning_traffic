@@ -224,7 +224,7 @@ class Bayesian1Env(MultiEnv):
                 else:
                     turn_num = 2 # turn left
 
-                observation[:5] = [yaw, speed, turn_num, curr_edge, edge_pos]
+                observation[:5] = [yaw/ 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50]
 
                 ped_param = [0, 0, 0, 0, 0, 0]
                 if len(visible_pedestrians) > 0:
@@ -270,7 +270,10 @@ class Bayesian1Env(MultiEnv):
 
                     if index <= 2:
                         observation[(index * 5) + 11: 5 * (index + 1) + 11] = \
-                                [observed_yaw, observed_speed, rel_x, rel_y, before]
+                                [observed_yaw / 360, observed_speed / 20, 
+                                        rel_x / 50, rel_y / 50, before / 5]
+                    if max(observation) > 1 or min(observation) < -1:
+                        print(observation)
 
                 obs.update({rl_id: observation})
 
