@@ -91,7 +91,6 @@ class Bayesian1Env(MultiEnv):
             #                       for idx in range(self.max_num_agents)}
             self.default_state = {idx: -1 * np.ones(self.observation_space.shape[0])
                                   for idx in range(self.max_num_agents)}
-
         # variable to encourage vehicle to move in curriculum training
         self.speed_reward_coefficient = 1
         # track all rl_vehicles: hack to compute the last reward of an rl vehicle (reward for arriving, set states to 0)
@@ -125,10 +124,8 @@ class Bayesian1Env(MultiEnv):
     def observation_space(self):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
-        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw, 
-        # + 6 comes from appending 6 posterior probabilities of there being pedestrians in grid i = 1, ..., 6 
-        # for visible car X
-        obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names) + 6 * max_objects,), dtype=np.float32)
+        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
+        obs_space = Box(-float('inf'), float('inf'), shape=(11 + max_objects * len(self.observation_names),), dtype=np.float32)
         if self.maddpg:
             # TODO(@evinitsky) put back the action mask
             # return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
@@ -223,18 +220,13 @@ class Bayesian1Env(MultiEnv):
                         self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-                observation[:10] = self.get_self_obs(veh_id, visible_pedestrians)
+                observation[:11] = self.get_self_obs(veh_id, visible_pedestrians)
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
                 for index, veh_id in enumerate(visible_vehicles):
 
-                    if veh_id not in self.arrival_order:
-                        before = 1
-                    elif self.arrival_order[rl_id] < self.arrival_order[veh_id]:
-                        before = 1
-                    else:
-                        before = 0
+                    before = self.arrived_before(rl_id, veh_id)
 
                     observed_yaw = self.k.vehicle.get_yaw(veh_id)
                     observed_speed = self.k.vehicle.get_speed(veh_id)
@@ -244,8 +236,11 @@ class Bayesian1Env(MultiEnv):
 
                     # Consider the first 3 visible vehicles
                     if index <= 2:
-                        observation[(index * 5) + 10: 5 * (index + 1) + 10] = \
-                                [observed_yaw, observed_speed, rel_x, rel_y, before]
+                        observation[(index * 5) + 11: 5 * (index + 1) + 11] = \
+                                [observed_yaw / 360, observed_speed / 20, 
+                                        rel_x / 50, rel_y / 50, before / 5]
+                    if max(observation) > 1 or min(observation) < -1:
+                        print(observation)
 
                     # append updated prob of ped in grid i to state vector
                     # self 
@@ -303,7 +298,7 @@ class Bayesian1Env(MultiEnv):
                     rewards[rl_id] = 50 / 100
             '''
             if rl_id in self.k.vehicle.get_arrived_ids():
-                rewards[rl_id] = 25
+                rewards[rl_id] = 25 / 100
 
         if self.maddpg:
             if len(self.rl_set) > 0:
@@ -567,6 +562,11 @@ class Bayesian1Env(MultiEnv):
         veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
         yaw = self.k.vehicle.get_yaw(rl_id)
         speed = self.k.vehicle.get_speed(rl_id)
+        curr_edge = self.k.vehicle.get_edge(rl_id)
+        if curr_edge in self.edge_to_int:
+            curr_edge = self.edge_to_int[curr_edge]
+        else:
+            curr_edge = -1
         edge_pos = self.k.vehicle.get_position(rl_id)
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
@@ -581,7 +581,7 @@ class Bayesian1Env(MultiEnv):
         else:
             turn_num = 2 # turn left
 
-        observation[:4] = [yaw, speed, turn_num, edge_pos]
+        observation[:5] = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50]
 
         ped_param = [0, 0, 0, 0, 0, 0]
         # we assuming there's only 1 ped?
@@ -609,6 +609,15 @@ class Bayesian1Env(MultiEnv):
                     ped_param[5] = 1
             else:
                 raise RuntimeError("Relative Angle is Invalid")
-        observation[4:10] = ped_param
+        observation[5:11] = ped_param
 
         return observation
+
+    def arrived_before(self, veh_1, veh_2):
+        """Return 1 if vehicle veh_1 arrived at the intersection before vehicle veh_2. Else, return 0."""
+        if veh_2 not in self.arrival_order:
+            return 1
+        elif self.arrival_order[veh_1] < self.arrival_order[veh_2]:
+            return 1
+        else:
+            return 0
