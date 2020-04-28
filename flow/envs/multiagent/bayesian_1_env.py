@@ -28,6 +28,7 @@ ADDITIONAL_ENV_PARAMS = {
     "maddpg": False
 }
 
+HARD_BRAKE_PENALTY = 0.01
 
 class Bayesian1Env(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
@@ -97,6 +98,8 @@ class Bayesian1Env(MultiEnv):
         self.rl_set = set()
         # feature for arrival
         self.arrival_order = {}
+        # set to store vehicles currently inside the intersection
+        self.inside_intersection = set()
 
         # TODO hardcoding
         # this is used for maddpg
@@ -274,6 +277,7 @@ class Bayesian1Env(MultiEnv):
 
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
+                inside_intersection = rl_id in self.inside_intersection
 
                 if len(collision_pedestrians) > 0:
                     reward = -300
@@ -288,6 +292,10 @@ class Bayesian1Env(MultiEnv):
                     '''
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                if rl_id in self.inside_intersection:
+                    # TODO(KL) 'hard-brake' as negative acceleration?
+                    if self.k.vehicle.get_acceleration(rl_id) < 0:
+                        reward -= HARD_BRAKE_PENALTY
 
                 rewards[rl_id] = reward / 100
 
@@ -545,10 +553,6 @@ class Bayesian1Env(MultiEnv):
             vehicle id
         visible_peds: [ped_obj, ped_obj, ...]
             list of pedestrian objects visible to vehicle id
-        edge_to_int:
-            ...
-        in_edges:
-            ...
 
         Returns
         -------
@@ -562,11 +566,16 @@ class Bayesian1Env(MultiEnv):
         veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
         yaw = self.k.vehicle.get_yaw(rl_id)
         speed = self.k.vehicle.get_speed(rl_id)
+
         curr_edge = self.k.vehicle.get_edge(rl_id)
         if curr_edge in self.edge_to_int:
             curr_edge = self.edge_to_int[curr_edge]
+            if rl_id in self.inside_intersection: 
+                self.inside_intersection.remove(rl_id)
         else:
             curr_edge = -1
+            self.inside_intersection.add(rl_id)
+
         edge_pos = self.k.vehicle.get_position(rl_id)
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
