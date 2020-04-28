@@ -28,7 +28,7 @@ ADDITIONAL_ENV_PARAMS = {
     "maddpg": False
 }
 
-HARD_BRAKE_PENALTY = 0.01
+HARD_BRAKE_PENALTY = 0.04
 
 class Bayesian1Env(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
@@ -292,10 +292,14 @@ class Bayesian1Env(MultiEnv):
                     '''
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
+                print(f'outside intersection?')
                 if rl_id in self.inside_intersection:
+                    print(f'no, inside')
                     # TODO(KL) 'hard-brake' as negative acceleration?
-                    if self.k.vehicle.get_acceleration(rl_id) < 0:
+                    print(self.k.vehicle.get_acceleration(rl_id))
+                    if self.k.vehicle.get_acceleration(rl_id) < -0.8:
                         reward -= HARD_BRAKE_PENALTY
+                        print('ouch penalty')
 
                 rewards[rl_id] = reward / 100
 

@@ -39,7 +39,7 @@ INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 
 
-def make_flow_params(args, pedestrians=False, render=True):
+def make_flow_params(args, pedestrians=False, render=False):
     """
     Generate the flow params for the experiment.
 
@@ -353,10 +353,10 @@ def setup_exps_PPO(args, flow_params):
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = True
     # config['no_done_at_end'] = True
-    config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
         config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
+        config['gamma'] = tune.grid_search([0.999, 0.95, 0.9])  # discount rate
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
@@ -532,10 +532,15 @@ if __name__ == '__main__':
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
+    parser.add_argument("--render",
+                        help="render SUMO simulation",
+                        action="store_true")
+
     args = parser.parse_args()
 
     pedestrians = args.pedestrians
-    flow_params = make_flow_params(args, pedestrians)
+    render = args.render
+    flow_params = make_flow_params(args, pedestrians, render)
 
     upload_dir = args.upload_dir
     RUN_MODE = args.run_mode
