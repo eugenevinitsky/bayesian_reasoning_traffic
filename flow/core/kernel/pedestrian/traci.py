@@ -144,11 +144,36 @@ class TraCIPedestrian(KernelPedestrian):
         return self.__sumo_obs.get(ped_id, {}).get(tc.VAR_ROAD_ID, error)
 
     def get_yaw(self, ped_id, error=-1001):
+        """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_yaw(pedID, error) for pedID in ped_id]
         return self.__sumo_obs.get(ped_id, {}).get(tc.VAR_ANGLE, error)
+
+    def get_next_edge(self, ped_id, error=-1001):
+         """See parent class."""
+        if isinstance(ped_id, (list, np.ndarray)):
+            return [self.get_next_edge(pedID, error) for pedID in ped_id]
+        return self.kernel_api._person.getNextEdge(ped_id) 
+ss
+    def get_lane_position(self, ped_id):
+         """See parent class."""
+        if isinstance(ped_id, (list, np.ndarray)):
+            return [self.get_lane_position(pedID, error) for pedID in ped_id]
+        return self.kernel_api._person.getLanePosition(ped_id)
 
     def is_pedestrian(self, obj_id):
         """See parent class"""
         # @Nick
         return obj_id in self.__ids
+
+
+    ############################################################################
+    #                             State setting methods                        #
+    ############################################################################
+
+    def set_speed(self, ped_id, speed, error=-1001):
+        """See parent class."""
+        if isinstance(ped_id, (list, np.ndarray)):
+            _ = [self.set_speed(pedID, error) for pedID in ped_id]
+        self.kernel_api._person.setSpeed(ped_id, speed)
+
