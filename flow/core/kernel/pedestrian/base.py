@@ -150,7 +150,7 @@ class KernelPedestrian(object):
     #                             State setting methods                        #
     ############################################################################
 
-    def set_speed(self, ped_id, speed, error=-""):
+    def set_speed(self, ped_id, speed, error=""):
         """Sets the maximum speed in m/s for the named person for subsequent step.
         TODO(KL) Subsequent step = immediate next step only?
 

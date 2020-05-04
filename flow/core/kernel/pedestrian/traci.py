@@ -150,13 +150,13 @@ class TraCIPedestrian(KernelPedestrian):
         return self.__sumo_obs.get(ped_id, {}).get(tc.VAR_ANGLE, error)
 
     def get_next_edge(self, ped_id, error=-1001):
-         """See parent class."""
+        """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_next_edge(pedID, error) for pedID in ped_id]
         return self.kernel_api._person.getNextEdge(ped_id) 
-ss
+
     def get_lane_position(self, ped_id):
-         """See parent class."""
+        """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_lane_position(pedID, error) for pedID in ped_id]
         return self.kernel_api._person.getLanePosition(ped_id)
