@@ -61,6 +61,16 @@ class KernelPedestrian(object):
         """
         raise NotImplementedError
 
+    def get_next_edge(self, ped_id):
+        """getNextEdge() -> string
+
+        If the person is walking, returns the next edge on the persons route
+        (including crossing and walkingareas). If there is no further edge or the
+        person is in another stage, returns the empty string.
+        """
+        raise NotImplementedError
+
+
     def remove(self, ped_id):
         """Remove a pedestrian.
 
@@ -113,6 +123,13 @@ class KernelPedestrian(object):
         """
         raise NotImplementedError
 
+    def get_lane_position(self, ped_id, error=-1001):
+        """Returns the position of the person along the lane / edge measured in m.
+        
+        Make sure to check what the 'start' of a lane / edge is.
+        """
+        raise NotImplementedError
+
     def get_edge(self, ped_id, error=""):
         """ Returns the edge the specified pedestrian is currently on.
 
@@ -126,5 +143,26 @@ class KernelPedestrian(object):
         Returns
         -------
         str
+        """
+        raise NotImplementedError
+
+    ############################################################################
+    #                             State setting methods                        #
+    ############################################################################
+
+    def set_speed(self, ped_id, speed, error=""):
+        """Sets the maximum speed in m/s for the named person for subsequent step.
+        TODO(KL) Subsequent step = immediate next step only?
+
+        Parameters
+        ----------
+        ped_id : str or list of str
+            pedestrian id, or list of pedestrian ids
+        speed : double
+            maximum speed in m/s for the named person for subsequent step.
+
+        Returns
+        -------
+        None
         """
         raise NotImplementedError
