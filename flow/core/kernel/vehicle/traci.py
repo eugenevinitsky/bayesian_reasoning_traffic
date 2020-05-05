@@ -531,6 +531,15 @@ class TraCIVehicle(KernelVehicle):
                 attributes['viewed'] = v_id in viewable_vehicles
                 viewed_veh[v_id] = attributes
 
+            # add observing vehicle to the visualization
+            attributes = {}
+            attributes['xy'] = self.get_orientation(veh_id)[:2]
+            attributes['yaw'] = self.get_yaw(veh_id)
+            attributes['length'] = self.get_length(veh_id)
+            attributes['width'] = self.get_width(veh_id)
+            attributes['viewed'] = True
+            viewed_veh[veh_id] = attributes
+
             viewed_ped = {}
             for ped_id in viewable_pedestrians:
                 attributes = {}

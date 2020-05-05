@@ -22,13 +22,15 @@ ADDITIONAL_ENV_PARAMS = {
     "target_velocity": 25,
     # how many objects in our local radius we want to return
     "max_num_objects": 3,
-    # how large of a radius to search in for a given vehicle in meters
-    "search_radius": 50,
+    # how large of a radius to search vehicles in for a given vehicle in meters
+    # "search_veh_radius": 50,
+    # # how large of a radius to search pedestrians in for a given vehicle in meters
+    # "search_ped_radius": 22,
     # whether we use an observation space configured for MADDPG
     "maddpg": False
 }
 
-HARD_BRAKE_PENALTY = 0.1/100
+HARD_BRAKE_PENALTY = 0.001
 
 class Bayesian0NoGridEnv(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
@@ -78,9 +80,9 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "ped_in_view"]
+        self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
+        self.search_ped_radius = self.env_params.additional_params["search_ped_radius"]
 
-        self.search_radius = self.env_params.additional_params["search_radius"]
-        
         # variable to encourage vehicle to move in curriculum training
         self.speed_reward_coefficient = 1
         # track all rl_vehicles: hack to compute the last reward of an rl vehicle (reward for arriving, set states to 0)
@@ -165,7 +167,6 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 else:
                     obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
-
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
@@ -181,7 +182,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                     observation = np.zeros(self.observation_space["obs"].shape[0])
                 else:
                     observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
-                visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
+
+                visible_vehicles, _ = self.find_visible_objects(rl_id, self.search_veh_radius)
+                _, visible_pedestrians = self.find_visible_objects(rl_id, self.search_ped_radius)
 
                 # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
                 visible_vehicles = sorted(visible_vehicles, key=lambda v: \
@@ -271,6 +274,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 if rl_id in self.k.vehicle.get_arrived_ids():
                     rewards[rl_id] = 50 / 100
             '''
+            # want the car to not just adapt that random rule of stopping for 5 secs, then going ...
             if rl_id in self.k.vehicle.get_arrived_ids():
                 rewards[rl_id] = 25 / 100
 
