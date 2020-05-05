@@ -52,40 +52,17 @@ def make_flow_params(args, pedestrians=False, render=False):
     dict
         flow_params object
     """
-
+    NUM_PEDS = 12
     pedestrian_params = None
     pedestrian_params = PedestrianParams()
-    pedestrian_params.add(
-        ped_id='ped_0',
-        depart_time='0.00',   #TODO(KL) depart time of non 0 doesn't work
-        start='(1.2)--(1.1)',
-        end='(1.1)--(1.0)',
-        depart_pos='44')
-    pedestrian_params.add(
-        ped_id='ped_1',
-        depart_time='0.00',
-        start='(1.2)--(1.1)',
-        end='(1.1)--(1.0)',
-        depart_pos='45')
-    pedestrian_params.add(
-        ped_id='ped_2',
-        depart_time='0.00',
-        start='(1.2)--(1.1)',
-        end='(1.1)--(1.0)',
-        depart_pos='46')
-    pedestrian_params.add(
-        ped_id='ped_3',
-        depart_time='0.00',
-        start='(1.2)--(1.1)',
-        end='(1.1)--(1.0)',
-        depart_pos='47')
-    pedestrian_params.add(
-        ped_id='ped_4',
-        depart_time='0.00',
-        start='(1.2)--(1.1)',
-        end='(1.1)--(1.0)',
-        depart_pos='48')
-
+    for i in range(NUM_PEDS):
+        pedestrian_params.add(
+            ped_id=f'ped_{i}',
+            depart_time='0.00',
+            start='(1.2)--(1.1)',
+            end='(1.1)--(1.0)',
+            depart_pos=f'{44 + 0.8*i}')
+        
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
     # support traffic light compliance
@@ -165,6 +142,7 @@ def make_flow_params(args, pedestrians=False, render=False):
         ),
 
         # environment related parameters (see flow.core.params.EnvParams)
+        
         env=EnvParams(
             horizon=args.horizon,
             additional_params={
@@ -177,12 +155,13 @@ def make_flow_params(args, pedestrians=False, render=False):
                 # how many objects in our local radius we want to return
                 "max_num_objects": 3,
                 # how large of a radius to search in for a given vehicle in meters
-                "search_radius": 50,
+                "search_veh_radius": 50,
+                # how large of a radius to search for pedestrians in for a given vehicle in meters (create effect of only seeing pedestrian only when relevant)
+                "search_ped_radius": 22,
                 # whether we use the multi-agent algorithm QMIX
                 "maddpg": args.algo == "MADDPG"
             },
         ),
-
         # network-related parameters (see flow.core.params.NetParams and the
         # network's documentation or ADDITIONAL_NET_PARAMS component)
         net=NetParams(
