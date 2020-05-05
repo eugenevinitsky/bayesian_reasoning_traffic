@@ -1,5 +1,5 @@
 """Objects that define the various meta-parameters of an experiment."""
-
+import numpy as np
 import logging
 import collections
 
@@ -364,7 +364,6 @@ class PedestrianParams:
         self.ids = []
         self.num_pedestrians = 0
         self.params = {}
-
         self.__pedestrians = collections.OrderedDict()
 
     def add(self, ped_id, depart_time, start, end, depart_pos='random', arrival_pos='random'):

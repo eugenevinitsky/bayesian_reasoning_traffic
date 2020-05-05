@@ -28,7 +28,7 @@ ADDITIONAL_ENV_PARAMS = {
     "maddpg": False
 }
 
-HARD_BRAKE_PENALTY = 0.04
+HARD_BRAKE_PENALTY = 0.1/100
 
 class Bayesian0NoGridEnv(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
@@ -360,6 +360,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.k.vehicle.remove(veh_id)
             except (FatalTraCIError, TraCIException):
                 print("Error during start: {}".format(traceback.format_exc()))
+
+        randomize_ped = True
+    
 
         # reintroduce the initial vehicles to the network # TODO(KL) I've set randomize_drivers to false - need to subclass
         randomize_drivers = False

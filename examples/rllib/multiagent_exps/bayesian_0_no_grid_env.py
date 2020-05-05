@@ -54,14 +54,37 @@ def make_flow_params(args, pedestrians=False, render=False):
     """
 
     pedestrian_params = None
-    if pedestrians and np.random.randint(10) < 5:
-        pedestrian_params = PedestrianParams()
-        pedestrian_params.add(
-            ped_id='ped_0',
-            depart_time='0.00',
-            start='(1.2)--(1.1)',
-            end='(1.1)--(1.0)',
-            depart_pos='49')
+    pedestrian_params = PedestrianParams()
+    pedestrian_params.add(
+        ped_id='ped_0',
+        depart_time='0.00',   #TODO(KL) depart time of non 0 doesn't work
+        start='(1.2)--(1.1)',
+        end='(1.1)--(1.0)',
+        depart_pos='44')
+    pedestrian_params.add(
+        ped_id='ped_1',
+        depart_time='0.00',
+        start='(1.2)--(1.1)',
+        end='(1.1)--(1.0)',
+        depart_pos='45')
+    pedestrian_params.add(
+        ped_id='ped_2',
+        depart_time='0.00',
+        start='(1.2)--(1.1)',
+        end='(1.1)--(1.0)',
+        depart_pos='46')
+    pedestrian_params.add(
+        ped_id='ped_3',
+        depart_time='0.00',
+        start='(1.2)--(1.1)',
+        end='(1.1)--(1.0)',
+        depart_pos='47')
+    pedestrian_params.add(
+        ped_id='ped_4',
+        depart_time='0.00',
+        start='(1.2)--(1.1)',
+        end='(1.1)--(1.0)',
+        depart_pos='48')
 
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -77,7 +100,7 @@ def make_flow_params(args, pedestrians=False, render=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='1.00',
+        depart_time='0.5',
         num_vehicles=1)
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
@@ -88,7 +111,7 @@ def make_flow_params(args, pedestrians=False, render=False):
             speed_mode='right_of_way',
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='3.00',
+        depart_time='2.5',
         num_vehicles=1,
         )
 
@@ -123,7 +146,7 @@ def make_flow_params(args, pedestrians=False, render=False):
 
     flow_params = dict(
         # name of the experiment
-        exp_tag="bayesian_1_env",
+        exp_tag="bayesian_0_no_grid_env",
 
         # name of the flow environment the experiment is running on
         env_name=Bayesian0NoGridEnv,
@@ -441,11 +464,11 @@ def setup_exps_MADDPG(args, flow_params):
         # config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
         # config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
         # config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
+        config['gamma'] = tune.grid_search([0.92, 0.95, 0.99])  # discount rate
         config['lr'] = tune.grid_search([1e-4, 1e-5])
-        config['n_step'] = tune.grid_search([1, 10, 100])
+        config['n_step'] = tune.grid_search([1, 10])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
-
 
     # define callbacks for tensorboard
 
