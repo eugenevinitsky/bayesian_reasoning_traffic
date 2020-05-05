@@ -175,6 +175,8 @@ class Bayesian1Network(TrafficLightGridNetwork):
 
         return rts
 
+
+
     def randomize_pedestrian_routes(self, pedestrians):
 
         if not pedestrians:

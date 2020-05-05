@@ -153,7 +153,29 @@ class Bayesian0Network(TrafficLightGridNetwork):
                car_2_start_edge: [car_2_start_edge, car_2_end_edge],
                car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
 
+        self.randomize_pedestrian_appearance(net_params.additional_params["pedestrian_kernel"], 0.5)
+    
+
         return rts
+
+    def randomize_pedestrian_appearance(self, pedestrians, appearance_prob=1):
+        """Randomly decide whether or not to include the pedestrian in the experiment
+        
+        We "don't include" the pedestrian by setting its departPos to a far away position - in this sense, the ped is still there, just irrelevant
+        """
+        if not pedestrians:
+            return None
+
+        if np.random.uniform() <= appearance_prob:
+            for ped_id in pedestrians.params:
+                # if departPosActual doesn't exist yet, then the current value of departPos is correct
+                pedestrians.params[ped_id]['departPos'] = pedestrians.params[ped_id].get("departPosActual", pedestrians.params[ped_id]['departPos'])
+                pedestrians.params[ped_id]['departPosActual'] = pedestrians.params[ped_id]['departPos']
+        else:
+            for ped_id in pedestrians.params:
+                # store the actual depart position because we're about to set the pedestrian to be as far as possible
+                pedestrians.params[ped_id]['departPosActual'] = pedestrians.params[ped_id].get("departPosActual", pedestrians.params[ped_id]['departPos'])
+                pedestrians.params[ped_id]['departPos'] = str(0)
 
     def specify_types(self, net_params):
         """See parent class."""
