@@ -61,7 +61,7 @@ def make_flow_params(args, pedestrians=False, render=False):
             depart_time='0.00',
             start='(1.2)--(1.1)',
             end='(1.1)--(1.0)',
-            depart_pos=f'{44 + 0.8*i}')
+            depart_pos=f'{44 + 0.5*i}')
         
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -72,6 +72,7 @@ def make_flow_params(args, pedestrians=False, render=False):
         veh_id="human",
         acceleration_controller=(SimCarFollowingController, {}),
         car_following_params=SumoCarFollowingParams(
+            max_speed=0.1,
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="right_of_way",
@@ -521,7 +522,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=500,
+    parser.add_argument("--horizon", type=int, default=1200,
                         help="Horizon length of a rollout")
 
     # optional input parameters
