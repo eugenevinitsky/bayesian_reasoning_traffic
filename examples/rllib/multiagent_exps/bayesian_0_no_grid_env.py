@@ -442,13 +442,14 @@ def setup_exps_MADDPG(args, flow_params):
     config['buffer_size'] = 10000
     config['actor_lr'] = 1e-3
     config['critic_lr'] = 1e-3
+    config['n_step'] = 1
+
     if args.grid_search:
         # config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
         # config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
         # config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
-        config['gamma'] = tune.grid_search([0.92, 0.95, 0.99])  # discount rate
+        config['gamma'] = tune.grid_search([0.99, 0.999])  # discount rate
         config['lr'] = tune.grid_search([1e-4, 1e-5])
-        config['n_step'] = tune.grid_search([1, 10])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
