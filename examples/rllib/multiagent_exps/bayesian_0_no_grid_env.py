@@ -61,7 +61,7 @@ def make_flow_params(args, pedestrians=False, render=False):
             depart_time='0.00',
             start='(1.2)--(1.1)',
             end='(1.1)--(1.0)',
-            depart_pos=f'{44 + 0.8*i}')
+            depart_pos=f'{44 + 0.5*i}')
         
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -351,7 +351,7 @@ def setup_exps_PPO(args, flow_params):
     config = agent_cls._default_config.copy()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['simple_optimizer'] = True
+    config['simple_optimizer'] = False
     # config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.999  # discount rate
@@ -441,13 +441,14 @@ def setup_exps_MADDPG(args, flow_params):
     config['buffer_size'] = 10000
     config['actor_lr'] = 1e-3
     config['critic_lr'] = 1e-3
+    config['n_step'] = 1
+
     if args.grid_search:
         # config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
         # config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
         # config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
-        config['gamma'] = tune.grid_search([0.92, 0.95, 0.99])  # discount rate
+        config['gamma'] = tune.grid_search([0.99, 0.999])  # discount rate
         config['lr'] = tune.grid_search([1e-4, 1e-5])
-        config['n_step'] = tune.grid_search([1, 10])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
@@ -521,7 +522,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=500,
+    parser.add_argument("--horizon", type=int, default=1200,
                         help="Horizon length of a rollout")
 
     # optional input parameters
