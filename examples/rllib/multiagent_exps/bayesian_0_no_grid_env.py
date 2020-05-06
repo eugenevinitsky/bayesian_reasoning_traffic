@@ -72,7 +72,6 @@ def make_flow_params(args, pedestrians=False, render=False):
         veh_id="human",
         acceleration_controller=(SimCarFollowingController, {}),
         car_following_params=SumoCarFollowingParams(
-            max_speed=0.1,
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="right_of_way",
@@ -352,7 +351,7 @@ def setup_exps_PPO(args, flow_params):
     config = agent_cls._default_config.copy()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['simple_optimizer'] = True
+    config['simple_optimizer'] = False
     # config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.999  # discount rate
