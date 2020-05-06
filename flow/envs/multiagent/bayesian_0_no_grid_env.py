@@ -23,9 +23,9 @@ ADDITIONAL_ENV_PARAMS = {
     # how many objects in our local radius we want to return
     "max_num_objects": 3,
     # how large of a radius to search vehicles in for a given vehicle in meters
-    # "search_veh_radius": 50,
+    "search_veh_radius": 50,
     # # how large of a radius to search pedestrians in for a given vehicle in meters
-    # "search_ped_radius": 22,
+    "search_ped_radius": 22,
     # whether we use an observation space configured for MADDPG
     "maddpg": False
 }
