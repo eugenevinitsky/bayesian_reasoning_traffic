@@ -138,11 +138,11 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
         car_1_start_edge = "(0.1)--(1.1)"
         car_1_end_edge = "(1.1)--(2.1)"
-
         car_2_start_edge = "(1.2)--(1.1)"
-        if np.random.uniform() < 0.33:
+        rand = np.random.uniform() 
+        if rand < 0.33:
             car_2_end_edge = "(1.1)--(2.1)"
-        elif np.random.uniform() < 0.33:
+        elif rand < 0.66:
             car_2_end_edge = "(1.1)--(1.0)"
         else:
             car_2_end_edge = "(1.1)--(0.1)"

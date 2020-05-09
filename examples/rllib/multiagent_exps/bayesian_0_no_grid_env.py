@@ -179,8 +179,8 @@ def make_flow_params(args, pedestrians=False, render=False):
                 "horizontal_lanes": 1,
                 "vertical_lanes": 1,
                 "randomize_routes": True,
-                "vehicle_kernel": vehicles,
-                "pedestrian_kernel": pedestrian_params,
+                # "vehicle_kernel": vehicles,
+                # "pedestrian_kernel": pedestrian_params,
             },
         ),
 
