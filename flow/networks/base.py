@@ -337,10 +337,6 @@ class Network(object):
         self.traffic_lights = traffic_lights
         self.pedestrians = pedestrians
 
-        # TODO(@nliu) find a better solution to passing in pedestrian kernel
-        # to randomize pedestrian routes
-        self.net_params.additional_params["pedestrian_kernel"] = pedestrians
-
         # specify routes vehicles and pedestrians can take
         self.routes = self.specify_routes(net_params)
 

@@ -145,8 +145,10 @@ class Bayesian0NoGridEnv(MultiEnv):
         # When vehicle exits, route is []
         if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
             return True
+        intersection_length = self.net_params.additional_params['grid_array']['inner_length']
+        dist_to_intersection = intersection_length - self.k.vehicle.get_position(veh_id) 
         return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
-                self.k.vehicle.get_position(veh_id) < 49)
+                dist_to_intersection > 20)
                 
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,

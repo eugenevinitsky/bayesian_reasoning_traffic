@@ -77,7 +77,7 @@ def make_flow_params(args, pedestrians=False, render=False):
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='0.5',
+        depart_time='0.25',
         num_vehicles=1)
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
@@ -179,6 +179,8 @@ def make_flow_params(args, pedestrians=False, render=False):
                 "horizontal_lanes": 1,
                 "vertical_lanes": 1,
                 "randomize_routes": True,
+                "vehicle_kernel": vehicles,
+                "pedestrian_kernel": pedestrian_params,
             },
         ),
 

@@ -140,11 +140,24 @@ class Bayesian0Network(TrafficLightGridNetwork):
         car_1_end_edge = "(1.1)--(2.1)"
 
         car_2_start_edge = "(1.2)--(1.1)"
-        car_2_end_edge = "(1.2)--(1.1)"
-
-        if 2 == 2:
-            car_2_start_edge = "(1.2)--(1.1)"
+        if np.random.uniform() < 0.33:
             car_2_end_edge = "(1.1)--(2.1)"
+        elif np.random.uniform() < 0.33:
+            car_2_end_edge = "(1.1)--(1.0)"
+        else:
+            car_2_end_edge = "(1.1)--(0.1)"
+
+        # randomize
+        # TODO(KL) Add in sumo kernel subscription for the position at which vehicle departs!!!
+        veh_id = 'human'
+        vehicles = net_params.additional_params["vehicle_kernel"]
+        vehicle = vehicles.type_parameters[veh_id]
+        if np.random.uniform() <= 0.4:
+            vehicle['departPos'] = str(np.random.normal(5))
+        elif np.random.uniform() <= 0.4:
+            vehicle['departPos'] = str(np.random.normal(20))
+        else:
+            vehicle['departPos'] = str(np.random.normal(15))
 
         car_3_start_edge = "(2.1)--(1.1)"
         car_3_end_edge = "(1.1)--(1.0)"
@@ -172,9 +185,9 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
                 # guard against the vehicle from stochastically stopping
                 if np.random.uniform() <= 0.4:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(45 + 0.3*ped_num, 1))
+                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(48 + 0.3*ped_num, 1))
                 elif np.random.uniform() <= 0.4:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(40 + 0.3*ped_num, 1))
+                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(42 + 0.3*ped_num, 1))
                 elif np.random.uniform() <= 0.4:
                     pedestrians.params[ped_id]['departPos'] = str(np.random.normal(35 + 0.3*ped_num, 1))
                 elif np.random.uniform() <= 0.8:
