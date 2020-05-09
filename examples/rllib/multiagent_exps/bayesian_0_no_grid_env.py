@@ -243,6 +243,7 @@ def on_episode_end(info):
     episode.custom_metrics['num_ped_collisions'] = episode.user_data['num_ped_collisions']
     episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
     episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
+    print("test if recording collision", 111111111111111111111111111111111111111111111111111111111111111111111111111111111111, episode.custom_metrics['num_ped_collisions'])
 
     if episode.user_data['num_ped_collisions'] + episode.user_data['num_ped_collisions'] == 0:
         episode.user_data['vehicle_leaving_time'] += \

@@ -149,15 +149,15 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
         # randomize
         # TODO(KL) Add in sumo kernel subscription for the position at which vehicle departs!!!
-        veh_id = 'human'
-        vehicles = net_params.additional_params["vehicle_kernel"]
-        vehicle = vehicles.type_parameters[veh_id]
-        if np.random.uniform() <= 0.4:
-            vehicle['departPos'] = str(np.random.normal(5))
-        elif np.random.uniform() <= 0.4:
-            vehicle['departPos'] = str(np.random.normal(20))
-        else:
-            vehicle['departPos'] = str(np.random.normal(15))
+        # veh_id = 'human'
+        # vehicles = net_params.additional_params["vehicle_kernel"]
+        # vehicle = vehicles.type_parameters[veh_id]
+        # if np.random.uniform() <= 0.4:
+        #     vehicle['departPos'] = str(np.random.normal(5))
+        # elif np.random.uniform() <= 0.4:
+        #     vehicle['departPos'] = str(np.random.normal(20))
+        # else:
+        #     vehicle['departPos'] = str(np.random.normal(15))
 
         car_3_start_edge = "(2.1)--(1.1)"
         car_3_end_edge = "(1.1)--(1.0)"
