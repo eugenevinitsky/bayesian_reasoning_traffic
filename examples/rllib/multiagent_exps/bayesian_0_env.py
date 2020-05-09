@@ -343,7 +343,7 @@ def setup_exps_PPO(args, flow_params):
     config = agent_cls._default_config.copy()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['simple_optimizer'] = True
+    config['simple_optimizer'] = False
     config['no_done_at_end'] = True
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
