@@ -137,7 +137,7 @@ def make_flow_params(args, pedestrians=False, render=False):
         # sumo-related parameters (see flow.core.params.SumoParams)
         sim=SumoParams(
             restart_instance=True,
-            sim_step=0.1,
+            sim_step=0.2,
             render=render,
         ),
 
