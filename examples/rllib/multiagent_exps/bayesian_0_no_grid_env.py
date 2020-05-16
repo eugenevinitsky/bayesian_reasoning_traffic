@@ -243,7 +243,6 @@ def on_episode_end(info):
     episode.custom_metrics['num_ped_collisions'] = episode.user_data['num_ped_collisions']
     episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
     episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
-    print("test if recording collision", 111111111111111111111111111111111111111111111111111111111111111111111111111111111111, episode.custom_metrics['num_ped_collisions'])
 
     if episode.user_data['num_ped_collisions'] + episode.user_data['num_ped_collisions'] == 0:
         episode.user_data['vehicle_leaving_time'] += \
@@ -533,7 +532,7 @@ if __name__ == '__main__':
                         help='If true, a grid search is run')
     parser.add_argument('--run_mode', type=str, default='local',
                         help="Experiment run mode (local | cluster)")
-    parser.add_argument('--algo', type=str, default='QMIX',
+    parser.add_argument('--algo', type=str, default='PPO',
                         help="RL method to use (PPO, TD3, QMIX)")
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",

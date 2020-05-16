@@ -31,6 +31,7 @@ ADDITIONAL_ENV_PARAMS = {
 }
 
 HARD_BRAKE_PENALTY = 0.001
+NUM_PED_LOCATIONS = 4
 
 class Bayesian0NoGridEnv(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
@@ -79,7 +80,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
 
         self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
-        self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "ped_in_view"]
+        self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
         self.search_ped_radius = self.env_params.additional_params["search_ped_radius"]
 
@@ -87,6 +88,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.speed_reward_coefficient = 1
         # track all rl_vehicles: hack to compute the last reward of an rl vehicle (reward for arriving, set states to 0)
         self.rl_set = set()
+        # track vehicles that have already been rewarded once for passing intersection
+        self.past_intersection_rewarded_set = set()
         # feature for arrival
         self.arrival_order = {}
         # set to store vehicles currently inside the intersection
@@ -149,7 +152,16 @@ class Bayesian0NoGridEnv(MultiEnv):
         dist_to_intersection = intersection_length - self.k.vehicle.get_position(veh_id) 
         return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
                 dist_to_intersection > 20)
-                
+    
+    def past_intersection(self, veh_id):
+        """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
+        edges_remaining = len(self.k.vehicle.get_route(veh_id))
+        if edges_remaining == 0:
+            return True
+        elif edges_remaining == 1 and self.k.vehicle.get_position(veh_id) > 20: # vehicle arrived at final destination
+            return True
+        return False
+
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
@@ -169,14 +181,18 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 else:
                     obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            if self.arrived_intersection(rl_id):
+            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+                print(self.past_intersection(rl_id))
+                # ensure 
+                # if self.past_intersection(rl_id):
+                #     self.past_intersection_rewarded_set.add(rl_id)
                 self.rl_set.add(rl_id)
-
                 assert rl_id in self.arrival_order
 
                 # MADDPG hack
@@ -216,20 +232,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     if max(observation) > 1 or min(observation) < -1:
                         print(observation)
 
-                    # append updated prob of ped in grid i to state vector
-                    # self 
-
                 obs.update({rl_id: observation})
-
-        # if self.maddpg and len(self.rl_set) > 0:
-
-        #     # TODO(@evinitsky) think this doesn't have to be a deepcopy
-        #     veh_info_copy = deepcopy(self.default_state)
-        #     # veh_info_copy.update({self.av_id_to_idx[rl_id]: {"obs": obs[rl_id],
-        #     #                                   "action_mask": self.get_action_mask(valid_agent=True)}
-        #     #                       for rl_id in obs.keys()})
-        #     veh_info_copy.update({self.av_id_to_idx[rl_id]: obs[rl_id] for rl_id in obs.keys()})
-        #     obs = veh_info_copy
 
         return obs
 
@@ -242,14 +245,13 @@ class Bayesian0NoGridEnv(MultiEnv):
         rewards = {}
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            if self.arrived_intersection(rl_id):
+            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
                 # TODO(@evinitsky) pick the right reward
                 reward = 0
 
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
                 inside_intersection = rl_id in self.inside_intersection
-
                 if len(collision_pedestrians) > 0:
                     reward = -300
                 elif rl_id in collision_vehicles:
@@ -270,21 +272,29 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 rewards[rl_id] = reward / 100
 
-        for rl_id in self.rl_set:
-            '''
-            if self.arrived_intersection(rl_id):
-                if rl_id in self.k.vehicle.get_arrived_ids():
-                    rewards[rl_id] = 50 / 100
-            '''
-            # want the car to not just adapt that random rule of stopping for 5 secs, then going ...
-            if rl_id in self.k.vehicle.get_arrived_ids():
+            elif self.past_intersection(rl_id):
                 rewards[rl_id] = 25 / 100
 
-        # if self.maddpg:
-        #     if len(self.rl_set) > 0:
-        #         temp_rewards = {self.av_id_to_idx[rl_id]: 0 for rl_id in self.av_id_to_idx.keys()}
-        #         temp_rewards.update({self.av_id_to_idx[rl_id]: reward for rl_id, reward in rewards.items()})
-        #         rewards = temp_rewards
+
+        # for rl_id in self.rl_set:
+        #     '''
+        #     if self.arrived_intersection(rl_id):
+        #         if rl_id in self.k.vehicle.get_arrived_ids():
+        #             rewards[rl_id] = 50 / 100
+        #     '''
+        #     print(self.past_intersection(rl_id), "past intersection")
+        #     print(rl_id in self.k.vehicle.get_arrived_ids(), "arrived ids")
+            
+        #     # need to 'disable' the truth value for this condition
+
+        #     if self.past_intersection(rl_id):
+        #         if rl_id not in self.past_intersection_rewarded_set:
+        #             self.past_intersection_rewarded_set.add(rl_id)
+        #             rewards[rl_id] = 25 / 100
+
+            # want the car to not just adapt that random rule of stopping for 5 secs, then going ...
+            # if rl_id in self.k.vehicle.get_arrived_ids():
+            #     rewards[rl_id] = 25 / 100
 
         return rewards
 
@@ -501,6 +511,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                 veh_id,
                 self.k.pedestrian,
                 radius)
+        # TODO(KL)
+        visible_edges = None
 
         return visible_vehicles, visible_pedestrians
 
@@ -550,7 +562,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             curr_edge = -1
             self.inside_intersection.add(rl_id)
-
         edge_pos = self.k.vehicle.get_position(rl_id)
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
@@ -567,8 +578,7 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         # subtract by one since we're not including the pedestrian here
         observation[:len(self.self_obs_names) - 1] = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50]
-        # TODO(KL) this won't work for more complex cases
-        ped_param = 1 if len(visible_peds) > 0 else 0
+        ped_param = self.ped_params(visible_peds, visible_edges=['(1.1)_c0', '(1.1)_c1', '(1.1)_c2', '(1.1)_c3', '(1.1)_w0', '(1.1)_w1', '(1.1)_w2', '(1.1)_w3'])
 
         # # we assuming there's only 1 ped?
         # if len(visible_peds) > 0:
@@ -596,7 +606,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     else:
         #         raise RuntimeError("Relative Angle is Invalid")
         # observation[5:num_self_obs] = ped_param
-        observation.append(ped_param)
+        observation.extend(ped_param)
         return observation
 
     def arrived_before(self, veh_1, veh_2):
@@ -607,3 +617,51 @@ class Bayesian0NoGridEnv(MultiEnv):
             return 1
         else:
             return 0
+
+    def ped_params(self, visible_pedestrians, visible_edges=['(1.1)_c0', '(1.1)_c1', '(1.1)_c2', '(1.1)_c3', '(1.1)_w0', '(1.1)_w1', '(1.1)_w2', '(1.1)_w3']):
+        """Return length 4 ternary indicator array for an RL car's pedestrian visibility state vector.
+        
+        1 = the car physically sees a pedestrian on that crosswalk
+        0 = the car physically sees no pedestrians on that crosswalk
+        -1 = the car can't tell if there's a pedestrian on that crosswalk (because crosswalk is not fully in view)
+
+        The 4 possible physical locations are indicated in the slide (?) currently in my journal.     
+        **Simplifying Assumption** pedestrians only traverse crossings counterclockwise:
+        
+        | Crossing number | Sumo Edge location   |
+        | --------------- | -------------------- |
+        | 0               | c0, w1_0             |
+        | 1               | c1, w2_0             |
+        | 2               | c2, w3_0             |
+        | 3               | c3, w0_0             |
+        """
+        locs = [-1] * NUM_PED_LOCATIONS
+        ped_kernel = self.k.pedestrian
+        for edge in visible_edges:
+            loc = self.ped_edge_to_loc(edge)
+            if loc is not None:
+                locs[loc] = 0
+
+        for ped in visible_pedestrians:
+            ped_edge = ped_kernel.get_edge(ped)
+            loc = self.ped_edge_to_loc(ped_edge)
+            if loc is not None:
+                locs[loc] = 1
+        return locs
+
+    def ped_edge_to_loc(self, ped_edge):
+        """Return the number that a pedestrian's edge corresponds to. 
+        Return None if pedestrian isn't on one of the physical locations
+        """
+        if "c" not in ped_edge and "w" not in ped_edge:
+            return None
+        else:
+            ped_edge = ped_edge.split("_")[1]    
+            if 'c' in ped_edge:
+                return int(ped_edge[1])
+            if 'w' in ped_edge:
+                return (int(ped_edge[1]) - 1) % 4
+            
+
+
+
