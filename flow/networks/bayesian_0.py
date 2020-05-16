@@ -147,18 +147,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
         else:
             car_2_end_edge = "(1.1)--(0.1)"
 
-        # randomize
-        # TODO(KL) Add in sumo kernel subscription for the position at which vehicle departs!!!
-        # veh_id = 'human'
-        # vehicles = net_params.additional_params["vehicle_kernel"]
-        # vehicle = vehicles.type_parameters[veh_id]
-        # if np.random.uniform() <= 0.4:
-        #     vehicle['departPos'] = str(np.random.normal(5))
-        # elif np.random.uniform() <= 0.4:
-        #     vehicle['departPos'] = str(np.random.normal(20))
-        # else:
-        #     vehicle['departPos'] = str(np.random.normal(15))
-
         car_3_start_edge = "(2.1)--(1.1)"
         car_3_end_edge = "(1.1)--(1.0)"
 
@@ -166,26 +154,36 @@ class Bayesian0Network(TrafficLightGridNetwork):
                car_2_start_edge: [car_2_start_edge, car_2_end_edge],
                car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
 
-        self.randomize_pedestrian_appearance(net_params.additional_params["pedestrian_kernel"], 0.5)
-    
+        self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.5)
 
         return rts
 
-    def randomize_pedestrian_appearance(self, pedestrians, appearance_prob=1):
-        """Randomly decide whether or not to include the pedestrian in the experiment
-        
+    def randomize_pedestrian_routes(self, pedestrians, appearance_prob=1):
+        """Randomly insert pedestrians into the experiment
+        **Simplifying Assumption**: pedestrians only traverse crossings counterclockwise:
+
         We "don't include" the pedestrian by setting its departPos to a far away position - in this sense, the ped is still there, just irrelevant
         """
         if not pedestrians:
             return None
 
+        routes = [('(1.2)--(1.1)', '(1.1)--(1.0)'),
+                ('(0.1)--(1.1)', '(1.1)--(2.1)'),
+                ('(1.0)--(1.1)', '(1.1)--(1.2)'),
+                ('(2.1)--(1.1)', '(1.1)--(0.1)')]
+                
+        rt = np.random.randint(4)
+
         if np.random.uniform() <= appearance_prob:
             for ped_id in pedestrians.params:
+                pedestrians.params[ped_id]['from'] = routes[rt][0]
+                pedestrians.params[ped_id]['to'] = routes[rt][1]
+
                 ped_num = int(ped_id.split("ped_")[1])
                 # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
                 # guard against the vehicle from stochastically stopping
                 if np.random.uniform() <= 0.4:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(48 + 0.3*ped_num, 1))
+                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(46 + 0.3*ped_num, 1))
                 elif np.random.uniform() <= 0.4:
                     pedestrians.params[ped_id]['departPos'] = str(np.random.normal(42 + 0.3*ped_num, 1))
                 elif np.random.uniform() <= 0.4:
@@ -289,7 +287,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
         # let the top car say here forever as an obstacle
         car_2_start_edge = "(1.2)--(1.1)"
         car_2_end_edge = "(1.1)--(2.1)"
-        car_2_start_pos = 0
+        car_2_start_pos = np.random.normal(25, 25)
 
         # # 'thinking' car
         # car_3_start_edge = "(2.1)--(1.1)"
@@ -299,6 +297,9 @@ class Bayesian0Network(TrafficLightGridNetwork):
         # start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
         # # In SUMO, lanes are zero-indexed starting from the right-most lane
         # start_lanes = [0, 0, 0]
+
+        # randomize
+        # TODO(KL) Add in sumo kernel subscription for the position at which vehicle departs!!!
 
         
         start_pos = [(car_1_start_edge, car_1_start_pos)]

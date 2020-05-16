@@ -242,6 +242,7 @@ class VehicleParams:
             num_vehicles=0,
             car_following_params=None,
             lane_change_params=None,
+            depart_pos=0,
             depart_time="now"):
         """Add a sequence of vehicles to the list of vehicles in the network.
 
@@ -292,6 +293,7 @@ class VehicleParams:
              "initial_speed": initial_speed,
              "car_following_params": car_following_params,
              "lane_change_params": lane_change_params,
+             "depart_pos": depart_pos,
              "depart_time": depart_time}
 
         # TODO: delete?
@@ -312,6 +314,8 @@ class VehicleParams:
                 car_following_params,
             "lane_change_params":
                 lane_change_params,
+            "depart_pos":
+                depart_pos,
             "depart_time":
                 depart_time
         })

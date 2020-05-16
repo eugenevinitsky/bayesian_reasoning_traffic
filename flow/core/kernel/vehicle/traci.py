@@ -100,6 +100,7 @@ class TraCIVehicle(KernelVehicle):
                 self.__vehicles[veh_id] = dict()
                 self.__vehicles[veh_id]['type'] = typ['veh_id']
                 self.__vehicles[veh_id]['initial_speed'] = typ['initial_speed']
+                self.__vehicles[veh_id]['depart_pos'] = typ['depart_pos']
                 self.__vehicles[veh_id]['depart_time'] = typ['depart_time']
                 self.num_vehicles += 1
                 if typ['acceleration_controller'][0] == RLController:
@@ -326,6 +327,10 @@ class TraCIVehicle(KernelVehicle):
         self.__vehicles[veh_id]["initial_speed"] = \
             self.type_parameters[veh_type]["initial_speed"]
 
+        # specify the departure position
+        self.__vehicles[veh_id]["depart_pos"] = \
+            self.type_parameters[veh_type]["depart_pos"]
+
         # specify the departure time
         self.__vehicles[veh_id]["depart_time"] = \
             self.type_parameters[veh_type]["depart_time"]
@@ -423,6 +428,10 @@ class TraCIVehicle(KernelVehicle):
     def get_depart_time(self, veh_id):
         """See parent class."""
         return self.__vehicles[veh_id]["depart_time"]
+
+    def get_depart_pos(self, veh_id):
+        """See parent class."""
+        return self.__vehicles[veh_id]["depart_pos"]
 
     def get_type(self, veh_id):
         """Return the type of the vehicle of veh_id."""

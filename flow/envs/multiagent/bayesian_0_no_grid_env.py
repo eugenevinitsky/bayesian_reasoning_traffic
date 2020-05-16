@@ -187,8 +187,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
-                print(self.past_intersection(rl_id))
+            if self.arrived_intersection(rl_id):
+                # and not self.past_intersection(rl_id):
+                #print(self.past_intersection(rl_id))
                 # ensure 
                 # if self.past_intersection(rl_id):
                 #     self.past_intersection_rewarded_set.add(rl_id)
@@ -245,7 +246,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         rewards = {}
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+            if self.arrived_intersection(rl_id): # and not self.past_intersection(rl_id):
                 # TODO(@evinitsky) pick the right reward
                 reward = 0
 
@@ -272,29 +273,28 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 rewards[rl_id] = reward / 100
 
-            elif self.past_intersection(rl_id):
-                rewards[rl_id] = 25 / 100
+            # elif self.arrived_intersection(rl_id) and self.past_intersection(rl_id):
+            #     rewards[rl_id] = 25 / 100
 
-
-        # for rl_id in self.rl_set:
-        #     '''
-        #     if self.arrived_intersection(rl_id):
-        #         if rl_id in self.k.vehicle.get_arrived_ids():
-        #             rewards[rl_id] = 50 / 100
-        #     '''
-        #     print(self.past_intersection(rl_id), "past intersection")
-        #     print(rl_id in self.k.vehicle.get_arrived_ids(), "arrived ids")
+        for rl_id in self.rl_set:
+            '''
+            if self.arrived_intersection(rl_id):
+                if rl_id in self.k.vehicle.get_arrived_ids():
+                    rewards[rl_id] = 50 / 100
+            '''
+            # print(self.past_intersection(rl_id), "past intersection")
+            # print(rl_id in self.k.vehicle.get_arrived_ids(), "arrived ids")
             
-        #     # need to 'disable' the truth value for this condition
+            # # need to 'disable' the truth value for this condition
 
-        #     if self.past_intersection(rl_id):
-        #         if rl_id not in self.past_intersection_rewarded_set:
-        #             self.past_intersection_rewarded_set.add(rl_id)
-        #             rewards[rl_id] = 25 / 100
+            # if self.past_intersection(rl_id):
+            #     if rl_id not in self.past_intersection_rewarded_set:
+            #         self.past_intersection_rewarded_set.add(rl_id)
+            #         rewards[rl_id] = 25 / 100
 
             # want the car to not just adapt that random rule of stopping for 5 secs, then going ...
-            # if rl_id in self.k.vehicle.get_arrived_ids():
-            #     rewards[rl_id] = 25 / 100
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                rewards[rl_id] = 25 / 100
 
         return rewards
 
