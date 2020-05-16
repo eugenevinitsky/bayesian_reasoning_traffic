@@ -126,7 +126,8 @@ class MultiEnv(MultiAgentEnv, Env):
             reward = self.compute_reward(clipped_actions, fail=crash)
         else:
             reward = self.compute_reward(rl_actions, fail=crash)
-
+        if states.keys() != reward.keys():
+            import ipdb; ipdb.set_trace()
         return states, reward, done, infos
 
     def reset(self, new_inflow_rate=None):
