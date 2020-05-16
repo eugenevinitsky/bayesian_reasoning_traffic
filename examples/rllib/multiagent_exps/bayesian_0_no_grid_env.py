@@ -355,12 +355,11 @@ def setup_exps_PPO(args, flow_params):
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
     # config['no_done_at_end'] = True
-    config['lr'] = 1e-4
+    config['lr'] = 5e-5
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
-        config['lr'] = tune.grid_search([1e-4, 1e-5])
-        config['gamma'] = tune.grid_search([0.999, 0.995, 0.99])  # discount rate
+        config['gamma'] = tune.grid_search([0.99, 0.97, 0.95])  # discount rate
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
