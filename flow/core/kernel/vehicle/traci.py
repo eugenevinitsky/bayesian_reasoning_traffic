@@ -537,18 +537,17 @@ class TraCIVehicle(KernelVehicle):
                     pts = list(lanes.getShape(lane))
                     pt_a, pt_b = pts[0], pts[1]
                     pts.append(((pt_a[0] + pt_b[0]) / 2, (pt_a[1] + pt_b[1]) / 2))
-                    if all([util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) \
-                            and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id) for pt in pts]):
+                    if all([util.observed(position, orientation, pt, looking_distance=radius) \
+                            and not util.check_blocked(position, pt, blocked, ped_id) for pt in pts]):
                         fully_viewable_lanes.append(lane)
                 elif 'w' in lane:
                     pts = lanes.getShape(lane)
-                    if all([util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) \
-                            and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id) for pt in pts]):
+                    if all([util.observed(position, orientation, pt, looking_distance=radius) \
+                            and not util.check_blocked(position, pt, blocked, ped_id) for pt in pts]):
                         fully_viewable_lanes.append(lane)
                 else:
                     # ignore 'general' lanes
                     continue
-        print(fully_viewable_lanes)
         # visualization
         if visualize:
 
