@@ -176,8 +176,8 @@ class Bayesian1Env(MultiEnv):
     def arrived_intersection(self, veh_id):
         """Return True if vehicle is at or past the intersection and false if not."""
         # When vehicle exits, route is []
-        if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
-            return True
+        # if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
+        #     return True
         return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
                 self.k.vehicle.get_position(veh_id) < 49)
                 

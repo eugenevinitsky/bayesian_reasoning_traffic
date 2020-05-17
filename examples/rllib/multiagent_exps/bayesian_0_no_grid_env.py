@@ -61,7 +61,8 @@ def make_flow_params(args, pedestrians=False, render=False):
             depart_time='0.00',
             start='(1.2)--(1.1)',
             end='(1.1)--(1.0)',
-            depart_pos=f'{44 + 0.5*i}')
+            depart_pos=f'{44 + 0.5*i}',
+            arrival_pos='5')
         
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -355,12 +356,11 @@ def setup_exps_PPO(args, flow_params):
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
     # config['no_done_at_end'] = True
-    config['lr'] = 1e-4
+    config['lr'] = 5e-5
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
-        config['lr'] = tune.grid_search([1e-4, 1e-5])
-        config['gamma'] = tune.grid_search([0.999, 0.995, 0.99])  # discount rate
+        config['gamma'] = tune.grid_search([0.99, 0.97, 0.95])  # discount rate
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
@@ -524,7 +524,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=1200,
+    parser.add_argument("--horizon", type=int, default=500,
                         help="Horizon length of a rollout")
 
     # optional input parameters

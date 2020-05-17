@@ -480,7 +480,7 @@ class TraCIVehicle(KernelVehicle):
         return crashed_pedestrians
 
 
-    def get_viewable_objects(self, veh_id, pedestrians=None, radius=50, visualize=False):
+    def get_viewable_objects(self, veh_id, pedestrians=None, lanes=None, radius=50, visualize=False):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.
 
         Return two lists of all vehicles and pedestrians that are within the viewing radius
@@ -492,14 +492,18 @@ class TraCIVehicle(KernelVehicle):
             unique identifier for the observation vehicle
         pedestrians : flow.core.kernel.pedestrian.KernelPedestrian
             KernelPedestrian object used to access pedestrian state info
+        lanes : flow.core.kernel.kernel_api.lane
+            kernel_api.lane object used to access lane state info
         radius : float
             the furthest distance the observation vehicle can see
 
         Return: list of (list of (str,), list of (str,))
             First list is comprised of the ids of the vehicles viewable by the observation vehicle
             Second list is comprised of the ids of the pedestrians viewable by the observation vehicle
+            Third list is comprised of the ids of the lanes fully viewable by the observation vehicle
+
         """
-        viewable_pedestrians, viewable_vehicles = [], []
+        viewable_pedestrians, viewable_vehicles, fully_viewable_lanes = [], [], []
         observed_vehicles = []
         blocked = {}
 
@@ -527,6 +531,24 @@ class TraCIVehicle(KernelVehicle):
                 if util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id):
                     viewable_pedestrians.append(ped_id)
 
+        if lanes:
+            for lane in lanes.getIDList():
+                if 'c' in lane:
+                    pts = list(lanes.getShape(lane))
+                    pt_a, pt_b = pts[0], pts[1]
+                    pts.append(((pt_a[0] + pt_b[0]) / 2, (pt_a[1] + pt_b[1]) / 2))
+                    if all([util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) \
+                            and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id) for pt in pts]):
+                        fully_viewable_lanes.append(lane)
+                elif 'w' in lane:
+                    pts = lanes.getShape(lane)
+                    if all([util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) \
+                            and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id) for pt in pts]):
+                        fully_viewable_lanes.append(lane)
+                else:
+                    # ignore 'general' lanes
+                    continue
+        print(fully_viewable_lanes)
         # visualization
         if visualize:
 
@@ -563,7 +585,7 @@ class TraCIVehicle(KernelVehicle):
 
             util.visualize_vision(observation_vehicle, blocked, viewed_veh, viewed_ped)
 
-        return viewable_vehicles, viewable_pedestrians
+        return viewable_vehicles, viewable_pedestrians, fully_viewable_lanes
 
     def get_ids(self):
         """See parent class."""
