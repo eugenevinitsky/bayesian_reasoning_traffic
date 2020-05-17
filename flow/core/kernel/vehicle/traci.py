@@ -480,7 +480,7 @@ class TraCIVehicle(KernelVehicle):
         return crashed_pedestrians
 
 
-    def get_viewable_objects(self, veh_id, pedestrians=None, lanes=None, radius=50, visualize=False):
+    def get_viewable_objects(self, veh_id, pedestrians=None, lanes=None, radius=50, visualize=True):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.
 
         Return two lists of all vehicles and pedestrians that are within the viewing radius
@@ -528,7 +528,7 @@ class TraCIVehicle(KernelVehicle):
 
         if pedestrians:
             for ped_id in pedestrians.get_ids():
-                if util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id):
+                if util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, veh_id):
                     viewable_pedestrians.append(ped_id)
 
         if lanes:
@@ -538,12 +538,12 @@ class TraCIVehicle(KernelVehicle):
                     pt_a, pt_b = pts[0], pts[1]
                     pts.append(((pt_a[0] + pt_b[0]) / 2, (pt_a[1] + pt_b[1]) / 2))
                     if all([util.observed(position, orientation, pt, looking_distance=radius) \
-                            and not util.check_blocked(position, pt, blocked, ped_id) for pt in pts]):
+                            and not util.check_blocked(position, pt, blocked, veh_id) for pt in pts]):
                         fully_viewable_lanes.append(lane)
                 elif 'w' in lane:
                     pts = lanes.getShape(lane)
                     if all([util.observed(position, orientation, pt, looking_distance=radius) \
-                            and not util.check_blocked(position, pt, blocked, ped_id) for pt in pts]):
+                            and not util.check_blocked(position, pt, blocked, veh_id) for pt in pts]):
                         fully_viewable_lanes.append(lane)
                 else:
                     # ignore 'general' lanes
