@@ -166,6 +166,8 @@ class Bayesian0Network(TrafficLightGridNetwork):
         """
         if not pedestrians:
             return None
+        rand_sd = 0.1
+        ped_spacing = 1
         routes = [('(1.2)--(1.1)', '(0.1)--(1.1)'),
                 ('(0.1)--(1.1)', '(1.0)--(1.1)'),
                 ('(1.0)--(1.1)', '(2.1)--(1.1)'),
@@ -180,33 +182,18 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ped_num = int(ped_id.split("ped_")[1])
                 # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
                 # guard against the vehicle from stochastically stopping
-                if np.random.uniform() <= 0.4:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(46 + 0.3*ped_num, 1))
-                elif np.random.uniform() <= 0.4:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(42 + 0.3*ped_num, 1))
-                elif np.random.uniform() <= 0.4:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(35 + 0.3*ped_num, 1))
-                elif np.random.uniform() <= 0.8:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(20 + 0.3*ped_num, 1))
+                num = np.random.uniform()
+                if num <= 0.33:
+                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(38 + ped_spacing*ped_num, rand_sd))
+                elif num <= 0.66:
+                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(22 + ped_spacing*ped_num, rand_sd))
                 else:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(30 + 0.3*ped_num, 1))
-
+                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(10 + ped_spacing*ped_num, rand_sd))
         else:
             for ped_id in pedestrians.params:
                 pedestrians.params[ped_id]['from'] = routes[rt][0]
                 pedestrians.params[ped_id]['to'] = routes[rt][1]
                 pedestrians.params[ped_id]['departPos'] = str(0)
-
-        # if np.random.uniform() <= appearance_prob:
-        #     for ped_id in pedestrians.params:
-        #         # if departPosActual doesn't exist yet, then the current value of departPos is correct
-        #         pedestrians.params[ped_id]['departPos'] = pedestrians.params[ped_id].get("departPosActual", pedestrians.params[ped_id]['departPos'])
-        #         pedestrians.params[ped_id]['departPosActual'] = pedestrians.params[ped_id]['departPos']
-        # else:
-        #     for ped_id in pedestrians.params:
-        #         # store the actual depart position because we're about to set the pedestrian to be as far as possible
-        #         pedestrians.params[ped_id]['departPosActual'] = pedestrians.params[ped_id].get("departPosActual", pedestrians.params[ped_id]['departPos'])
-        #         pedestrians.params[ped_id]['departPos'] = str(0)
 
     def specify_types(self, net_params):
         """See parent class."""
