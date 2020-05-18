@@ -289,7 +289,7 @@ def setup_exps_TD3(args, flow_params):
         #config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
         #config['prioritized_replay'] = tune.grid_search([True, False])
     config['horizon'] = args.horizon
-    # config['no_done_at_end'] = True
+    config['no_done_at_end'] = True
     config['observation_filter'] = 'NoFilter'
 
     config['callbacks'] = {
@@ -355,7 +355,7 @@ def setup_exps_PPO(args, flow_params):
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
-    # config['no_done_at_end'] = True
+    config['no_done_at_end'] = True
     config['lr'] = 5e-5
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
@@ -414,7 +414,6 @@ def setup_exps_PPO(args, flow_params):
     })
 
     return alg_run, env_name, config
-
 
 def setup_exps_MADDPG(args, flow_params):
     """

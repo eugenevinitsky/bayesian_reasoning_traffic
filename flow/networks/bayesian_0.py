@@ -153,8 +153,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
         rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
                car_2_start_edge: [car_2_start_edge, car_2_end_edge],
                car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
-
-        self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.5)
+        self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.9)
 
         return rts
 
@@ -172,7 +171,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ('(0.1)--(1.1)', '(1.0)--(1.1)'),
                 ('(1.0)--(1.1)', '(2.1)--(1.1)'),
                 ('(2.1)--(1.1)', '(1.2)--(1.1)')]
-                
         rt = np.random.randint(len(routes))
         if np.random.uniform() <= appearance_prob:
             for ped_id in pedestrians.params:
@@ -183,12 +181,10 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
                 # guard against the vehicle from stochastically stopping
                 num = np.random.uniform()
-                if num <= 0.33:
+                if num <= 0.5:
                     pedestrians.params[ped_id]['departPos'] = str(np.random.normal(38 + ped_spacing*ped_num, rand_sd))
-                elif num <= 0.66:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(22 + ped_spacing*ped_num, rand_sd))
                 else:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(10 + ped_spacing*ped_num, rand_sd))
+                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(15 + ped_spacing*ped_num, rand_sd))
         else:
             for ped_id in pedestrians.params:
                 pedestrians.params[ped_id]['from'] = routes[rt][0]
