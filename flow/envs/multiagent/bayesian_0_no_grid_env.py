@@ -210,7 +210,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                                         rel_x / 50, rel_y / 50, before / 5]
 
                 obs.update({rl_id: observation})
-
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -240,9 +239,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
                 inside_intersection = rl_id in self.inside_intersection
                 if len(collision_pedestrians) > 0:
-                    reward = -300
+                    reward = -1500
                 elif rl_id in collision_vehicles:
-                    reward = -100
+                    reward = -300
                 else:
                     reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
                     # TODO(@nliu & evinitsky) positive reward?
@@ -253,7 +252,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                         reward -= HARD_BRAKE_PENALTY
 
                 rewards[rl_id] = reward / 100
-
         return rewards
 
 
@@ -505,7 +503,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         Returns
         -------
         observation : [int / float]
-            list of integer / float values [yaw, speed, turn_num, edge_pos, ped_1, ..., ped_6]
+            list of integer / float values [yaw, speed, turn_num, edge_pos, ped_1, ..., ped_4]
             ped_i is a binary value indicating whether (1) or not (0) 
             there's a pedestrian in grid cell i of veh in question
         
@@ -540,7 +538,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         # subtract by one since we're not including the pedestrian here
         observation[:len(self.self_obs_names) - 1] = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50]
         ped_param = self.ped_params(visible_peds, visible_lanes)
-        print(ped_param)
         observation.extend(ped_param)
         return observation
 

@@ -165,26 +165,24 @@ class Bayesian0Network(TrafficLightGridNetwork):
         """
         if not pedestrians:
             return None
-        rand_sd = 0.1
-        ped_spacing = 1
-        routes = [('(1.2)--(1.1)', '(0.1)--(1.1)'),
-                ('(0.1)--(1.1)', '(1.0)--(1.1)'),
+        rand_sd = 0
+        ped_spacing = 1.3
+        routes = [('(0.1)--(1.1)', '(1.0)--(1.1)'),
                 ('(1.0)--(1.1)', '(2.1)--(1.1)'),
-                ('(2.1)--(1.1)', '(1.2)--(1.1)')]
+                ('(2.1)--(1.1)', '(1.2)--(1.1)'),
+                ('(1.2)--(1.1)', '(0.1)--(1.1)')]
+        # rt = 1
         rt = np.random.randint(len(routes))
         if np.random.uniform() <= appearance_prob:
             for ped_id in pedestrians.params:
                 pedestrians.params[ped_id]['from'] = routes[rt][0]
                 pedestrians.params[ped_id]['to'] = routes[rt][1]
-
+                # import ipdb; ipdb.set_trace()
                 ped_num = int(ped_id.split("ped_")[1])
                 # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
                 # guard against the vehicle from stochastically stopping
-                num = np.random.uniform()
-                if num <= 0.5:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(38 + ped_spacing*ped_num, rand_sd))
-                else:
-                    pedestrians.params[ped_id]['departPos'] = str(np.random.normal(15 + ped_spacing*ped_num, rand_sd))
+                pedestrians.params[ped_id]['departPos'] = str(30.1 + ped_spacing*ped_num)
+
         else:
             for ped_id in pedestrians.params:
                 pedestrians.params[ped_id]['from'] = routes[rt][0]
