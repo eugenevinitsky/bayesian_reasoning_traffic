@@ -139,8 +139,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     continue
                 if rl_id in self.k.vehicle.get_rl_ids():
                     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
-                # accel = actions[0]
-                accel = -1
+                accel = actions[0]
                 rl_ids.append(rl_id)
                 accels.append(accel)
             self.k.vehicle.apply_acceleration(rl_ids, accels)
