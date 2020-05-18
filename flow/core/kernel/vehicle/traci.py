@@ -480,7 +480,7 @@ class TraCIVehicle(KernelVehicle):
         return crashed_pedestrians
 
 
-    def get_viewable_objects(self, veh_id, pedestrians=None, lanes=None, radius=50, visualize=True):
+    def get_viewable_objects(self, veh_id, pedestrians=None, lanes=None, radius=50, visualize=False):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.
 
         Return two lists of all vehicles and pedestrians that are within the viewing radius

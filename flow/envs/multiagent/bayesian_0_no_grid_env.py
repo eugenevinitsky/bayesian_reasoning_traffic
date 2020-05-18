@@ -164,7 +164,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         obs = {}
         num_self_obs = len(self.self_obs_names)
         num_veh_obs = len(self.veh_obs_names)
-
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
@@ -541,6 +540,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         # subtract by one since we're not including the pedestrian here
         observation[:len(self.self_obs_names) - 1] = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50]
         ped_param = self.ped_params(visible_peds, visible_lanes)
+        print(ped_param)
         observation.extend(ped_param)
         return observation
 
@@ -577,7 +577,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             # check if a lane is fully in view (i.e. need both)
             junction = lane.split("_")[0][1:]
             if JUNCTION_ID == junction:
-                loc = self.ped_edge_to_loc(lane)
+                loc = self.edge_to_loc(lane)
                 if loc is not None:
                     if 'c' in lane:
                         lane_visible_arr[loc][0] = 1
@@ -588,25 +588,56 @@ class Bayesian0NoGridEnv(MultiEnv):
             if val[0] == val[1] == 1:
                 locs[idx] = 0
 
-        for ped in visible_pedestrians:
-            ped_edge = ped_kernel.get_edge(ped)
-            loc = self.ped_edge_to_loc(ped_edge)
+        for ped_id in visible_pedestrians:
+            ped_edge = ped_kernel.get_edge(ped_id)
+            loc = self.edge_to_loc(ped_edge, ped_id)
             if loc is not None:
                 locs[loc] = 1
         return locs
 
-    def ped_edge_to_loc(self, ped_edge):
-        """Return the number that a pedestrian's edge corresponds to. 
+    def edge_to_loc(self, lane, ped_id=None):
+        """Return the number that a lane or pedestrian's physical location corresponds to. 
         Return None if pedestrian isn't on one of the physical locations
+
+        Also, to overcome the issue of a pedestrian being really far away along a walkway
+        that it might as well be irrelevant, I'll check if the pedestrian is also within a 
+        certain radius of the corresponding crosswalk.
         """
-        if "c" not in ped_edge and "w" not in ped_edge:
+        if "c" not in lane and "w" not in lane:
             return None
         else:
-            ped_edge = ped_edge.split("_")[1]    
-            if 'c' in ped_edge:
-                return int(ped_edge[1])
-            if 'w' in ped_edge:
-                return (int(ped_edge[1]) - 1) % 4
+            if 'c' in lane:
+                lane = lane.split("_")[1]    
+                return int(lane[1])
+            if 'w' in lane:
+                # Ugly code alert - there's a lot of random formatting to get things done in SUMO
+                if ped_id:
+                    # check if pedestrian is in an appropriate radius 
+                    lane_kernel = self.k.network.kernel_api.lane
+                    lane_id_copy = list(lane)
+                    w_idx = lane.index('w')
+                    lane_id_copy[w_idx] = 'c'
+                    lane_id_copy[-1] = str((int(lane_id_copy[-1]) - 1) % 4)
+                    corresp_crosswalk_id = "".join(lane_id_copy)
+                    pts = lane_kernel.getShape(corresp_crosswalk_id + '_0')
+                    pt_a, pt_b = pts[0], pts[1]
+                    cross_walk_center = ((pt_a[0] + pt_b[0]) / 2, (pt_a[1] + pt_b[1]) / 2)
+                    walkway_length = lane_kernel.getLength(lane + '_0')
+                    lane = lane.split("_")[1]    
+                    if self.in_circle_radius(cross_walk_center, walkway_length * 1.3, self.k.pedestrian.get_position(ped_id)):
+                        return (int(lane[1]) - 1) % 4
+                    else:
+                        return None
+                else:
+                    lane = lane.split("_")[1]    
+                    return (int(lane[1]) - 1) % 4
+    
+    def in_circle_radius(self, center, radius, pt):
+        """Return True if pt is within the circle specified by the center point and the radius"""
+        dist_to_center = np.sqrt((center[0] - pt[0])**2 + (center[1] - pt[1])**2)
+        return dist_to_center <= radius
+
+            
             
 
 
