@@ -241,7 +241,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 if len(collision_pedestrians) > 0:
                     reward = -1500
                 elif rl_id in collision_vehicles:
-                    reward = -300
+                    reward = -1500
                 else:
                     reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
                     # TODO(@nliu & evinitsky) positive reward?
