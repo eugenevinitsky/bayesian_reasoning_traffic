@@ -139,7 +139,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                     continue
                 if rl_id in self.k.vehicle.get_rl_ids():
                     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
-                accel = actions[0]
+                # accel = actions[0]
+                accel = -1
                 rl_ids.append(rl_id)
                 accels.append(accel)
             self.k.vehicle.apply_acceleration(rl_ids, accels)
@@ -624,7 +625,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     cross_walk_center = ((pt_a[0] + pt_b[0]) / 2, (pt_a[1] + pt_b[1]) / 2)
                     walkway_length = lane_kernel.getLength(lane + '_0')
                     lane = lane.split("_")[1]    
-                    if self.in_circle_radius(cross_walk_center, walkway_length * 1.4, self.k.pedestrian.get_position(ped_id)):
+                    if self.in_circle_radius(cross_walk_center, walkway_length * 1.3, self.k.pedestrian.get_position(ped_id)):
                         return (int(lane[1]) - 1) % 4
                     else:
                         return None
