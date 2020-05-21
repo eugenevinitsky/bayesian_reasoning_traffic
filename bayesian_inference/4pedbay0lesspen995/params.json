@@ -1,0 +1,141 @@
+{
+  "batch_mode": "truncate_episodes",
+  "callbacks": {
+    "on_episode_end": "<function on_episode_end at 0x7fef22106620>",
+    "on_episode_start": "<function on_episode_start at 0x7fefd8f41d90>",
+    "on_episode_step": "<function on_episode_step at 0x7fef224f6a60>",
+    "on_train_result": "<function setup_exps_PPO.<locals>.on_train_result at 0x7fef22106950>"
+  },
+  "clip_actions": true,
+  "clip_param": 0.3,
+  "clip_rewards": null,
+  "collect_metrics_timeout": 180,
+  "compress_observations": false,
+  "custom_resources_per_worker": {},
+  "eager": false,
+  "eager_tracing": false,
+  "entropy_coeff": 0.0,
+  "entropy_coeff_schedule": null,
+  "env": "Bayesian0NoGridEnv-v0",
+  "env_config": {
+    "flow_params": "{\n    \"env\": {\n        \"additional_params\": {\n            \"maddpg\": false,\n            \"max_accel\": 2.6,\n            \"max_decel\": 4.5,\n            \"max_num_objects\": 3,\n            \"search_ped_radius\": 22,\n            \"search_veh_radius\": 50,\n            \"target_velocity\": 25\n        },\n        \"clip_actions\": true,\n        \"evaluate\": false,\n        \"horizon\": 500,\n        \"sims_per_step\": 1,\n        \"warmup_steps\": 0\n    },\n    \"env_name\": \"flow.envs.multiagent.bayesian_0_no_grid_env.Bayesian0NoGridEnv\",\n    \"exp_tag\": \"bayesian_0_no_grid_env\",\n    \"initial\": {\n        \"additional_params\": {},\n        \"bunching\": 0,\n        \"edges_distribution\": \"all\",\n        \"lanes_distribution\": Infinity,\n        \"min_gap\": 0,\n        \"perturbation\": 0.0,\n        \"shuffle\": false,\n        \"sidewalks\": true,\n        \"spacing\": \"custom\",\n        \"x0\": 0\n    },\n    \"net\": {\n        \"additional_params\": {\n            \"grid_array\": {\n                \"cars_bot\": 1,\n                \"cars_left\": 0,\n                \"cars_right\": 1,\n                \"cars_top\": 1,\n                \"col_num\": 1,\n                \"inner_length\": 50,\n                \"row_num\": 1\n            },\n            \"horizontal_lanes\": 1,\n            \"randomize_routes\": true,\n            \"speed_limit\": 5,\n            \"vertical_lanes\": 1\n        },\n        \"inflows\": {\n            \"_InFlows__flows\": []\n        },\n        \"osm_path\": null,\n        \"template\": null\n    },\n    \"network\": \"flow.networks.bayesian_0.Bayesian0Network\",\n    \"ped\": {\n        \"_PedestrianParams__pedestrians\": {},\n        \"ids\": [\n            \"ped_0\",\n            \"ped_1\",\n            \"ped_2\",\n            \"ped_3\",\n            \"ped_4\",\n            \"ped_5\",\n            \"ped_6\",\n            \"ped_7\",\n            \"ped_8\",\n            \"ped_9\",\n            \"ped_10\",\n            \"ped_11\",\n            \"ped_12\",\n            \"ped_13\",\n            \"ped_14\"\n        ],\n        \"num_pedestrians\": 15,\n        \"params\": {\n            \"ped_0\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"44.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_0\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_1\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"44.5\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_1\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_10\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"49.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_10\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_11\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"49.5\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_11\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_12\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"50.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_12\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_13\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"50.5\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_13\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_14\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"51.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_14\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_2\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"45.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_2\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_3\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"45.5\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_3\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_4\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"46.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_4\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_5\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"46.5\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_5\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_6\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"47.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_6\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_7\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"47.5\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_7\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_8\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"48.0\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_8\",\n                \"to\": \"(1.1)--(1.0)\"\n            },\n            \"ped_9\": {\n                \"arrivalPos\": \"5\",\n                \"depart\": \"0.00\",\n                \"departPos\": \"48.5\",\n                \"from\": \"(1.2)--(1.1)\",\n                \"id\": \"ped_9\",\n                \"to\": \"(1.1)--(1.0)\"\n            }\n        }\n    },\n    \"sim\": {\n        \"color_vehicles\": true,\n        \"emission_path\": null,\n        \"lateral_resolution\": null,\n        \"no_step_log\": true,\n        \"num_clients\": 1,\n        \"overtake_right\": false,\n        \"port\": null,\n        \"print_warnings\": true,\n        \"pxpm\": 2,\n        \"render\": false,\n        \"restart_instance\": true,\n        \"rllib_training\": false,\n        \"save_render\": false,\n        \"seed\": null,\n        \"show_radius\": false,\n        \"sight_radius\": 25,\n        \"sim_step\": 0.2,\n        \"teleport_time\": -1\n    },\n    \"simulator\": \"traci\",\n    \"veh\": [\n        {\n            \"acceleration_controller\": [\n                \"SimCarFollowingController\",\n                {}\n            ],\n            \"car_following_params\": {\n                \"controller_params\": {\n                    \"accel\": 2.6,\n                    \"carFollowModel\": \"IDM\",\n                    \"decel\": 7.5,\n                    \"impatience\": 0.5,\n                    \"maxSpeed\": 30,\n                    \"minGap\": 2.5,\n                    \"sigma\": 0.5,\n                    \"speedDev\": 0.1,\n                    \"speedFactor\": 1.0,\n                    \"tau\": 1.0\n                },\n                \"speed_mode\": 25\n            },\n            \"depart_pos\": 0,\n            \"depart_time\": \"0.25\",\n            \"initial_speed\": 0,\n            \"lane_change_controller\": [\n                \"SimLaneChangeController\",\n                {}\n            ],\n            \"lane_change_params\": {\n                \"controller_params\": {\n                    \"laneChangeModel\": \"LC2013\",\n                    \"lcCooperative\": \"1.0\",\n                    \"lcKeepRight\": \"1.0\",\n                    \"lcSpeedGain\": \"1.0\",\n                    \"lcStrategic\": \"1.0\"\n                },\n                \"lane_change_mode\": 512\n            },\n            \"num_vehicles\": 1,\n            \"routing_controller\": [\n                \"GridRouter\",\n                {}\n            ],\n            \"veh_id\": \"human\"\n        },\n        {\n            \"acceleration_controller\": [\n                \"RLController\",\n                {}\n            ],\n            \"car_following_params\": {\n                \"controller_params\": {\n                    \"accel\": 2.6,\n                    \"carFollowModel\": \"IDM\",\n                    \"decel\": 4.5,\n                    \"impatience\": 0.5,\n                    \"maxSpeed\": 30,\n                    \"minGap\": 2.5,\n                    \"sigma\": 0.5,\n                    \"speedDev\": 0.1,\n                    \"speedFactor\": 1.0,\n                    \"tau\": 1.0\n                },\n                \"speed_mode\": 25\n            },\n            \"depart_pos\": 0,\n            \"depart_time\": \"3.5\",\n            \"initial_speed\": 0,\n            \"lane_change_controller\": [\n                \"SimLaneChangeController\",\n                {}\n            ],\n            \"lane_change_params\": {\n                \"controller_params\": {\n                    \"laneChangeModel\": \"LC2013\",\n                    \"lcCooperative\": \"1.0\",\n                    \"lcKeepRight\": \"1.0\",\n                    \"lcSpeedGain\": \"1.0\",\n                    \"lcStrategic\": \"1.0\"\n                },\n                \"lane_change_mode\": 512\n            },\n            \"num_vehicles\": 1,\n            \"routing_controller\": [\n                \"GridRouter\",\n                {}\n            ],\n            \"veh_id\": \"rl\"\n        }\n    ]\n}",
+    "run": "PPO"
+  },
+  "evaluation_config": {},
+  "evaluation_interval": null,
+  "evaluation_num_episodes": 10,
+  "gamma": 0.995,
+  "grad_clip": null,
+  "horizon": 500,
+  "ignore_worker_failures": false,
+  "input": "sampler",
+  "input_evaluation": [
+    "is",
+    "wis"
+  ],
+  "kl_coeff": 0.2,
+  "kl_target": 0.01,
+  "lambda": 1.0,
+  "local_tf_session_args": {
+    "inter_op_parallelism_threads": 8,
+    "intra_op_parallelism_threads": 8
+  },
+  "log_level": "WARN",
+  "log_sys_usage": true,
+  "lr": 5e-05,
+  "lr_schedule": null,
+  "memory": 0,
+  "memory_per_worker": 0,
+  "metrics_smoothing_episodes": 100,
+  "min_iter_time_s": 0,
+  "model": {
+    "conv_activation": "relu",
+    "conv_filters": null,
+    "custom_action_dist": null,
+    "custom_model": null,
+    "custom_options": {},
+    "custom_preprocessor": null,
+    "dim": 84,
+    "fcnet_activation": "tanh",
+    "fcnet_hiddens": [
+      256,
+      256
+    ],
+    "framestack": true,
+    "free_log_std": false,
+    "grayscale": false,
+    "lstm_cell_size": 256,
+    "lstm_use_prev_action_reward": false,
+    "max_seq_len": 20,
+    "no_final_linear": false,
+    "state_shape": null,
+    "use_lstm": false,
+    "vf_share_layers": true,
+    "zero_mean": true
+  },
+  "monitor": false,
+  "multiagent": {
+    "policies": {
+      "av": [
+        "<class 'ray.rllib.policy.tf_policy_template.PPOTFPolicy'>",
+        "Box(24,)",
+        "Box(1,)",
+        {}
+      ]
+    },
+    "policies_to_train": [
+      "av"
+    ],
+    "policy_mapping_fn": "<function setup_exps_PPO.<locals>.policy_mapping_fn at 0x7fef221f76a8>"
+  },
+  "no_done_at_end": true,
+  "no_eager_on_workers": false,
+  "num_cpus_for_driver": 1,
+  "num_cpus_per_worker": 1,
+  "num_envs_per_worker": 1,
+  "num_gpus": 0,
+  "num_gpus_per_worker": 0,
+  "num_sgd_iter": 30,
+  "num_workers": 7,
+  "object_store_memory": 0,
+  "object_store_memory_per_worker": 0,
+  "observation_filter": "NoFilter",
+  "optimizer": {},
+  "output": null,
+  "output_compress_columns": [
+    "obs",
+    "new_obs"
+  ],
+  "output_max_file_size": 67108864,
+  "postprocess_inputs": false,
+  "preprocessor_pref": "deepmind",
+  "remote_env_batch_wait_ms": 0,
+  "remote_worker_envs": false,
+  "sample_async": false,
+  "sample_batch_size": 200,
+  "seed": null,
+  "sgd_minibatch_size": 128,
+  "shuffle_buffer_size": 0,
+  "shuffle_sequences": true,
+  "simple_optimizer": false,
+  "soft_horizon": false,
+  "synchronize_filters": true,
+  "tf_session_args": {
+    "allow_soft_placement": true,
+    "device_count": {
+      "CPU": 1
+    },
+    "gpu_options": {
+      "allow_growth": true
+    },
+    "inter_op_parallelism_threads": 2,
+    "intra_op_parallelism_threads": 2,
+    "log_device_placement": false
+  },
+  "timesteps_per_iteration": 0,
+  "train_batch_size": 10000,
+  "use_gae": true,
+  "vf_clip_param": 10.0,
+  "vf_loss_coeff": 1.0,
+  "vf_share_layers": false
+}
