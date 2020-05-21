@@ -237,7 +237,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 edge_pos = self.k.vehicle.get_position(rl_id)
                 if 48 < edge_pos < 50:
                     if rl_id in self.near_intersection_rewarded_set:
-                        continue
+                        pass
                     else:
                         rewards[rl_id] = 25 / 100
                         self.near_intersection_rewarded_set.add(rl_id)
@@ -258,7 +258,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                     # TODO(KL) 'hard-brake' as negative acceleration?
                     if self.k.vehicle.get_acceleration(rl_id) < -0.8:
                         reward -= HARD_BRAKE_PENALTY
+
                 rewards[rl_id] = reward / 100
+
         return rewards
 
     def reset(self, new_inflow_rate=None):
