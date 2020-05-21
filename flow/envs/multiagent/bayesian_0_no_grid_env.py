@@ -269,7 +269,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 #         reward -= HARD_BRAKE_PENALTY
 
                 rewards[rl_id] = reward / 100
-        print(rewards)
+
         return rewards
 
     def reset(self, new_inflow_rate=None):
