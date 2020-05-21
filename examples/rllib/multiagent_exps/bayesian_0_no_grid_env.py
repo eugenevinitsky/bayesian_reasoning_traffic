@@ -531,7 +531,7 @@ if __name__ == '__main__':
                         help="Experiment run mode (local | cluster)")
     parser.add_argument('--algo', type=str, default='PPO',
                         help="RL method to use (PPO, TD3, QMIX)")
-    parser.add_argument("--pedestrians",
+    parser.add_argument("--pedestrians", default=True,
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
     parser.add_argument("--render",
