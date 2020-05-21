@@ -357,7 +357,7 @@ def setup_exps_PPO(args, flow_params):
     config['simple_optimizer'] = False
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
-    config['gamma'] = 0.98  # discount rate
+    config['gamma'] = 0.975  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate

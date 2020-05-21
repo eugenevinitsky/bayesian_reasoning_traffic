@@ -97,6 +97,7 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         self.near_intersection_rewarded_set_1 = set()
         self.near_intersection_rewarded_set_2 = set()
+        self.near_intersection_rewarded_set_3 = set()
 
         self.edge_to_int = {
                 "(1.1)--(2.1)" : 0,
@@ -237,19 +238,26 @@ class Bayesian0NoGridEnv(MultiEnv):
             if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
-                if 40 < edge_pos < 43:
+                if 38 < edge_pos < 40:
                     if rl_id in self.near_intersection_rewarded_set_1:
                         pass
                     else:
-                        reward = 50
+                        reward = 200
+                        self.near_intersection_rewarded_set_1.add(rl_id)
+
+                if 44 < edge_pos < 46:
+                    if rl_id in self.near_intersection_rewarded_set_1:
+                        pass
+                    else:
+                        reward = 250
                         self.near_intersection_rewarded_set_1.add(rl_id)
             
                 if 47 < edge_pos < 50:
-                    if rl_id in self.near_intersection_rewarded_set_2:
+                    if rl_id in self.near_intersection_rewarded_set_3:
                         pass
                     else:
-                        reward = 150
-                        self.near_intersection_rewarded_set_2.add(rl_id)
+                        reward = 300
+                        self.near_intersection_rewarded_set_3.add(rl_id)
 
                 # TODO(@evinitsky) pick the right reward
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
@@ -435,6 +443,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.near_intersection_rewarded_set_1 = set()
         # set the near intersection rewarded set to empty
         self.near_intersection_rewarded_set_2 = set()
+        # set the near intersection rewarded set to empty
+        self.near_intersection_rewarded_set_3 = set()
 
         # advance the simulation in the simulator by one step
         self.k.simulation.simulation_step()
