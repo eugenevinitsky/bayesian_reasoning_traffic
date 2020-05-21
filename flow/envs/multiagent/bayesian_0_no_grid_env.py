@@ -155,8 +155,10 @@ class Bayesian0NoGridEnv(MultiEnv):
     
     def past_intersection(self, veh_id):
         """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
-        on_post_intersection_edge = self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1] or self.k.vehicle.get_edge == ''        
+        on_post_intersection_edge = self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]       
         if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 8: # vehicle arrived at final destination, 8 is a random distance
+            return True
+        elif self.k.vehicle.get_edge(veh_id) == '':
             return True
         return False
 
@@ -250,7 +252,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 elif rl_id in collision_vehicles:
                     reward = -800
                 else:
-                    reward = self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
+                    reward += self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
                 if rl_id in self.inside_intersection:
@@ -259,7 +261,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                         reward -= HARD_BRAKE_PENALTY
 
                 rewards[rl_id] = reward / 100
-
         return rewards
 
     def reset(self, new_inflow_rate=None):
