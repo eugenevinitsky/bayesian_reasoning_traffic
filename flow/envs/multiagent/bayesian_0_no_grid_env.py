@@ -95,7 +95,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         # set to store vehicles currently inside the intersection
         self.inside_intersection = set()
 
-        self.near_intersection_rewarded_set = set()
+        self.near_intersection_rewarded_set_1 = set()
+        self.near_intersection_rewarded_set_2 = set()
 
         self.edge_to_int = {
                 "(1.1)--(2.1)" : 0,
@@ -236,12 +237,19 @@ class Bayesian0NoGridEnv(MultiEnv):
             if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
-                if 48 < edge_pos < 50:
-                    if rl_id in self.near_intersection_rewarded_set:
+                if 40 < edge_pos < 43:
+                    if rl_id in self.near_intersection_rewarded_set_1:
                         pass
                     else:
-                        reward = 200
-                        self.near_intersection_rewarded_set.add(rl_id)
+                        reward = 50
+                        self.near_intersection_rewarded_set_1.add(rl_id)
+            
+                if 47 < edge_pos < 50:
+                    if rl_id in self.near_intersection_rewarded_set_2:
+                        pass
+                    else:
+                        reward = 150
+                        self.near_intersection_rewarded_set_2.add(rl_id)
 
                 # TODO(@evinitsky) pick the right reward
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
@@ -250,17 +258,18 @@ class Bayesian0NoGridEnv(MultiEnv):
                 if len(collision_pedestrians) > 0:
                     reward = -800
                 elif rl_id in collision_vehicles:
-                    reward = -800
-                else:
-                    reward += self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
+                    reward = -1000
+                # else:
+                #     reward += self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                if rl_id in self.inside_intersection:
-                    # TODO(KL) 'hard-brake' as negative acceleration?
-                    if self.k.vehicle.get_acceleration(rl_id) < -0.8:
-                        reward -= HARD_BRAKE_PENALTY
+                # if rl_id in self.inside_intersection:
+                #     # TODO(KL) 'hard-brake' as negative acceleration?
+                #     if self.k.vehicle.get_acceleration(rl_id) < -0.8:
+                #         reward -= HARD_BRAKE_PENALTY
 
                 rewards[rl_id] = reward / 100
+        print(rewards)
         return rewards
 
     def reset(self, new_inflow_rate=None):
@@ -423,7 +432,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         # set the past intersection rewarded set to empty
         self.past_intersection_rewarded_set = set()
         # set the near intersection rewarded set to empty
-        self.near_intersection_rewarded_set = set()
+        self.near_intersection_rewarded_set_1 = set()
+        # set the near intersection rewarded set to empty
+        self.near_intersection_rewarded_set_2 = set()
 
         # advance the simulation in the simulator by one step
         self.k.simulation.simulation_step()
@@ -535,6 +546,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             curr_edge = -1
             self.inside_intersection.add(rl_id)
         edge_pos = self.k.vehicle.get_position(rl_id)
+        # import ipdb; ipdb.set_trace()
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
         start, end = self.k.vehicle.get_route(rl_id)
