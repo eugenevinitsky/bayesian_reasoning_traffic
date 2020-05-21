@@ -356,11 +356,11 @@ def setup_exps_PPO(args, flow_params):
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
     config['no_done_at_end'] = True
-    config['lr'] = 5e-5
-    config['gamma'] = 0.999  # discount rate
+    config['lr'] = 1e-4
+    config['gamma'] = 0.98  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.97, 0.95])  # discount rate
+        config['gamma'] = tune.grid_search([0.99, 0.98])  # discount rate
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
@@ -445,10 +445,7 @@ def setup_exps_MADDPG(args, flow_params):
     config['n_step'] = 1
 
     if args.grid_search:
-        # config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-        # config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
-        # config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
-        config['gamma'] = tune.grid_search([0.99, 0.999])  # discount rate
+        config['gamma'] = tune.grid_search([0.94, 0.93])  # discount rate
         config['lr'] = tune.grid_search([1e-4, 1e-5])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
@@ -523,7 +520,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=500,
+    parser.add_argument("--horizon", type=int, default=400,
                         help="Horizon length of a rollout")
 
     # optional input parameters
