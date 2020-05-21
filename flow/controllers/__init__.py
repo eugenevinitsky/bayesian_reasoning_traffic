@@ -29,10 +29,14 @@ from flow.controllers.base_routing_controller import BaseRouter
 from flow.controllers.routing_controllers import ContinuousRouter, \
     GridRouter, BayBridgeRouter
 
+# multiagent controllers
+from flow.controllers.bayesian_predict_controller import BayesianPredictController
+
 __all__ = [
     "RLController", "BaseController", "BaseLaneChangeController", "BaseRouter",
     "CFMController", "BCMController", "OVMController", "LinearOVM",
     "IDMController", "SimCarFollowingController", "FollowerStopper",
     "PISaturation", "StaticLaneChanger", "SimLaneChangeController",
-    "ContinuousRouter", "GridRouter", "BayBridgeRouter", "LACController"
+    "ContinuousRouter", "GridRouter", "BayBridgeRouter", "LACController",
+    "BayesianPredictController"
 ]
