@@ -158,7 +158,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def past_intersection(self, veh_id):
         """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
         on_post_intersection_edge = self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]       
-        if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 8: # vehicle arrived at final destination, 8 is a random distance
+        if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 7: # vehicle arrived at final destination, 8 is a random distance
             return True
         elif self.k.vehicle.get_edge(veh_id) == '':
             return True
@@ -214,7 +214,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                         observation[(index * num_veh_obs) + num_self_obs: num_veh_obs * (index + 1) + num_self_obs] = \
                                 [observed_yaw / 360, observed_speed / 20, 
                                         rel_x / 50, rel_y / 50, before / 5]
-
                 obs.update({rl_id: observation})
         return obs
 
@@ -238,19 +237,19 @@ class Bayesian0NoGridEnv(MultiEnv):
             if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
-                if 38 < edge_pos < 40:
+                if 38 < edge_pos <= 42:
                     if rl_id in self.near_intersection_rewarded_set_1:
                         pass
                     else:
                         reward = 200
                         self.near_intersection_rewarded_set_1.add(rl_id)
 
-                if 44 < edge_pos < 46:
-                    if rl_id in self.near_intersection_rewarded_set_1:
+                if 44 < edge_pos <= 47:
+                    if rl_id in self.near_intersection_rewarded_set_2:
                         pass
                     else:
                         reward = 250
-                        self.near_intersection_rewarded_set_1.add(rl_id)
+                        self.near_intersection_rewarded_set_2.add(rl_id)
             
                 if 47 < edge_pos < 50:
                     if rl_id in self.near_intersection_rewarded_set_3:
@@ -264,7 +263,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
                 inside_intersection = rl_id in self.inside_intersection
                 if len(collision_pedestrians) > 0:
-                    reward = -800
+                    reward = -1000
                 elif rl_id in collision_vehicles:
                     reward = -1000
                 # else:

@@ -475,6 +475,7 @@ class TraCIVehicle(KernelVehicle):
                     self.get_width(veh_id),
                     ped_pos)
             if crash:
+                import ipdb; ipdb.set_trace()
                 crashed_pedestrians.append(ped_id)
 
         return crashed_pedestrians
