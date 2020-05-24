@@ -70,7 +70,7 @@ def make_flow_params(args, pedestrians=False, render=False):
     vehicles = VehicleParams()
 
     vehicles.add(
-        veh_id="human",
+        veh_id="human_0",
         acceleration_controller=(SimCarFollowingController, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
@@ -89,23 +89,33 @@ def make_flow_params(args, pedestrians=False, render=False):
             speed_mode='right_of_way',
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='3.5',
+        depart_time='3.5',    #TODO change back to 3.5s
         num_vehicles=1,
         )
 
-    '''
+    
     vehicles.add(
         veh_id="human_1",
         acceleration_controller=(SimCarFollowingController, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
-            max_speed=V_ENTER,
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="right_of_way",
         ),
         routing_controller=(GridRouter, {}),
         num_vehicles=1)
-    '''
+
+    vehicles.add(
+        veh_id="human_2",
+        acceleration_controller=(SimCarFollowingController, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="right_of_way",
+        ),
+        routing_controller=(GridRouter, {}),
+        num_vehicles=1)    
+    
 
     n_rows = 1
     n_columns = 1
@@ -357,7 +367,7 @@ def setup_exps_PPO(args, flow_params):
     config['simple_optimizer'] = False
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
-    config['gamma'] = 0.975  # discount rate
+    config['gamma'] = 0.97  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate

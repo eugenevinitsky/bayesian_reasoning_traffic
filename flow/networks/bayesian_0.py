@@ -137,22 +137,40 @@ class Bayesian0Network(TrafficLightGridNetwork):
     def specify_routes(self, net_params):
 
         car_1_start_edge = "(0.1)--(1.1)"
-        car_1_end_edge = "(1.1)--(2.1)"
-        car_2_start_edge = "(1.2)--(1.1)"
-        rand = np.random.uniform() 
-        if rand < 0.33:
-            car_2_end_edge = "(1.1)--(2.1)"
-        elif rand < 0.66:
-            car_2_end_edge = "(1.1)--(1.0)"
-        else:
-            car_2_end_edge = "(1.1)--(0.1)"
+        car_2_start_edge = "(2.1)--(1.1)"
+        car_3_start_edge = "(1.0)--(1.1)"
+        car_4_start_edge = "(1.2)--(1.1)"
 
-        car_3_start_edge = "(2.1)--(1.1)"
-        car_3_end_edge = "(1.1)--(1.0)"
+        car_3_end_edge = "(1.1)--(2.1)"
 
-        rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
-               car_2_start_edge: [car_2_start_edge, car_2_end_edge],
-               car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
+        end_edges_lst = ["(1.1)--(2.1)",
+                        "(1.1)--(1.2)",
+                        "(1.1)--(0.1)",
+                        "(1.1)--(1.0)"]
+
+        randomize_routes = True
+
+        rts = {}
+        if net_params.additional_params.get("randomize_routes", False):
+            start_edges = ['(1.2)--(1.1)',
+                        '(0.1)--(1.1)',
+                        '(1.0)--(1.1)',
+                        '(2.1)--(1.1)']
+            end_edges = ['(1.1)--(1.2)',
+                        '(1.1)--(0.1)',
+                        '(1.1)--(1.0)',
+                        '(1.1)--(2.1)']
+
+            for i in range(len(start_edges)):
+                start = start_edges[i]
+                end_index = np.random.randint(0, 4)
+                if end_index == i: # no u-turn routes
+                    end_index = (i + 1) % 4
+                end = end_edges[end_index]
+                rts[start] = [start, end]
+
+        rts["(0.1)--(1.1)"] = ["(0.1)--(1.1)", car_3_end_edge]
+
         self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.9)
 
         return rts
@@ -172,6 +190,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ('(2.1)--(1.1)', '(1.2)--(1.1)'),
                 ('(1.2)--(1.1)', '(0.1)--(1.1)')]
         rt = np.random.randint(len(routes))
+
         if np.random.uniform() <= appearance_prob:
             for ped_id in pedestrians.params:
                 pedestrians.params[ped_id]['from'] = routes[rt][0]
@@ -260,19 +279,27 @@ class Bayesian0Network(TrafficLightGridNetwork):
         2. list of start lanes [lane0, lane1, lane 2, ...]"""
 
         # pos = 0 starts from the starting node of the edge
-        car_1_start_edge = "(0.1)--(1.1)"
+        car_1_start_edge = "(1.0)--(1.1)"
         car_1_end_edge = "(1.1)--(2.1)"
-        car_1_start_pos = 0
+        car_1_start_pos = np.random.normal(25, 30)
 
         car_2_start_edge = "(1.2)--(1.1)"
         car_2_end_edge = "(1.1)--(2.1)"
-        car_2_start_pos = np.random.normal(25, 25)
+        car_2_start_pos = np.random.normal(25, 30)
+
+        car_3_start_edge = "(0.1)--(1.1)"
+        car_3_end_edge = "(1.1)--(2.1)"
+        car_3_start_pos = 0
+
+        car_4_start_edge = "(2.1)--(1.1)"
+        car_4_end_edge = "(1.1)--(2.1)"
+        car_4_start_pos = np.random.normal(25, 30)        
         
         start_pos = [(car_1_start_edge, car_1_start_pos)]
         start_lanes = [0]
 
         if 2 == 2:
-            start_pos = [(car_2_start_edge, car_2_start_pos), (car_1_start_edge, car_1_start_pos)]
-            start_lanes = [0, 0]
+            start_pos = [(car_4_start_edge, car_4_start_pos), (car_3_start_edge, car_3_start_pos), (car_2_start_edge, car_2_start_pos), (car_1_start_edge, car_1_start_pos)]
+            start_lanes = [0, 0, 0, 0]
 
         return start_pos, start_lanes

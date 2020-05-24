@@ -94,6 +94,12 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.arrival_order = {}
         # set to store vehicles currently inside the intersection
         self.inside_intersection = set()
+        
+        # dict to store the ground truth state of pedestrians at the four locations
+        self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
+        # dict to store the counts for each possible transiion
+        self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
+
 
         self.near_intersection_rewarded_set_1 = set()
         self.near_intersection_rewarded_set_2 = set()
@@ -167,6 +173,13 @@ class Bayesian0NoGridEnv(MultiEnv):
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
+        # new_loc_states = self.curr_ped_state()
+        # for loc, val in enumerate(new_loc_states):
+        #     prev = self.prev_loc_ped_state[loc]
+        #     curr = val
+        #     self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
+        #     self.prev_loc_ped_state[loc] = curr
+
         obs = {}
         num_self_obs = len(self.self_obs_names)
         num_veh_obs = len(self.veh_obs_names)
@@ -295,7 +308,12 @@ class Bayesian0NoGridEnv(MultiEnv):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
-	    # Now that we've passed the possibly fake init steps some rl libraries
+        # print(self.ped_transition_cnt)
+        # self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
+        # # dict to store the counts for each possible transiion
+        # self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
+        
+        # Now that we've passed the possibly fake init steps some rl libraries
         # do, we can feel free to actually render things
         if self.should_render:
             self.sim_params.render = True
@@ -582,6 +600,21 @@ class Bayesian0NoGridEnv(MultiEnv):
             return 1
         else:
             return 0
+
+    def curr_ped_state(self):
+        """Return a list containing the ground truth state of pedestrians wrt the four locations. 
+        Idx i of the list corresponds to location i"""
+        locs = [0] * NUM_PED_LOCATIONS
+
+        ped_kernel = self.k.pedestrian
+        for loc in range(NUM_PED_LOCATIONS):
+            for ped_id in ped_kernel.get_ids():
+                ped_edge = ped_kernel.get_edge(ped_id)
+                loc = self.edge_to_loc(ped_edge, ped_id)
+                if loc is not None:
+                    locs[loc] = 1
+        
+        return locs
 
     def ped_params(self, visible_pedestrians, visible_lanes):
         """Return length 4 ternary indicator array for an RL car's pedestrian visibility state vector.
