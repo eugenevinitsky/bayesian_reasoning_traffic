@@ -1,5 +1,4 @@
 from flow.controllers.base_controller import BaseController
-
 from examples.sumo.bayesian_1_runner import bayesian_1_example
 
 import numpy as np
@@ -10,9 +9,12 @@ class BayesianPredictController(BaseController):
 
         self.query_env = bayesian_1_example(pedestrians=True).env
         self.query_env.reset()
+        
+        # Hacks to make fewer changes to bayesian_1_example
         self.query_env.k.vehicle.set_acc_controller('agent_0', (BayesianManualController, {}))
         self.query_env.k.vehicle.set_controlled('agent_0')
 
+        # Convert between naming of vehicles across env and query_env
         self.map_vehicles = {
                     "human_0" : "human_0_0",
                     "human_1" : "human_0_1",
@@ -21,6 +23,7 @@ class BayesianPredictController(BaseController):
 
     def get_accel(self, env):
 
+        # Set query_env state to the same as env
         for veh_id in env.k.vehicle.get_ids():
             x, y = env.k.vehicle.get_xy(veh_id)
             edge_id = env.k.vehicle.get_edge(veh_id)
@@ -40,6 +43,7 @@ class BayesianPredictController(BaseController):
             self.query_env.k.pedestrian.set_xy(
                     ped_id, edge, x, y)
 
+        # Perform recursive look ahead
         action, _ = self.look_ahead()
         return action
 
@@ -48,6 +52,7 @@ class BayesianPredictController(BaseController):
         return (best accel, score of best accel)
         '''
 
+        # Set score that vehicle tries to maximize
         score = self.query_env.k.vehicle.get_position('agent_0')
         if score > 25:
             score = -1
@@ -56,6 +61,7 @@ class BayesianPredictController(BaseController):
         if steps == 0 or score < 0:
             return 0, score
 
+        # Different accelerations to iterate over
         accels = np.arange(-2, 3) * 1.7 # TODO:add as a param
 
         # save current state information
@@ -75,15 +81,20 @@ class BayesianPredictController(BaseController):
         best_action = 0
         best_score = 0
 
+        # Iterate through each acceleration
         for a in accels:
 
+            # Forward step
             self.query_env.k.vehicle.get_acc_controller('agent_0').set_accel(a)
             self.query_env.step(None)
             _, score = self.look_ahead(steps - 1)
+
+            # Update if best accel so far
             if score >= best_score:
                 best_score = score
                 best_action = a
 
+            # Restore query_env to before the forward step was taken
             for veh_id in self.query_env.k.vehicle.get_ids():
                 state = states[veh_id]
                 self.query_env.k.vehicle.set_xy(veh_id, state[2],
@@ -94,17 +105,14 @@ class BayesianPredictController(BaseController):
                 state = ped_states[ped_id]
                 self.query_env.k.pedestrian.set_xy(ped_id, state[2],
                         state[0], state[1])
+
+            # Take a step to reset vehicle positions and speed
             self.query_env.step(None)
-        if steps == 3:
-            print(best_action, best_score)
+
         return best_action, best_score
-        '''
-        for i in range(10):
-            self.query_env.k.vehicle.get_acc_controller('agent_0').set_accel(2)
-            state, reward, done, _ = self.query_env.step(None)
-        '''
 
     def get_action(self, env):
+        # copied from parent and modified to maintain control through intersection
         """Convert the get_accel() acceleration into an action.
 
         If no acceleration is specified, the action returns a None as well,
