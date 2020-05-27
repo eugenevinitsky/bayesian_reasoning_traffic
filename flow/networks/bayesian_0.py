@@ -190,7 +190,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ('(2.1)--(1.1)', '(1.2)--(1.1)'),
                 ('(1.2)--(1.1)', '(0.1)--(1.1)')]
         rt = np.random.randint(len(routes))
-
         if np.random.uniform() <= appearance_prob:
             for ped_id in pedestrians.params:
                 pedestrians.params[ped_id]['from'] = routes[rt][0]
@@ -292,6 +291,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
         car_3_start_pos = 0
 
         car_4_start_edge = "(2.1)--(1.1)"
+        car_4_start_edge = "(1.2)--(1.1)"
         car_4_end_edge = "(1.1)--(2.1)"
         car_4_start_pos = np.random.normal(25, 30)        
         
