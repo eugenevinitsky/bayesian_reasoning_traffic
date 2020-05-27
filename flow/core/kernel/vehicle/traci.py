@@ -387,10 +387,6 @@ class TraCIVehicle(KernelVehicle):
         self.num_vehicles = len(self.get_ids())
         self.num_rl_vehicles = len(self.get_rl_ids())
 
-    def test_set_speed(self, veh_id, speed):
-        """Set the speed of the specified vehicle."""
-        self.__sumo_obs[veh_id][tc.VAR_SPEED] = speed
-
     def test_set_edge(self, veh_id, edge):
         """Set the speed of the specified vehicle."""
         self.__sumo_obs[veh_id][tc.VAR_ROAD_ID] = edge
@@ -407,6 +403,10 @@ class TraCIVehicle(KernelVehicle):
         """See parent class."""
         return self.__vehicles[veh_id]["orientation"]
 
+    def get_xy(self, veh_id, error=-1001):
+        """Returns xy position of vehicle"""
+        return self.__vehicles[veh_id]["orientation"][:2]
+
     def get_timestep(self, veh_id):
         """See parent class."""
         return self.__vehicles[veh_id]["timestep"]
@@ -422,6 +422,18 @@ class TraCIVehicle(KernelVehicle):
     def get_initial_speed(self, veh_id):
         """Return the initial speed of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["initial_speed"]
+ 
+    def set_speed_mode(self, veh_id, speed_mode):
+        SPEED_MODES = {
+                "aggressive" : 0,
+                "obey_safe_speed" : 1,
+                "no_collide" : 7,
+                "right_of_way" : 25,
+                "all_checks" : 31
+        }
+        if type(speed_mode) == str:
+            speed_mode = SPEED_MODES[speed_mode]
+        self.kernel_api.vehicle.setSpeedMode(veh_id, speed_mode)
 
     def get_relative_angle(self, veh_id, position):
         """Return the relative angle between veh_id and another position."""
@@ -693,6 +705,17 @@ class TraCIVehicle(KernelVehicle):
             return [self.get_acc_controller(vehID, error) for vehID in veh_id]
         return self.__vehicles.get(veh_id, {}).get("acc_controller", error)
 
+    def set_acc_controller(self, veh_id, acc_controller):
+        """Manually set acceleration controller"""
+        veh_type = self.get_type(veh_id)
+        car_following_params = \
+            self.type_parameters[veh_type]["car_following_params"]
+
+        self.__vehicles[veh_id]["acc_controller"] = \
+            acc_controller[0](veh_id,
+                            car_following_params=car_following_params,
+                            **acc_controller[1])
+
     def get_lane_changing_controller(self, veh_id, error=None):
         """See parent class."""
         if isinstance(veh_id, (list, np.ndarray)):
@@ -757,6 +780,21 @@ class TraCIVehicle(KernelVehicle):
         if isinstance(veh_id, (list, np.ndarray)):
             return [self.get_lane_tailways(vehID, error) for vehID in veh_id]
         return self.__vehicles.get(veh_id, {}).get("lane_tailways", error)
+    
+    def set_speed(self, veh_id, speed):
+        """Set vehicle speed"""
+        self.kernel_api.vehicle.setSpeed(veh_id, speed)
+        self.__sumo_obs.get(veh_id, {})[tc.VAR_SPEED] = speed
+
+    def set_controlled(self, veh_id):
+        """Specify a vehicle is being controlled"""
+        if veh_id in self.__ids:
+            self.__controlled_ids.append(veh_id)
+    
+    def set_xy(self, veh_id, edge_id, lane, x, y):
+        "Set vehicle's xy position"""
+        self.kernel_api.vehicle.moveToXY(veh_id, edge_id, lane, x, y)
+        self.__vehicles[veh_id]["orientation"][:2] = [x, y]
 
     def set_lane_followers(self, veh_id, lane_followers):
         """Set the lane followers of the specified vehicle."""

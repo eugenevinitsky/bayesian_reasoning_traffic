@@ -147,7 +147,6 @@ class TrafficLightGridNetwork(Network):
             self.nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes, self.horizontal_lanes)
         else:
             self.nodes_radius = nodes_radius
-        
 
         # total number of edges in the network
         self.num_edges = 4 * ((self.col_num + 1) * self.row_num + self.col_num)
@@ -347,21 +346,25 @@ class TrafficLightGridNetwork(Network):
                 cross = top_junction + '--' + junction + ' ' + junction + '--' + top_junction
                 crossings.append({"node": junction,
                     "edges": cross,
+                    "priority": str(1),
                     "width": str(self.sidewalk_width)})
                 
                 cross = bottom_junction + '--' + junction + ' ' + junction + '--' + bottom_junction
                 crossings.append({"node": junction,
                     "edges": cross,
+                    "priority": str(1),
                     "width": str(self.sidewalk_width)})
 
                 cross = left_junction + '--' + junction + ' ' + junction + '--' + left_junction
                 crossings.append({"node": junction,
                     "edges": cross,
+                    "priority": str(1),
                     "width": str(self.sidewalk_width)})
 
                 cross = right_junction + '--' + junction + ' ' + junction + '--' + right_junction
                 crossings.append({"node": junction,
                     "edges": cross,
+                    "priority": str(1),
                     "width": str(self.sidewalk_width)})
         
         return crossings

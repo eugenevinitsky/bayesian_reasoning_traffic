@@ -1,7 +1,7 @@
 """Sets up and runs the basic bayesian example. This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
-from flow.controllers import GridRouter
+from flow.controllers import GridRouter, BayesianPredictController
 from flow.core.experiment import Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, SumoLaneChangeParams
 from flow.core.params import VehicleParams
@@ -125,7 +125,7 @@ def bayesian_1_example(render=None, pedestrians=False):
         "cars_bot": num_cars_bot
     }
 
-    sim_params = SumoParams(sim_step=1, render=True)
+    sim_params = SumoParams(sim_step=0.1, render=True)
 
     if render is not None:
         sim_params.render = render
@@ -151,7 +151,7 @@ def bayesian_1_example(render=None, pedestrians=False):
 
     vehicles = VehicleParams()
     vehicles.add(
-        veh_id="human_0",
+        veh_id="human",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
@@ -160,12 +160,16 @@ def bayesian_1_example(render=None, pedestrians=False):
         ),
         lane_change_params=lane_change_params,
         num_vehicles=2)
+
+    # TODO (@nliu) with aggressive speed_mode, vehicle still stops to avoid crashes
     vehicles.add(
         veh_id="agent",
+        acceleration_controller=(BayesianPredictController, {}),
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
+            #speed_mode="right_of_way",
             speed_mode="aggressive",
         ),
         lane_change_params=lane_change_params,

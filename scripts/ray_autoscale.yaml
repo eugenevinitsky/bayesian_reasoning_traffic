@@ -1,7 +1,7 @@
 # cluster.yaml ========================================= 
 
 # An unique identifier for the head node and workers of this cluster.
-cluster_name: test #<YOUR NAME>
+cluster_name: nliu_bayesian_1 #<YOUR NAME>
 
 # The minimum number of workers nodes to launch in addition to the head
 # node. This number should be >= 0.
@@ -40,7 +40,7 @@ auth:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
     InstanceType: c4.4xlarge
-    ImageId: ami-09544298704576518 # Flow AMI (Ubuntu)
+    ImageId: ami-0d8e66894b7f9300e # Flow AMI (Ubuntu)
     InstanceMarketOptions:
         MarketType: spot
          #Additional options can be found in the boto docs, e.g.
@@ -55,9 +55,9 @@ head_node:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
     InstanceType: c4.4xlarge
-    ImageId: ami-09544298704576518 # Flow AMI (Ubuntu)
+    ImageId: ami-0d8e66894b7f9300e # Flow AMI (Ubuntu)
 
-    #Run workers on spot by default. Comment this out to use on-demand.
+  #Run workers on spot by default. Comment this out to use on-demand.
     InstanceMarketOptions:
         MarketType: spot
          # Additional options can be found in the boto docs, e.g.
@@ -67,10 +67,13 @@ worker_nodes:
     # Additional options in the boto docs.
 
 setup_commands:
-    - cd flow && git fetch && git checkout origin/master
+    - cd bayesian_reasoning_traffic && git fetch && git checkout origin/nliu/training
+    - pip install gym==0.17.1
+    - pip install torch==1.4.0
+    - pip install tensorflow_probability
+    - pip install tensorflow==2.1.0
 
-head_setup_commands:
-    - pip install boto3==1.4.8  # 1.4.8 adds InstanceMarketOptions
+head_setup_commands: []
 
 # Custom commands that will be run on worker nodes after common setup.
 worker_setup_commands: []
