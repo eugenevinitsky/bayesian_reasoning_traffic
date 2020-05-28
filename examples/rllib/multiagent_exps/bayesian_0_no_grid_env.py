@@ -94,27 +94,27 @@ def make_flow_params(args, pedestrians=False, render=False):
         )
 
     
-    vehicles.add(
-        veh_id="human_1",
-        acceleration_controller=(SimCarFollowingController, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        routing_controller=(GridRouter, {}),
-        num_vehicles=1)
+    # vehicles.add(
+    #     veh_id="human_1",
+    #     acceleration_controller=(SimCarFollowingController, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #     ),
+    #     routing_controller=(GridRouter, {}),
+    #     num_vehicles=1)
 
-    vehicles.add(
-        veh_id="human_2",
-        acceleration_controller=(SimCarFollowingController, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        routing_controller=(GridRouter, {}),
-        num_vehicles=1)    
+    # vehicles.add(
+    #     veh_id="human_2",
+    #     acceleration_controller=(SimCarFollowingController, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #     ),
+    #     routing_controller=(GridRouter, {}),
+    #     num_vehicles=1)    
     
 
     n_rows = 1
@@ -359,18 +359,22 @@ def setup_exps_PPO(args, flow_params):
     dict
         training configuration parameters
     """
-    alg_run = 'PPO'
-    agent_cls = get_agent_class(alg_run)
-    config = agent_cls._default_config.copy()
+
+    from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
+    alg_run = PPOTrainer
+    config = PPO_DEFAULT_CONFIG.copy()
+
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
+    config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        # config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'

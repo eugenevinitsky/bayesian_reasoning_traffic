@@ -275,22 +275,128 @@ class Bayesian0NoGridEnv(MultiEnv):
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
                 inside_intersection = rl_id in self.inside_intersection
+
                 if len(collision_pedestrians) > 0:
                     reward = -1000
                 elif rl_id in collision_vehicles:
                     reward = -1000
-                # else:
-                #     reward += self.k.vehicle.get_speed(rl_id) / 100.0 * self.speed_reward_coefficient
-                    # TODO(@nliu & evinitsky) positive reward?
-                    # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                # if rl_id in self.inside_intersection:
-                #     # TODO(KL) 'hard-brake' as negative acceleration?
-                #     if self.k.vehicle.get_acceleration(rl_id) < -0.8:
-                #         reward -= HARD_BRAKE_PENALTY
 
                 rewards[rl_id] = reward / 100
 
         return rewards
+
+    def step(self, rl_actions):
+        """Advance the environment by one step.
+
+        Assigns actions to autonomous and human-driven agents (i.e. vehicles,
+        traffic lights, etc...). Actions that are not assigned are left to the
+        control of the simulator. The actions are then used to advance the
+        simulator by the number of time steps requested per environment step.
+
+        Results from the simulations are processed through various classes,
+        such as the Vehicle and TrafficLight kernels, to produce standardized
+        methods for identifying specific network state features. Finally,
+        results from the simulator are used to generate appropriate
+        observations.
+
+        Parameters
+        ----------
+        rl_actions : array_like
+            an list of actions provided by the rl algorithm
+
+        Returns
+        -------
+        observation : dict of array_like
+            agent's observation of the current environment
+        reward : dict of floats
+            amount of reward associated with the previous state/action pair
+        done : dict of bool
+            indicates whether the episode has ended
+        info : dict
+            contains other diagnostic information from the previous action
+        """
+        for _ in range(self.env_params.sims_per_step):
+            self.time_counter += 1
+            self.step_counter += 1
+
+            # perform acceleration actions for controlled human-driven vehicles
+            if len(self.k.vehicle.get_controlled_ids()) > 0:
+                accel = []
+                for veh_id in self.k.vehicle.get_controlled_ids():
+                    accel_contr = self.k.vehicle.get_acc_controller(veh_id)
+                    action = accel_contr.get_action(self)
+                    accel.append(action)
+                self.k.vehicle.apply_acceleration(
+                    self.k.vehicle.get_controlled_ids(), accel)
+
+            # perform lane change actions for controlled human-driven vehicles
+            if len(self.k.vehicle.get_controlled_lc_ids()) > 0:
+                direction = []
+                for veh_id in self.k.vehicle.get_controlled_lc_ids():
+                    target_lane = self.k.vehicle.get_lane_changing_controller(
+                        veh_id).get_action(self)
+                    direction.append(target_lane)
+                self.k.vehicle.apply_lane_change(
+                    self.k.vehicle.get_controlled_lc_ids(),
+                    direction=direction)
+
+            # perform (optionally) routing actions for all vehicle in the
+            # network, including rl and sumo-controlled vehicles
+            routing_ids = []
+            routing_actions = []
+            for veh_id in self.k.vehicle.get_ids():
+                if self.k.vehicle.get_routing_controller(veh_id) is not None:
+                    routing_ids.append(veh_id)
+                    route_contr = self.k.vehicle.get_routing_controller(veh_id)
+                    routing_actions.append(route_contr.choose_route(self))
+            self.k.vehicle.choose_routes(routing_ids, routing_actions)
+
+            self.apply_rl_actions(rl_actions)
+
+            self.additional_command()
+
+            # advance the simulation in the simulator by one step
+            self.k.simulation.simulation_step()
+
+            # store new observations in the vehicles and traffic lights class
+            self.k.update(reset=False)
+
+            # update the colors of vehicles
+            if self.sim_params.render:
+                self.k.vehicle.update_vehicle_colors()
+
+            # crash encodes whether the simulator experienced a collision
+            crash = self.k.simulation.check_collision()
+
+            # update crash if there's an pedestrian-vehicle collision
+            if self.k.pedestrian:
+                for veh_id in self.k.vehicle.get_rl_ids():
+                    if len(self.k.vehicle.get_pedestrian_crash(veh_id, self.k.pedestrian)) > 0:
+                        crash = True
+
+            # stop collecting new simulation steps if there is a collision
+            if crash:
+                break
+
+        states = self.get_state()
+        done = {key: key in self.k.vehicle.get_arrived_ids()
+                for key in states.keys()}
+        if crash:
+            done['__all__'] = True
+        else:
+            done['__all__'] = False
+        infos = {key: {} for key in states.keys()}
+
+        # compute the reward
+        if self.env_params.clip_actions:
+            clipped_actions = self.clip_actions(rl_actions)
+            reward = self.compute_reward(clipped_actions, fail=crash)
+        else:
+            reward = self.compute_reward(rl_actions, fail=crash)
+        if states.keys() != reward.keys():
+            reward = self.compute_reward(rl_actions, fail=crash)
+            states = self.get_state()
+        return states, reward, done, infos
 
     def reset(self, new_inflow_rate=None):
         """Reset the environment.
