@@ -15,9 +15,9 @@ from flow.utils.exceptions import FatalFlowError
 
 ADDITIONAL_ENV_PARAMS = {
     # maximum acceleration of autonomous vehicles
-    'max_accel': -4.5,
+    'max_accel': 4.5,
     # maximum deceleration of autonomous vehicles
-    'max_decel': -8.6,
+    'max_decel': -2.6,
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
     # how many objects in our local radius we want to return
