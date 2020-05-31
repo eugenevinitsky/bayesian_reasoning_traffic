@@ -373,7 +373,7 @@ def setup_exps_PPO(args, flow_params):
     config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
-        # config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
         config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
 
     config['horizon'] = args.horizon
