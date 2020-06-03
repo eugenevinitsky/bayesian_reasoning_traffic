@@ -2,17 +2,16 @@ import tensorflow as tf
 import os
 import numpy as np
 import math
-
 from flow.core.params import SumoCarFollowingParams
 from imitating_controller import ImitatingController
 from imitating_network import ImitatingNetwork
-from flow.controllers.car_following_models import IDMController
-from flow.controllers.velocity_controllers import FollowerStopper
+from flow.controllers.car_following_models import IDMController, SimCarFollowingController
 from flow.core.rewards import *
+from flow.envs.multiagent.bayesian_0_no_grid_env import *
 
 """ Class agnostic helper functions """
 
-def sample_trajectory_singleagent(env, controllers, action_network, max_trajectory_length, use_expert, v_des, max_decel):
+def sample_trajectory_singleagent(env, controllers, action_network, max_trajectory_length, use_expert, max_decel):
     """
     Samples a single trajectory from a singleagent environment.
     Parameters
@@ -27,8 +26,6 @@ def sample_trajectory_singleagent(env, controllers, action_network, max_trajecto
         maximum steps in a trajectory
     use_expert: bool
         if True, trajectory is collected using expert policy (for behavioral cloning)
-    v_des: float
-        v_des parameter for follower-stopper
     max_decel: float
         maximum deceleration of environment. Used to determine dummy values to put as labels when environment has less vehicles than the maximum amount.
     Returns
@@ -36,7 +33,7 @@ def sample_trajectory_singleagent(env, controllers, action_network, max_trajecto
     dict
         Dictionary of numpy arrays, where matching indeces of each array given (state, action, expert_action, reward, next_state, terminal) tuples
     """
-
+    # import ipdb; ipdb.set_trace()
     # reset and initialize arrays to store trajectory
     observation = env.reset()
 
@@ -67,7 +64,7 @@ def sample_trajectory_singleagent(env, controllers, action_network, max_trajecto
 
         for vehicle_id in vehicle_ids:
             if vehicle_id not in set(controllers.keys()):
-                expert = FollowerStopper(vehicle_id, car_following_params=car_following_params, v_des=v_des)
+                expert = IDMController(vehicle_id, car_following_params=car_following_params)
                 imitator = ImitatingController(vehicle_id, action_network, False, car_following_params=car_following_params)
                 controllers[vehicle_id] = (imitator, expert)
 
@@ -88,7 +85,6 @@ def sample_trajectory_singleagent(env, controllers, action_network, max_trajecto
             else:
                 imitator = controllers[vehicle_ids[i]][0]
                 expert = controllers[vehicle_ids[i]][1]
-
                 expert_action = expert.get_action(env)
                 # catch invalid expert actions
                 if (expert_action is None or math.isnan(expert_action)):
@@ -141,7 +137,7 @@ def sample_trajectory_singleagent(env, controllers, action_network, max_trajecto
     return traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals), traj_length
 
 
-def sample_trajectory_multiagent(env, controllers, action_network, max_trajectory_length, use_expert, v_des):
+def sample_trajectory_multiagent(env, controllers, action_network, max_trajectory_length, use_expert, expert_control="SUMO"):
     """
     Samples a single trajectory from a multiagent environment.
 
@@ -157,20 +153,26 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
         maximum steps in a trajectory
     use_expert: bool
         if True, trajectory is collected using expert policy (for behavioral cloning)
-    v_des: float
-        v_des parameter for follower-stopper
     Returns
     _______
     dict
-        Dictionary of numpy arrays, where matching indeces of each array given (state, action, expert_action, reward, next_state, terminal) tuples
+        Dictionary of numpy arrays, where matching indices of each array given (state, action, expert_action, reward, next_state, terminal) tuples
     """
 
     observation_dict = env.reset()
 
     observations, actions, expert_actions, rewards, next_observations, terminals = [], [], [], [], [], []
+    # account for get_acceleration being one step behind
+
     traj_length = 0
+    done = {"__all__": False}
 
     while True:
+
+        traj_length += 1
+        terminate_rollout = done['__all__'] or (traj_length == max_trajectory_length)
+        if terminate_rollout:
+            break
 
         vehicle_ids = list(observation_dict.keys())
         # add nothing to replay buffer if no vehicles
@@ -188,36 +190,56 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
 
         for i in range(len(vehicle_ids)):
             vehicle_id = vehicle_ids[i]
-
             if vehicle_id not in set(controllers.keys()):
                 car_following_params = SumoCarFollowingParams()
+                if expert_control == "SUMO":
+                    expert = SimCarFollowingController(vehicle_id, car_following_params=car_following_params)
+                else:
+                    # Other controllers would just crash
+                    expert = IDMController(vehicle_id, car_following_params=car_following_params)
 
-                expert = FollowerStopper(vehicle_id, car_following_params=car_following_params, v_des=v_des)
-                imitator = ImitatingController(vehicle_id, action_network, True, car_following_params=car_following_params)
+                imitator = ImitatingController(vehicle_id, action_network, multiagent=True, car_following_params=car_following_params)
                 controllers[vehicle_id] = (imitator, expert)
 
             expert_controller = controllers[vehicle_id][1]
+
             if use_expert:
                 controller = expert_controller
             else:
                 controller = controllers[vehicle_id][0]
 
-            if traj_length == 0 and i == 0:
+            if actions == [] and i == 0:
                 print("Controller collecting trajectory: ", controller)
 
-            action = controller.get_action(env)
+            if expert_control == "SUMO" and use_expert:
+                # SUMO gives the previous action taken
+                action = env.k.vehicle.get_acceleration(vehicle_id)
+                expert_action = action
+                expert_action_dict[vehicle_id] = expert_action
+
+            elif expert_control == "SUMO" and not use_expert:
+                # for eg IDM, the acceleration 'action' is what the car takes on
+                if not env.past_intersection(vehicle_id):
+                    action = controller.get_action(env, allow_junction_control=True)
+                else:
+                    action = None
+                    
+                # if action == None:
+                #     import ipdb; ipdb.set_trace()
+                #     action = controller.get_action(env)
+
+                expert_action = env.k.vehicle.get_acceleration(vehicle_id)
+                expert_action_dict[vehicle_id] = expert_action
 
             # action should be a scalar acceleration
             if type(action) == np.ndarray:
                 action = action.flatten()[0]
 
-            expert_action = expert_controller.get_action(env)
-            expert_action_dict[vehicle_id] = expert_action
-
             if (expert_action is None or math.isnan(expert_action)):
                 invalid_expert_action = True
-
+            
             rl_actions[vehicle_id] = action
+            # print(f'rl_actions is {rl_actions}')
 
         if invalid_expert_action:
             # invalid action in rl_actions, so default control to SUMO
@@ -228,11 +250,19 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
             continue
 
         for vehicle_id in vehicle_ids:
-            observations.append(observation_dict[vehicle_id])
-            actions.append(rl_actions[vehicle_id])
-            expert_actions.append(expert_action_dict[vehicle_id])
+            if not env.past_intersection(vehicle_id):
+                observations.append(observation_dict[vehicle_id])
+                actions.append(rl_actions[vehicle_id])
+                expert_actions.append(expert_action_dict[vehicle_id])
 
-        observation_dict, reward_dict, done_dict, _ = env.step(rl_actions)
+        if expert_control == "SUMO" and use_expert:
+            observation_dict, reward_dict, done_dict, _ = env.step(None)
+        if expert_control == "SUMO" and not use_expert:
+            if not env.past_intersection("rl_0"):
+                observation_dict, reward_dict, done_dict, _ = env.step(rl_actions)
+            else:
+                observation_dict, reward_dict, done_dict, _ = env.step(None)
+
         terminate_rollout = done_dict['__all__'] or (traj_length == max_trajectory_length)
 
         for vehicle_id in vehicle_ids:
@@ -240,15 +270,25 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
             rewards.append(reward_dict.get(vehicle_id, 0))
             terminals.append(terminate_rollout)
 
-        traj_length += 1
-
         if terminate_rollout:
             break
+    
+    if use_expert and expert_control == "SUMO":
+        expert_actions = expert_actions[1:]
+        actions = expert_actions
+        observations = observations[:-1]
+        next_observations = next_observations[:-1]
+
+    if not use_expert and expert_control == "SUMO":
+        expert_actions = expert_actions[1:]
+        actions = actions[:-1]
+        observations = observations[:-1]
+        next_observations = next_observations[:-1]
 
     return traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals), traj_length
 
 
-def sample_trajectories(env, controllers, action_network, min_batch_timesteps, max_trajectory_length, multiagent, use_expert, v_des=15, max_decel=4.5):
+def sample_trajectories(env, controllers, action_network, min_batch_timesteps, max_trajectory_length, multiagent, use_expert, max_decel=4.5):
     """
     Samples trajectories from environment.
 
@@ -268,8 +308,6 @@ def sample_trajectories(env, controllers, action_network, min_batch_timesteps, m
         if True, env is a multiagent env
     use_expert: bool
         if True, trajectory is collected using expert policy (for behavioral cloning)
-    v_des: float
-        v_des parameter for follower-stopper
     max_decel: float
         maximum deceleration of environment. Used to determine dummy values to put as labels when environment has less vehicles than the maximum amount.
 
@@ -283,11 +321,10 @@ def sample_trajectories(env, controllers, action_network, min_batch_timesteps, m
     trajectories = []
 
     while total_envsteps < min_batch_timesteps:
-
         if multiagent:
-            trajectory, traj_length = sample_trajectory_multiagent(env, controllers, action_network, max_trajectory_length, use_expert, v_des)
+            trajectory, traj_length = sample_trajectory_multiagent(env, controllers, action_network, max_trajectory_length, use_expert)
         else:
-            trajectory, traj_length = sample_trajectory_singleagent(env, controllers, action_network, max_trajectory_length, use_expert, v_des, max_decel)
+            trajectory, traj_length = sample_trajectory_singleagent(env, controllers, action_network, max_trajectory_length, use_expert, max_decel)
 
         trajectories.append(trajectory)
 
@@ -295,7 +332,7 @@ def sample_trajectories(env, controllers, action_network, min_batch_timesteps, m
 
     return trajectories, total_envsteps
 
-def sample_n_trajectories(env, controllers, action_network, n, max_trajectory_length, multiagent, use_expert, v_des=15, max_decel=4.5):
+def sample_n_trajectories(env, controllers, action_network, n, max_trajectory_length, multiagent, use_expert, max_decel=4.5):
     """
     Samples n trajectories from environment.
 
@@ -315,8 +352,6 @@ def sample_n_trajectories(env, controllers, action_network, n, max_trajectory_le
         if True, env is a multiagent env
     use_expert: bool
         if True, trajectory is collected using expert policy (for behavioral cloning)
-    v_des: float
-        v_des parameter for follower-stopper
     max_decel: float
         maximum deceleration of environment. Used to determine dummy values to put as labels when environment has less vehicles than the maximum amount.
 
@@ -330,9 +365,9 @@ def sample_n_trajectories(env, controllers, action_network, n, max_trajectory_le
     for _ in range(n):
 
         if multiagent:
-            trajectory, length = sample_trajectory_multiagent(env, controllers, action_network, max_trajectory_length, use_expert, v_des)
+            trajectory, length = sample_trajectory_multiagent(env, controllers, action_network, max_trajectory_length, use_expert)
         else:
-            trajectory, length = sample_trajectory_singleagent(env, controllers, action_network, max_trajectory_length, use_expert, v_des, max_decel)
+            trajectory, length = sample_trajectory_singleagent(env, controllers, action_network, max_trajectory_length, use_expert, max_decel)
 
         trajectories.append((trajectory, length))
 

@@ -1,92 +1,99 @@
-"""Class to store agent's experiences e_t = (s_t, a_t, r_t, s_{t+1}), to be used in training"""
-
 import time
 import numpy as np
-import tensorflow as tf
-import gym
 import os
 
-from cs285.infrastructure.utils import *
 
 class ReplayBuffer(object):
+    """ Replay buffer class to store state, action, expert_action, reward, next_state, terminal tuples"""
 
-    def __init__(self, max_size=1000000):
+    def __init__(self, max_size=100000):
 
+        # max size of buffer
         self.max_size = max_size
 
         # store each rollout
-        self.paths = []
+        self.rollouts = []
 
-        # store (concatenated) component arrays from each rollout
-        self.obs = None
-        self.acs = None
-        self.rews = None
-        self.next_obs = None
+        # store component arrays from each rollout
+        self.observations = None
+        self.actions = None
+        self.expert_actions = None
+        self.rewards = None
+        self.next_observations = None
         self.terminals = None
 
-    def __len__(self):
-        if self.obs:
-            return self.obs.shape[0]
-        else:
-            return 0
 
-    def add_rollouts(self, paths, concat_rew=True):
+    def add_rollouts(self, rollouts_list):
+        """
+        Add a list of rollouts to the replay buffer
 
-        # add new rollouts into our list of rollouts
-        for path in paths:
-            self.paths.append(path)
+        Parameters
+        __________
+        rollouts_list: list
+            list of rollout dictionaries
 
-        # convert new rollouts into their component arrays, and append them onto our arrays
-        observations, actions, rewards, next_observations, terminals = convert_listofrollouts(paths, concat_rew)
+        """
 
-        if self.obs is None:
-            self.obs = observations[-self.max_size:]
-            self.acs = actions[-self.max_size:]
-            self.rews = rewards[-self.max_size:]
-            self.next_obs = next_observations[-self.max_size:]
+        for rollout in rollouts_list:
+            self.rollouts.append(rollout)
+
+        observations, actions, expert_actions, rewards, next_observations, terminals = self.unpack_rollouts(rollouts_list)
+        assert (not np.any(np.isnan(expert_actions))), "Invalid actions added to replay buffer"
+
+        # only keep max_size tuples in buffer
+        if self.observations is None:
+            self.observations = observations[-self.max_size:]
+            self.actions = actions[-self.max_size:]
+            self.expert_actions = expert_actions[-self.max_size:]
+            self.rewards = rewards[-self.max_size:]
+            self.next_observations = next_observations[-self.max_size:]
             self.terminals = terminals[-self.max_size:]
         else:
-            self.obs = np.concatenate([self.obs, observations])[-self.max_size:]
-            self.acs = np.concatenate([self.acs, actions])[-self.max_size:]
-            if concat_rew:
-                self.rews = np.concatenate([self.rews, rewards])[-self.max_size:]
-            else:
-                if isinstance(rewards, list):
-                    self.rews += rewards
-                else:
-                    self.rews.append(rewards)
-                self.rews = self.rews[-self.max_size:]
-            self.next_obs = np.concatenate([self.next_obs, next_observations])[-self.max_size:]
+            self.observations = np.concatenate([self.observations, observations])[-self.max_size:]
+            self.actions = np.concatenate([self.actions, actions])[-self.max_size:]
+            self.expert_actions = np.concatenate([self.expert_actions, expert_actions])[-self.max_size:]
+            self.rewards = np.concatenate([self.rewards, rewards])[-self.max_size:]
+            self.next_observations = np.concatenate([self.next_observations, next_observations])[-self.max_size:]
             self.terminals = np.concatenate([self.terminals, terminals])[-self.max_size:]
 
-    ########################################
-    ########################################
-
-    def sample_random_data(self, batch_size):
-        assert self.obs.shape[0] == self.acs.shape[0] == self.rews.shape[0] == self.next_obs.shape[0] == self.terminals.shape[0]
-        assert self.obs.shape[0] >= batch_size
-        sample_lst = np.array(range(batch_size))
-        sample_lst = np.random.permutation(sample_lst)
-        random_indices = sample_lst[:batch_size]
-
-        return self.obs[random_indices], self.acs[random_indices], self.rews[random_indices], self.next_obs[random_indices], self.terminals[random_indices]
-
-    def sample_recent_data(self, batch_size=1):
-        return self.obs[-batch_size:], self.acs[-batch_size:], self.rews[-batch_size:], self.next_obs[-batch_size:], self.terminals[-batch_size:]
-
-
-    def convert_listofrollouts(paths, concat_rew=True):
+    def sample_batch(self, batch_size):
         """
-        Take a list of rollout dictionaries
-        and return separate arrays,
-        where each array is a concatenation of that array from across the rollouts
+        Sample a batch of data (with size batch_size) from replay buffer.
+
+        Parameters
+        ----------
+        batch_size: int
+            size of batch to sample
+
+        Returns
+        _______
+        Data in separate numpy arrays of observations, actions, and expert actionis
         """
-        observations = np.concatenate([path["observation"] for path in paths])
-        actions = np.concatenate([path["action"] for path in paths])
-        if concat_rew:
-            rewards = np.concatenate([path["reward"] for path in paths])
-        else:
-            rewards = [path["reward"] for path in paths]
-        next_observations = np.concatenate([path["next_observation"] for path in paths])
-        terminals = np.concatenate([path["terminal"] for path in paths])
-        return observations, actions, rewards, next_observations, terminals
+        assert self.observations is not None and self.actions is not None and self.expert_actions is not None
+
+        size = len(self.observations)
+        rand_inds = np.random.randint(0, size, batch_size)
+        return self.observations[rand_inds], self.actions[rand_inds], self.expert_actions[rand_inds]
+
+
+
+    def unpack_rollouts(self, rollouts_list):
+        """
+        Convert list of rollout dictionaries to individual observation, action, rewards, next observation, terminal arrays
+        Parameters
+        ----------
+        rollouts: list
+            list of rollout dictionaries
+
+        Returns
+        ----------
+        separate numpy arrays of observations, actions, rewards, next_observations, and is_terminals
+        """
+        observations = np.concatenate([rollout["observations"] for rollout in rollouts_list])
+        actions = np.concatenate([rollout["actions"] for rollout in rollouts_list])
+        expert_actions = np.concatenate([rollout["expert_actions"] for rollout in rollouts_list])
+        rewards = np.concatenate([rollout["rewards"] for rollout in rollouts_list])
+        next_observations = np.concatenate([rollout["next_observations"] for rollout in rollouts_list])
+        terminals = np.concatenate([rollout["terminals"] for rollout in rollouts_list])
+
+        return observations, actions, expert_actions, rewards, next_observations, terminals

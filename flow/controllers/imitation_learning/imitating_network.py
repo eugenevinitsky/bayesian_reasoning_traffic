@@ -1,19 +1,17 @@
 import numpy as np
 import tensorflow as tf
-from time import time
+from utils_tensorflow import *
+from keras_utils import *
 import tensorflow_probability as tfp
-
-from flow.controllers.imitation_learning.utils.utils_tensorflow import *
-from flow.controllers.imitation_learning.utils.keras_utils import *
 from flow.controllers.base_controller import BaseController
-
+from replay_buffer import ReplayBuffer
+from time import time
 from tensorflow.python.keras.callbacks import TensorBoard
-from flow.controller.imitation_learning.replay_buffer import ReplayBuffer
 
-class MLPPolicy():
+
+class ImitatingNetwork():
     """
-    Class containing MLP neural network that learns to imitate a 
-    given expert.
+    Class containing neural network which learns to imitate a given expert controller.
     """
 
     def __init__(self, sess, action_dim, obs_dim, fcnet_hiddens, replay_buffer_size, stochastic=False, variance_regularizer = 0, load_model=False, load_path=''):
@@ -111,7 +109,7 @@ class MLPPolicy():
         """
 
         # network expects an array of arrays (matrix); if single observation (no batch), convert to array of arrays
-        if len(observation.shape) <= 1:
+        if len(observation.shape)<=1:
             observation = observation[None]
         # "batch size" is 1, so just get single acceleration/acceleration vector
         network_output = self.model.predict(observation)
@@ -125,7 +123,7 @@ class MLPPolicy():
 
     def get_accel(self, env):
         """
-        Get network's action / acceleration prediction(s) based on given env
+        Get network's acceleration prediction(s) based on given env
 
         Parameters
         ----------
