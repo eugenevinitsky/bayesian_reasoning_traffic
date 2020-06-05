@@ -1,4 +1,4 @@
-from runner import *
+from flow.controllers.imitation_learning.run import *
 from examples.train import *
 
 def parse_args(args):
@@ -75,23 +75,33 @@ def parse_args(args):
 
     # Imitation Learning args
 
-    parser.add_argument('--ep_len', type=int, default=5000, help="Maximum length of episode for imitation learning")
+    parser.add_argument('--ep_len', type=int, default=5000, help='Max length of episodes for rollouts.')
 
-    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1000, help="Number of gradient steps to take per iteration")  # number of gradient steps for training policy
-    parser.add_argument('--n_iter', type=int, default=5, help="Number of iterations of DAgger to perform (1st iteration is behavioral cloning)")
+    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1000, help='Number of gradient steps for training policy.')  # number of gradient steps for training policy
+    parser.add_argument('--n_bc_iter', type=int, default=200, help='Number of pure behavior cloning iterations to run')
+    parser.add_argument('--n_iter', type=int, default=220, help='Number of DAgger iterations to run (after pure bc iterations)')
 
-    parser.add_argument('--batch_size', type=int, default=3000, help="")  # training data collected (in the env) during each iteration
-    parser.add_argument('--init_batch_size', type=int, default=4000)
+    parser.add_argument('--batch_size', type=int, default=1000, help='Number of environment steps to collect in iteration of DAgger')
+    parser.add_argument('--init_batch_size', type=int, default=2000, help='Number of environment steps to collect on 1st iteration of DAgger (behavioral cloning iteration)')
+    parser.add_argument('--vf_batch_size', type=int, default=2000, help='Number of environment steps to collect to learn value function for a policy')
+    parser.add_argument('--num_vf_iters', type=int, default=100, help='Number of iterations to run vf training') # TODO: better help description for this
 
-    parser.add_argument('--train_batch_size', type=int, default=100, help="Batch size for training")  # number of sampled data points to be used per gradient/train step
-    parser.add_argument('--tensorboard_path', type=str, help='Path to tensorboard log dir for imitation')
+    parser.add_argument('--train_batch_size', type=int, default=100, help='Batch size to train on')
 
-    parser.add_argument('--replay_buffer_size', type=int, default=1000000)
-    parser.add_argument('--num_eval_episodes', type=int, default=0, help="Number of episodes to evaluate imitation controller.")
-    parser.add_argument('--stochastic', type=bool, default=False, help="If true, controller learns stochastic policy (multivariate gaussian)")
-    parser.add_argument('--multiagent', type=bool, default=False, help="Whether the env is multiagent")
-    parser.add_argument('--v_des', type=float, default=15, help="v_des for FollowerStopper")
-    parser.add_argument('--variance_regularizer', type=float, default=0.5, help="Regularization parameter to penalize high variance in negative log likelihood loss")
+    parser.add_argument('--load_imitation_model', type=bool, default=False, help='Whether to load an existing imitation neural net')
+    parser.add_argument('--load_imitation_path', type=str, default='', help='Path to h5 file from which to load existing imitation neural net')
+    parser.add_argument('--tensorboard_path', type=str, default='/tensorboard/', help='Path to which tensorboard events should be written.')
+    parser.add_argument('--replay_buffer_size', type=int, default=1000000, help='Max size of replay buffer')
+    parser.add_argument('--save_model', type=int, default=1, help='If true, save models in h5 format')
+    parser.add_argument('--num_eval_episodes', type=int, default=0, help='Number of episodes on which to evaluate imitation model')
+    parser.add_argument('--stochastic', type=bool, default=False, help='If true, learn a stochastic policy (MV Gaussian)')
+    parser.add_argument('--multiagent', type=bool, default=False, help='If true, env is multiagent.')
+    parser.add_argument('--v_des', type=float, default=15, help='Desired velocity for follower-stopper')
+    parser.add_argument('--variance_regularizer', type=float, default=0.5, help='Regularization hyperparameter to penalize variance in imitation learning loss, for stochastic policies.')
+
+
+    time_now = time.ctime(time.clock_gettime(0))
+    parser.add_argument('--save_path', type=str, default=f'flow/controllers/imitation_learning/model_files/bay0_{time_now}', help='Filepath to h5 file in which imitation model should be saved')
 
 
     parsed_args = parser.parse_known_args(args)[0]
@@ -106,28 +116,29 @@ def parse_args(args):
 def main(args):
 
     # Parse args, train imitation learning
-    # import ipdb;ipdb.set_trace()
+
     flags, params = parse_args(args)
     params["fcnet_hiddens"] = [32, 32, 32]
+    params['PPO_save_path'] = params['load_weights_path']
 
-    assert flags.n_iter>1, ('DAgger needs >1 iteration')
 
     print("\n\n********** IMITATION LEARNING ************ \n")
     # run training
     imitation_runner = Runner(params)
-    imitation_runner.run_training_loop()
+    # import ipdb; ipdb.set_trace()
+    # imitation_runner.run_training_loop()
 
     # convert model to work for PPO and save for training
-    imitation_runner.save_controller_for_PPO()
+    # imitation_runner.save_controller_for_PPO()
 
     # Imitation Done, start RL
     print("\n\n********** RL ************ \n")
 
-    # Import relevant information from the exp_config script.
-    module = __import__(
-        "examples.exp_configs.rl.singleagent", fromlist=[flags.exp_config])
-    module_ma = __import__(
-        "examples.exp_configs.rl.multiagent", fromlist=[flags.exp_config])
+    # import appropriate exp_config module
+    if params['multiagent']:
+        module = __import__("examples.rllib.multiagent_exps", fromlist=[params['exp_config']])
+    else:
+        module = __import__("examples.rllib.multiagent_exps", fromlist=[params['exp_config']])
 
     # Import the sub-module containing the specified exp_config and determine
     # whether the environment is single agent or multi-agent.

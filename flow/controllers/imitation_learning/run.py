@@ -68,29 +68,30 @@ def main():
 
     parser.add_argument('--ep_len', type=int, default=5000, help='Max length of episodes for rollouts. ')
 
-    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=100, help='Number of gradient steps for training policy.')  # number of gradient steps for training policy
-    parser.add_argument('--n_bc_iter', type=int, default=2, help='Number of pure behavior cloning iterations to run')
-    parser.add_argument('--n_iter', type=int, default=4, help='Number of DAgger iterations to run (after pure bc iterations)')
+    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1500, help='Number of gradient steps for training policy.')  # number of gradient steps for training policy
+    parser.add_argument('--n_bc_iter', type=int, default=200, help='Number of pure behavior cloning iterations to run')
+    parser.add_argument('--n_iter', type=int, default=220, help='Number of DAgger iterations to run (after pure bc iterations)')
 
     parser.add_argument('--batch_size', type=int, default=3000, help='Number of environment steps to collect in iteration of DAgger')
     parser.add_argument('--init_batch_size', type=int, default=4000, help='Number of environment steps to collect on 1st iteration of DAgger (behavioral cloning iteration)')
 
-    parser.add_argument('--train_batch_size', type=int, default=100, help='Batch size to train on')
-
+    parser.add_argument('--train_batch_size', type=int, default=600, help='Batch size to train on')
+    parser.add_argument('--load_imitation_model', type=bool, default=False, help='Whether to load an existin imitation neural net')
+    parser.add_argument('--load_imitation_path', type=str, default='', help='Path to h5 file from which to load existing imitation neural net')
     parser.add_argument('--replay_buffer_size', type=int, default=1000000, help='Max size of replay buffer')
-    parser.add_argument('--save_path', type=str, default='flow/controllers/imitation_learning/model_files/bay0_1', help='Filepath to h5 file in which imitation model should be saved')
     parser.add_argument('--PPO_save_path', type=str, default='', help='Filepath to h5 file in which PPO model with copied weights should be saved')
     parser.add_argument('--save_model', type=int, default=1, help='If true, save models in h5 format')
-    parser.add_argument('--num_eval_episodes', type=int, default=10, help='Number of episodes on which to evaluate imitation model')
-    parser.add_argument('--stochastic', type=bool, default=False, help='If true, learn a stochastic policy (MV Gaussian)')
+    parser.add_argument('--num_eval_episodes', type=int, default=5, help='Number of episodes on which to evaluate imitation model')
+    parser.add_argument('--stochastic', type=bool, default=True, help='If true, learn a stochastic policy (MV Gaussian)')
     parser.add_argument('--multiagent', type=bool, default=True, help='If true, env is multiagent. ')
-    parser.add_argument('--v_des', type=float, default=15, help='Desired velocity for follower-stopper')
-    parser.add_argument('--variance_regularizer', type=float, default=0.5, help='Regularization hyperparameter to penalize variance in imitation learning loss, for stochastic policies.')
+    parser.add_argument('--variance_regularizer', type=float, default=30, help='Regularization hyperparameter to penalize variance in imitation learning loss, for stochastic policies.')
+
+    time_now = time.ctime(time.clock_gettime(0))
+    parser.add_argument('--save_path', type=str, default=f'flow/controllers/imitation_learning/model_files/bay0_{time_now}', help='Filepath to h5 file in which imitation model should be saved')
     args = parser.parse_args()
 
     # convert args to dictionary
     params = vars(args)
-
     # change this to determine number and size of hidden layers
     params["fcnet_hiddens"] = [32, 32, 32]
 
@@ -100,7 +101,6 @@ def main():
     # run training
     train = Runner(params)
     train.run_training_loop()
-
     # save model after training
     if params['save_model'] == 1:
         train.save_controller_network()

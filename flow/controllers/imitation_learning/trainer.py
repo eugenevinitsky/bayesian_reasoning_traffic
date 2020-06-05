@@ -4,6 +4,7 @@ import numpy as np
 import gym
 import os
 import argparse
+import matplotlib.pyplot as plt
 
 from collections import OrderedDict
 
@@ -71,7 +72,10 @@ class Trainer(object):
         self.params['obs_dim'] = obs_dim
 
         # initialize neural network class and tf variables
-        self.action_network = ImitatingNetwork(self.sess, self.params['action_dim'], self.params['obs_dim'], self.params['fcnet_hiddens'], self.params['replay_buffer_size'], stochastic=self.params['stochastic'], variance_regularizer=self.params['variance_regularizer'])
+        self.action_network = ImitatingNetwork(self.sess, self.params['action_dim'], self.params['obs_dim'], self.params['fcnet_hiddens'], 
+                                                self.params['replay_buffer_size'], stochastic=self.params['stochastic'], 
+                                                variance_regularizer=self.params['variance_regularizer'], load_model=self.params['load_imitation_model'], 
+                                                load_path=self.params['load_imitation_path'])
 
         # tf.global_variables_initializer().run(session=self.sess)
 
@@ -119,8 +123,8 @@ class Trainer(object):
             # train controller
             self.train_controller()
 
-            if itr % 20 == 0:
-                self.evaluate_controller(10)
+            if itr % 100 == 0 and itr > 1:
+                self.evaluate_controller(self.params["num_eval_episodes"])
 
     def collect_training_trajectories(self, itr, batch_size):
         """
@@ -142,20 +146,23 @@ class Trainer(object):
         print("\nCollecting data to be used for training...")
         max_decel = self.flow_params['env'].additional_params['max_decel']
         trajectories, envsteps_this_batch = sample_trajectories(self.env, self.controllers, self.action_network, batch_size, self.params['ep_len'], self.multiagent, use_expert= itr<self.params['n_bc_iter'], max_decel=max_decel)
-        print(itr<self.params['n_bc_iter'])
         return trajectories, envsteps_this_batch
 
-    def train_controller(self):
+    def train_controller(self, plot_error=False):
         """
         Trains controller for specified number of steps, using data sampled from replay buffer; each step involves running optimizer (i.e. Adam) once
         """
-
+        errors = []
         print("Training controller using sampled data from replay buffer...")
         for train_step in range(self.params['num_agent_train_steps_per_iter']):
             # sample data from replay buffer
             ob_batch, ac_batch, expert_ac_batch = self.action_network.sample_data(self.params['train_batch_size'])
             # train network on sampled data
-            self.action_network.train(ob_batch, expert_ac_batch)
+            errors.append(self.action_network.train(ob_batch, expert_ac_batch))
+        if plot_error:
+            plt.plot(errors)
+            plt.title("train controller error vs train steps")
+            plt.show()
 
     def evaluate_controller(self, num_trajs = 10):
         """
@@ -200,7 +207,6 @@ class Trainer(object):
             average_imitator_reward_per_rollout += np.sum(traj['rewards'])
     
         if len(trajectories) == 0:
-            import ipdb; ipdb.set_trace()
             trajectories = sample_n_trajectories(self.env, self.controllers, self.action_network, num_trajs, self.params['ep_len'], self.multiagent, False)
 
         # compute averages for metrics

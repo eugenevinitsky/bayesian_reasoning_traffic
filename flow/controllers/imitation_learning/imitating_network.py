@@ -1,7 +1,8 @@
 import numpy as np
 import tensorflow as tf
-from utils_tensorflow import *
-from keras_utils import *
+from flow.controllers.imitation_learning.utils_tensorflow import *
+from flow.controllers.imitation_learning.keras_utils import *
+from flow.controllers.imitation_learning.keras_utils import negative_log_likelihood_loss
 import tensorflow_probability as tfp
 from flow.controllers.base_controller import BaseController
 from replay_buffer import ReplayBuffer
@@ -86,12 +87,20 @@ class ImitatingNetwork():
             numpy array containing batch of observations (inputs)
         action_batch : numpy array
             numpy array containing batch of actions (labels)
+
+        Returns
+        -------
+        Scalar training loss
+        (if the model has a single output and no metrics)
+        or list of scalars (if the model has multiple outputs
+        and/or metrics). The attribute `model.metrics_names` will give you
+        the display labels for the scalar outputs.
         """
 
         # reshape action_batch to ensure a shape (batch_size, action_dim)
         action_batch = action_batch.reshape(action_batch.shape[0], self.action_dim)
         # one gradient step on batch
-        self.model.train_on_batch(observation_batch, action_batch)
+        return self.model.train_on_batch(observation_batch, action_batch)
 
     def get_accel_from_observation(self, observation):
         """
@@ -117,6 +126,8 @@ class ImitatingNetwork():
             mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
             var = np.exp(2 * log_std)
             action = np.random.multivariate_normal(mean[0], var)
+            print("action", action, "mean", mean[0], "var", var[0])
+
             return action
         else:
             return network_output
@@ -190,7 +201,7 @@ class ImitatingNetwork():
             path to h5 file containing model to load from
         """
         if self.stochastic:
-            self.model = tf.keras.models.load_model(load_path, custom_objects={'negative_log_likelihood_loss': negative_log_likelihood_loss})
+            self.model = tf.keras.models.load_model(load_path, custom_objects={'nll_loss': negative_log_likelihood_loss(self.variance_regularizer)})
         else:
             self.model = tf.keras.models.load_model(load_path)
 
