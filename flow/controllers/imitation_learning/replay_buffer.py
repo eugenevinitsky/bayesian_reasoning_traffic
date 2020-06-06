@@ -4,7 +4,9 @@ import os
 
 
 class ReplayBuffer(object):
-    """ Replay buffer class to store state, action, expert_action, reward, next_state, terminal tuples"""
+    """ Replay buffer class to store state, action, expert_action, reward, next_state, terminal, state_info tuples.
+    
+    State info is a dict containing information on the vehicle whose observation that the s, a, r, t tuple is based on"""
 
     def __init__(self, max_size=100000):
 
@@ -21,6 +23,7 @@ class ReplayBuffer(object):
         self.rewards = None
         self.next_observations = None
         self.terminals = None
+        self.state_infos = None
 
 
     def add_rollouts(self, rollouts_list):
@@ -37,7 +40,7 @@ class ReplayBuffer(object):
         for rollout in rollouts_list:
             self.rollouts.append(rollout)
 
-        observations, actions, expert_actions, rewards, next_observations, terminals = self.unpack_rollouts(rollouts_list)
+        observations, actions, expert_actions, rewards, next_observations, terminals, state_infos = self.unpack_rollouts(rollouts_list)
         assert (not np.any(np.isnan(expert_actions))), "Invalid actions added to replay buffer"
 
         # only keep max_size tuples in buffer
@@ -48,6 +51,7 @@ class ReplayBuffer(object):
             self.rewards = rewards[-self.max_size:]
             self.next_observations = next_observations[-self.max_size:]
             self.terminals = terminals[-self.max_size:]
+            self.state_infos = state_infos[-self.max_size:]
         else:
             self.observations = np.concatenate([self.observations, observations])[-self.max_size:]
             self.actions = np.concatenate([self.actions, actions])[-self.max_size:]
@@ -55,6 +59,7 @@ class ReplayBuffer(object):
             self.rewards = np.concatenate([self.rewards, rewards])[-self.max_size:]
             self.next_observations = np.concatenate([self.next_observations, next_observations])[-self.max_size:]
             self.terminals = np.concatenate([self.terminals, terminals])[-self.max_size:]
+            self.state_infos = np.concatenate([self.state_infos, state_infos])[-self.max_size:]
 
     def sample_batch(self, batch_size):
         """
@@ -64,16 +69,17 @@ class ReplayBuffer(object):
         ----------
         batch_size: int
             size of batch to sample
-
+        
         Returns
         _______
-        Data in separate numpy arrays of observations, actions, and expert actionis
+        Data in separate numpy arrays of observations, actions, and expert actions
         """
         assert self.observations is not None and self.actions is not None and self.expert_actions is not None
 
         size = len(self.observations)
         rand_inds = np.random.randint(0, size, batch_size)
-        return self.observations[rand_inds], self.actions[rand_inds], self.expert_actions[rand_inds]
+
+        return self.observations[rand_inds], self.actions[rand_inds], self.expert_actions[rand_inds], self.state_infos[rand_inds]
 
 
 
@@ -95,5 +101,8 @@ class ReplayBuffer(object):
         rewards = np.concatenate([rollout["rewards"] for rollout in rollouts_list])
         next_observations = np.concatenate([rollout["next_observations"] for rollout in rollouts_list])
         terminals = np.concatenate([rollout["terminals"] for rollout in rollouts_list])
+        state_infos = np.concatenate([rollout["state_infos"] for rollout in rollouts_list])
 
-        return observations, actions, expert_actions, rewards, next_observations, terminals
+
+        return observations, actions, expert_actions, rewards, next_observations, terminals, state_infos
+        

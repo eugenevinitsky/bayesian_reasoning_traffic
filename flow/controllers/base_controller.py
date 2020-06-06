@@ -67,7 +67,7 @@ class BaseController:
         """Return the acceleration of the controller."""
         raise NotImplementedError
 
-    def get_action(self, env):
+    def get_action(self, env, allow_junction_control=False):
         """Convert the get_accel() acceleration into an action.
 
         If no acceleration is specified, the action returns a None as well,
@@ -94,8 +94,9 @@ class BaseController:
             return None
 
         # this allows the acceleration behavior of vehicles in a junction be
-        # described by sumo instead of an explicit model
-        if env.k.vehicle.get_edge(self.veh_id)[0] == ":":
+        # described by sumo instead of an explicit model - for imitation learning,
+        # we want out imitation controller to control the vehicle everywhere
+        if env.k.vehicle.get_edge(self.veh_id)[0] == ":" and not allow_junction_control:
             return None
 
         accel = self.get_accel(env)

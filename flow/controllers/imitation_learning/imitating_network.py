@@ -15,11 +15,14 @@ class ImitatingNetwork():
     Class containing neural network which learns to imitate a given expert controller.
     """
 
-    def __init__(self, sess, action_dim, obs_dim, fcnet_hiddens, replay_buffer_size, stochastic=False, variance_regularizer = 0, load_model=False, load_path=''):
+    def __init__(self, env, sess, action_dim, obs_dim, fcnet_hiddens, replay_buffer_size, stochastic=False, variance_regularizer = 0, load_model=False, load_path=''):
 
         """Initializes and constructs neural network.
+
         Parameters
         ----------
+        env : flow.env object
+            flow env the imitating network operates in
         sess : tf.Session
             Tensorflow session variable
         action_dim : int
@@ -40,7 +43,7 @@ class ImitatingNetwork():
             path to h5 file containing model to load.
 
         """
-
+        self.env = env
         self.sess = sess
         self.action_dim = action_dim
         self.obs_dim = obs_dim
@@ -77,7 +80,7 @@ class ImitatingNetwork():
         self.model.compile(loss=loss, optimizer='adam')
 
 
-    def train(self, observation_batch, action_batch):
+    def train(self, observation_batch, action_batch, state_info_batch, sample_weight=False):
         """
         Executes one training (gradient) step for the given batch of observation and action data
 
@@ -87,6 +90,11 @@ class ImitatingNetwork():
             numpy array containing batch of observations (inputs)
         action_batch : numpy array
             numpy array containing batch of actions (labels)
+        state_info_batch: numpy array of dicts
+            numpy array containing dicts that store info about the state of the env
+            when the observation came about
+        sample_weight : str or boolean
+            flag for whether to weight training points e.g. on distance to intersection
 
         Returns
         -------
@@ -99,8 +107,35 @@ class ImitatingNetwork():
 
         # reshape action_batch to ensure a shape (batch_size, action_dim)
         action_batch = action_batch.reshape(action_batch.shape[0], self.action_dim)
+
         # one gradient step on batch
-        return self.model.train_on_batch(observation_batch, action_batch)
+        return self.model.train_on_batch(observation_batch, action_batch, \
+                                            sample_weight=self.sample_weight_array(observation_batch, state_info_batch, sample_weight="intersection_dist"))
+
+    def sample_weight_array(self, observation_batch, state_info_batch, sample_weight):
+        """If sample_weight is None, weights default to 1.
+        
+        Other, give big importance to when the vehicle is close to the intersection / inside the intersection"""
+        # import ipdb; ipdb.set_trace()
+        if sample_weight == False:
+            return None
+        elif sample_weight == "intersection_dist":
+            # ASSUMPTION: one agent
+            weights = []
+            for idx, obs in enumerate(observation_batch):
+                veh_edge, veh_route, veh_pos, edge_len = state_info_batch[idx]
+                dist_from_intersection = edge_len - veh_pos
+                weight = 1
+                if veh_edge == veh_route[0]:
+                    if dist_from_intersection < 5:
+                        weight = max(10, 2 + 1 / dist_from_intersection)
+                if ":" in veh_edge:
+                    weight = 1.5
+
+                weights.append(weight)
+        # return np.ones(1)
+        import ipdb; ipdb.set_trace()
+        return np.array(weights)
 
     def get_accel_from_observation(self, observation):
         """
@@ -160,7 +195,6 @@ class ImitatingNetwork():
         rollout_list : list
             list of rollout dictionaries
         """
-
         self.replay_buffer.add_rollouts(rollout_list)
 
 

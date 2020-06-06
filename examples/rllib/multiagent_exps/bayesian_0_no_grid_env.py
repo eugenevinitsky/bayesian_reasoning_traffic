@@ -21,7 +21,8 @@ from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.core.params import PedestrianParams
 
-from flow.controllers import SimCarFollowingController, GridRouter, RLController
+from flow.controllers import SimCarFollowingController, GridRouter, RLController, IDMController
+# from flow.controllers.car_following_models import IDMController
 
 
 from flow.utils.registry import make_create_env

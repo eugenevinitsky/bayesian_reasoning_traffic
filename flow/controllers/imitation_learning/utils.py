@@ -156,12 +156,15 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
     Returns
     _______
     dict
-        Dictionary of numpy arrays, where matching indices of each array given (state, action, expert_action, reward, next_state, terminal) tuples
+        Dictionary of numpy arrays, where matching indices of each array given (state, action, expert_action, reward, next_state, terminal, state_info) tuples
+        state_info: dict
+            state_info[veh_id] = [veh_edge, veh_route, veh_pos]
+
     """
 
     observation_dict = env.reset()
 
-    observations, actions, expert_actions, rewards, next_observations, terminals = [], [], [], [], [], []
+    observations, actions, expert_actions, rewards, next_observations, terminals, state_infos = [], [], [], [], [], [], []
     # account for get_acceleration being one step behind
 
     traj_length = 0
@@ -187,6 +190,9 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
         invalid_expert_action = False
         # actions taken by expert
         expert_action_dict= dict()
+        # state info for relevant vehicle
+        state_info_dict= dict()
+
 
         for i in range(len(vehicle_ids)):
             vehicle_id = vehicle_ids[i]
@@ -231,6 +237,11 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
                 expert_action = env.k.vehicle.get_acceleration(vehicle_id)
                 expert_action_dict[vehicle_id] = expert_action
 
+            veh_edge, veh_route, veh_pos, edge_len = env.k.vehicle.get_edge(vehicle_id), env.k.vehicle.get_route(vehicle_id), \
+                                                     env.k.vehicle.get_position(vehicle_id), env.k.network.edge_length(env.k.vehicle.get_edge(vehicle_id))
+            state_info = [veh_edge, veh_route, veh_pos, edge_len]
+            state_info_dict[vehicle_id] = state_info
+
             # action should be a scalar acceleration
             if type(action) == np.ndarray:
                 action = action.flatten()[0]
@@ -254,6 +265,7 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
                 observations.append(observation_dict[vehicle_id])
                 actions.append(rl_actions[vehicle_id])
                 expert_actions.append(expert_action_dict[vehicle_id])
+                state_infos.append(state_info_dict[vehicle_id])
 
         if expert_control == "SUMO" and use_expert:
             observation_dict, reward_dict, done_dict, _ = env.step(None)
@@ -272,20 +284,23 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
 
         if terminate_rollout:
             break
-    
+
+    # deal with the fact that I'm retrieving the previous timestep from SUMO
     if use_expert and expert_control == "SUMO":
         expert_actions = expert_actions[1:]
         actions = expert_actions
         observations = observations[:-1]
         next_observations = next_observations[:-1]
+        state_infos = state_infos[:-1]
 
     if not use_expert and expert_control == "SUMO":
         expert_actions = expert_actions[1:]
         actions = actions[:-1]
         observations = observations[:-1]
         next_observations = next_observations[:-1]
+        state_infos = state_infos[:-1]
 
-    return traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals), traj_length
+    return traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals, state_infos), traj_length
 
 
 def sample_trajectories(env, controllers, action_network, min_batch_timesteps, max_trajectory_length, multiagent, use_expert, max_decel=4.5):
@@ -314,7 +329,7 @@ def sample_trajectories(env, controllers, action_network, min_batch_timesteps, m
     Returns
     _______
     dict, int
-        Dictionary of trajectory numpy arrays, where matching indeces of each array given (state, action, expert_action, reward, next_state, terminal) tuples
+        Dictionary of trajectory numpy arrays, where matching indeces of each array given (state, action, expert_action, reward, next_state, terminal, state_info) tuples
         Total number of env transitions seen over trajectories
     """
     total_envsteps = 0
@@ -374,7 +389,7 @@ def sample_n_trajectories(env, controllers, action_network, n, max_trajectory_le
     return trajectories
 
 
-def traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals):
+def traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals, state_infos):
     """
     Collects  observation, action, expert_action, rewards, next observation, terminal lists (collected over a rollout) into a single rollout dictionary.
     Parameters
@@ -389,6 +404,8 @@ def traj_dict(observations, actions, expert_actions, rewards, next_observations,
         list of next observations; ith entry is the observation transitioned to due to state and action at ith timestep
     terminals: list
         list of booleans indicating if rollout ended at that timestep
+    state_infos: list
+        list of np arrays, each array is a list of [veh_edge, veh_route, veh_pos, edge_len]
 
     Returns
     _______
@@ -400,4 +417,5 @@ def traj_dict(observations, actions, expert_actions, rewards, next_observations,
             "expert_actions": np.array(expert_actions),
             "rewards" : np.array(rewards),
             "next_observations": np.array(next_observations),
-            "terminals": np.array(terminals)}
+            "terminals": np.array(terminals),
+            "state_infos": np.array(state_infos)}

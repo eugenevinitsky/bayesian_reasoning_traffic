@@ -179,7 +179,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     curr = val
         #     self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
         #     self.prev_loc_ped_state[loc] = curr
-
         obs = {}
         num_self_obs = len(self.self_obs_names)
         num_veh_obs = len(self.veh_obs_names)
@@ -188,8 +187,12 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            if rl_id in self.past_intersection_rewarded_set:
+            # keep going until it's past the intersection
+            # if rl_id in self.past_intersection_rewarded_set:
+            #     continue
+            if self.past_intersection(rl_id):
                 continue
+                
             if self.arrived_intersection(rl_id):
                 self.rl_set.add(rl_id)
                 assert rl_id in self.arrival_order
@@ -237,8 +240,10 @@ class Bayesian0NoGridEnv(MultiEnv):
             return {}
 
         rewards = {}
-        for rl_id in self.k.vehicle.get_rl_ids():            
-            if self.past_intersection(rl_id):
+        for rl_id in self.k.vehicle.get_rl_ids():   
+            # reward rl slightly earlier than when control is given back to SUMO
+            on_post_intersection_edge = self.k.vehicle.get_edge(rl_id) == self.k.vehicle.get_route(rl_id)[-1]       
+            if on_post_intersection_edge and self.k.vehicle.get_position(rl_id) > 5.5: # vehicle arrived at final destination, 5.5 is a random distance
                 if rl_id in self.past_intersection_rewarded_set:
                     continue
                 else:

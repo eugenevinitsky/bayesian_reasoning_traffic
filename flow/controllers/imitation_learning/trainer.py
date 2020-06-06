@@ -72,7 +72,7 @@ class Trainer(object):
         self.params['obs_dim'] = obs_dim
 
         # initialize neural network class and tf variables
-        self.action_network = ImitatingNetwork(self.sess, self.params['action_dim'], self.params['obs_dim'], self.params['fcnet_hiddens'], 
+        self.action_network = ImitatingNetwork(self.env, self.sess, self.params['action_dim'], self.params['obs_dim'], self.params['fcnet_hiddens'], 
                                                 self.params['replay_buffer_size'], stochastic=self.params['stochastic'], 
                                                 variance_regularizer=self.params['variance_regularizer'], load_model=self.params['load_imitation_model'], 
                                                 load_path=self.params['load_imitation_path'])
@@ -128,7 +128,7 @@ class Trainer(object):
 
     def collect_training_trajectories(self, itr, batch_size):
         """
-        Collect (state, action, reward, next_state, terminal) tuples for training
+        Collect (state, action, reward, next_state, terminal, state_info) tuples for training
 
         Parameters
         __________
@@ -156,9 +156,9 @@ class Trainer(object):
         print("Training controller using sampled data from replay buffer...")
         for train_step in range(self.params['num_agent_train_steps_per_iter']):
             # sample data from replay buffer
-            ob_batch, ac_batch, expert_ac_batch = self.action_network.sample_data(self.params['train_batch_size'])
+            ob_batch, ac_batch, expert_ac_batch, state_info_batch = self.action_network.sample_data(self.params['train_batch_size'])
             # train network on sampled data
-            errors.append(self.action_network.train(ob_batch, expert_ac_batch))
+            errors.append(self.action_network.train(ob_batch, expert_ac_batch, state_info_batch))
         if plot_error:
             plt.plot(errors)
             plt.title("train controller error vs train steps")
