@@ -10,7 +10,7 @@ from flow.core.util import emission_to_csv
 
 
 class Experiment:
-    """w
+    """
     Class for systematically running simulations in any supported simulator.
 
     This class acts as a runner for a network and environment. In order to use
@@ -58,13 +58,12 @@ class Experiment:
     def __init__(self, env):
         """Instantiate Experiment."""
         self.env = env
-
         logging.info(" Starting experiment {} at {}".format(
             env.network.name, str(datetime.datetime.utcnow())))
 
         logging.info("Initializing environment.")
 
-    def run(self, num_runs, num_steps, rl_actions=None, convert_to_csv=False):
+    def run(self, num_runs, num_steps, rl_actions=None, convert_to_csv=False, multiagent=False):
         """Run the given network for a set number of runs and steps per run.
 
         Parameters
@@ -79,6 +78,9 @@ class Experiment:
         convert_to_csv : bool
             Specifies whether to convert the emission file created by sumo
             into a csv file
+        multiagent: bool
+            specify whether env is multiagent or not (i.e. will the done variable
+            be a dict or not)
 
         Returns
         -------
@@ -120,16 +122,27 @@ class Experiment:
 
                 # print(self.env.k.vehicle.get_viewable_objects('human_1', \
                 #         pedestrians=self.env.k.pedestrian, visualize=True))
-
+                # print(rl_actions(state), 2222)
+                # print(state)
                 state, reward, done, _ = self.env.step(rl_actions(state))
+                print(reward, done)
                 vel[j] = np.mean(
                     self.env.k.vehicle.get_speed(self.env.k.vehicle.get_ids()))     # TODO(KL) Check w Eugene what the point of that the mean is?
                 # import ipdb;ipdb.set_trace()
                 # ret += reward
                 ret_list.append(reward)
+                # print(ret_list)
+                if multiagent:
+                    for key in reward.keys():
+                        ret += reward[key]     
+                    if done["__all__"]:
+                        break
+                else:
+                    ret += reward
+                    ret_list.append(reward)
+                    if done:
+                        break
 
-                if done:
-                    break
             rets.append(ret)
             vels.append(vel)
             # mean_rets.append(np.mean(ret_list))
