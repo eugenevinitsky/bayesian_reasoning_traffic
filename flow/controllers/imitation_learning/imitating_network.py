@@ -1,12 +1,14 @@
 import numpy as np
+from time import time
 import tensorflow as tf
+import tensorflow_probability as tfp
+
 from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.controllers.imitation_learning.keras_utils import *
 from flow.controllers.imitation_learning.keras_utils import negative_log_likelihood_loss
-import tensorflow_probability as tfp
+
 from flow.controllers.base_controller import BaseController
 from replay_buffer import ReplayBuffer
-from time import time
 from tensorflow.python.keras.callbacks import TensorBoard
 
 
@@ -104,13 +106,17 @@ class ImitatingNetwork():
         and/or metrics). The attribute `model.metrics_names` will give you
         the display labels for the scalar outputs.
         """
+        # {"dense_3": weights}
+        prev_weights = self.sample_weight_array(observation_batch, state_info_batch, sample_weight="intersection_dist")
 
         # reshape action_batch to ensure a shape (batch_size, action_dim)
         action_batch = action_batch.reshape(action_batch.shape[0], self.action_dim)
-
         # one gradient step on batch
+        weights = np.ones(action_batch.shape)
+        import ipdb;ipdb.set_trace()
+        print(observation_batch.shape, action_batch.shape)
         return self.model.train_on_batch(observation_batch, action_batch, \
-                                            sample_weight=self.sample_weight_array(observation_batch, state_info_batch, sample_weight="intersection_dist"))
+                                            sample_weight={"dense_3": weights})
 
     def sample_weight_array(self, observation_batch, state_info_batch, sample_weight):
         """If sample_weight is None, weights default to 1.
@@ -128,13 +134,12 @@ class ImitatingNetwork():
                 weight = 1
                 if veh_edge == veh_route[0]:
                     if dist_from_intersection < 5:
-                        weight = max(10, 2 + 1 / dist_from_intersection)
+                        weight = min(10, 2 + 1 / dist_from_intersection)
                 if ":" in veh_edge:
                     weight = 1.5
 
                 weights.append(weight)
-        # return np.ones(1)
-        import ipdb; ipdb.set_trace()
+        
         return np.array(weights)
 
     def get_accel_from_observation(self, observation):

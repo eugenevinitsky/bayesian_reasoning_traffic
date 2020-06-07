@@ -27,12 +27,15 @@ ADDITIONAL_ENV_PARAMS = {
     # # how large of a radius to search pedestrians in for a given vehicle in meters
     "search_ped_radius": 22,
     # whether we use an observation space configured for MADDPG
-    "maddpg": False
+    "maddpg": False,
+    # whether or not we have a discrete action space (does discrete allow for decimal points?)
+    "discrete": True
 }
 
 HARD_BRAKE_PENALTY = 0.001
 NUM_PED_LOCATIONS = 4
 JUNCTION_ID = '(1.1)'
+DISCRETE_VALS = 10
 
 class Bayesian0NoGridEnv(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
@@ -79,7 +82,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     'Environment parameter "{}" not supplied'.format(p))
 
         super().__init__(env_params, sim_params, network, simulator)
-
+        self.discrete = env_params.additional_params.get("discrete", False)
         self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
@@ -120,7 +123,10 @@ class Bayesian0NoGridEnv(MultiEnv):
                 "(1.2)--(1.1)",
                 "(0.1)--(1.1)",
                 "(1.0)--(1.1)"]
-        
+
+        max_accel, max_decel = self.env_params.additional_params['max_decel'], -self.env_params.additional_params['max_decel']
+        step_size = (max_accel - max_decel) / (DISCRETE_VALS + 1)
+        self.discrete_actions_to_accels = [round(max_decel + i * step_size, 2) for i in range(DISCRETE_VALS)]
 
     @property
     def observation_space(self):
@@ -132,11 +138,15 @@ class Bayesian0NoGridEnv(MultiEnv):
     @property
     def action_space(self):
         """See class definition."""
-        return Box(
-            low=-np.abs(self.env_params.additional_params['max_decel']),
-            high=self.env_params.additional_params['max_accel'],
-            shape=(1,),  # (4,),
-            dtype=np.float32)
+        if self.discrete:
+            # 10 different accelerations
+            return Discrete(10)
+        else:
+            return Box(
+                low=-np.abs(self.env_params.additional_params['max_decel']),
+                high=self.env_params.additional_params['max_accel'],
+                shape=(1,),  # (4,),
+                dtype=np.float32)
 
     def _apply_rl_actions(self, rl_actions):
         """See class definition."""
@@ -149,9 +159,16 @@ class Bayesian0NoGridEnv(MultiEnv):
                     continue
                 if rl_id in self.k.vehicle.get_rl_ids():
                     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
-                accel = actions[0]
+                
+                if self.discrete:
+                    print(actions)
+                    accel = self.discrete_actions_to_accels[actions]
+                else:
+                    accel = actions[0]
+
                 rl_ids.append(rl_id)
                 accels.append(accel)
+
             self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
@@ -243,7 +260,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         for rl_id in self.k.vehicle.get_rl_ids():   
             # reward rl slightly earlier than when control is given back to SUMO
             on_post_intersection_edge = self.k.vehicle.get_edge(rl_id) == self.k.vehicle.get_route(rl_id)[-1]       
-            if on_post_intersection_edge and self.k.vehicle.get_position(rl_id) > 5.5: # vehicle arrived at final destination, 5.5 is a random distance
+            if on_post_intersection_edge and self.k.vehicle.get_position(rl_id) > 7: # vehicle arrived at final destination, 5.5 is a random distance
                 if rl_id in self.past_intersection_rewarded_set:
                     continue
                 else:
