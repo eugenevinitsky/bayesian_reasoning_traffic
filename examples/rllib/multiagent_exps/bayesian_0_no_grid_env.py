@@ -171,7 +171,9 @@ def make_flow_params(args, pedestrians=False, render=False):
                 # how large of a radius to search for pedestrians in for a given vehicle in meters (create effect of only seeing pedestrian only when relevant)
                 "search_ped_radius": 22,
                 # whether we use the multi-agent algorithm QMIX
-                "maddpg": args.algo == "MADDPG"
+                "maddpg": args.algo == "MADDPG",
+                # whether or not we have a discrete action space,
+                "discrete": True
             },
         ),
         # network-related parameters (see flow.core.params.NetParams and the
@@ -264,6 +266,94 @@ def on_episode_end(info):
     else:
         episode.custom_metrics['avg_rl_veh_arrival'] = 500
 
+
+def setup_exps_DQN(args, flow_params):
+    """
+    Experiment setup with DQN using RLlib.
+
+    Parameters
+    ----------
+    flow_params : dictionary of flow parameters
+
+    Returns
+    -------
+    str
+        name of the training algorithm
+    str
+        name of the gym environment to be trained
+    dict
+        training configuration parameters
+    """
+
+    alg_run = 'TD3'
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
+
+    config["num_workers"] = min(args.n_cpus, args.n_rollouts)
+    config['train_batch_size'] = args.horizon * args.n_rollouts
+    config['simple_optimizer'] = False
+    config['no_done_at_end'] = True
+    config['lr'] = 1e-4
+    config['gamma'] = 0.97  # discount rate
+    config['entropy_coeff'] = -0.01
+    config['model'].update({'fcnet_hiddens': [256, 256]})
+    if args.grid_search:
+        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
+
+    config['horizon'] = args.horizon
+    config['observation_filter'] = 'NoFilter'
+
+    # define callbacks for tensorboard
+
+    def on_train_result(info):
+        result = info['result']
+        trainer = info['trainer']
+        trainer.workers.foreach_worker(
+                lambda ev: ev.foreach_env(
+                    lambda env: env.update_curriculum(result['training_iteration'])
+                )
+        )
+
+    config['callbacks'] = {
+            "on_episode_start":tune.function(on_episode_start),
+            "on_episode_step":tune.function(on_episode_step),
+            "on_episode_end":tune.function(on_episode_end),
+            "on_train_result":tune.function(on_train_result)}
+
+    # save the flow params for replay
+    flow_json = json.dumps(
+        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
+    config['env_config']['flow_params'] = flow_json
+    config['env_config']['run'] = alg_run
+
+    create_env, env_name = make_create_env(params=flow_params, version=0)
+
+    # Register as rllib env
+    register_env(env_name, create_env)
+
+    test_env = create_env()
+    obs_space = test_env.observation_space
+    act_space = test_env.action_space
+
+    def gen_policy():
+        return None, obs_space, act_space, {}
+
+    # Setup PG with a single policy graph for all agents
+    policy_graphs = {'av': gen_policy()}
+
+    def policy_mapping_fn(_):
+        return 'av'
+
+    config.update({
+        'multiagent': {
+            'policies': policy_graphs,
+            'policy_mapping_fn': tune.function(policy_mapping_fn),
+            'policies_to_train': ['av']
+        }
+    })
+
+    return alg_run, env_name, config
 
 def setup_exps_TD3(args, flow_params):
     """
@@ -430,6 +520,7 @@ def setup_exps_PPO(args, flow_params):
     })
 
     return alg_run, env_name, config
+
 
 def setup_exps_MADDPG(args, flow_params):
     """
