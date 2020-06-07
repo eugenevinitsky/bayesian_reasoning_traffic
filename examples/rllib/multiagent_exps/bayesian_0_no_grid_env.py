@@ -285,17 +285,15 @@ def setup_exps_DQN(args, flow_params):
         training configuration parameters
     """
 
-    alg_run = 'TD3'
+    alg_run = 'DQN'
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
 
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['simple_optimizer'] = False
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
-    config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
@@ -636,7 +634,7 @@ if __name__ == '__main__':
     parser.add_argument('--run_mode', type=str, default='local',
                         help="Experiment run mode (local | cluster)")
     parser.add_argument('--algo', type=str, default='PPO',
-                        help="RL method to use (PPO, TD3, QMIX)")
+                        help="RL method to use (PPO, TD3, QMIX, DQN)")
     parser.add_argument("--pedestrians", default=True,
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
@@ -662,6 +660,9 @@ if __name__ == '__main__':
     elif ALGO == 'MADDPG':
         alg_run, env_name, config = setup_exps_MADDPG(args, flow_params)
         CHECKPOINT_FREQ *= 10
+    elif ALGO == 'DQN':
+        alg_run, env_name, config = setup_exps_DQN(args, flow_params)
+
     else:
         raise NotImplementedError
 
