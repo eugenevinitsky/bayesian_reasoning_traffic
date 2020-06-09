@@ -42,7 +42,7 @@ N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 NUM_PEDS = 15
 
 
-def make_flow_params(args, pedestrians=False, render=False):
+def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     """
     Generate the flow params for the experiment.
 
@@ -173,7 +173,7 @@ def make_flow_params(args, pedestrians=False, render=False):
                 # whether we use the multi-agent algorithm QMIX
                 "maddpg": args.algo == "MADDPG",
                 # whether or not we have a discrete action space,
-                "discrete": True
+                "discrete": discrete
             },
         ),
         # network-related parameters (see flow.core.params.NetParams and the
@@ -640,12 +640,16 @@ if __name__ == '__main__':
     parser.add_argument("--render",
                         help="render SUMO simulation",
                         action="store_true")
+    parser.add_argument("--discrete",
+                        help="determine if policy has discrete actions",
+                        action="store_true")
 
     args = parser.parse_args()
 
     pedestrians = args.pedestrians
     render = args.render
-    flow_params = make_flow_params(args, pedestrians, render)
+    discrete = args.discrete
+    flow_params = make_flow_params(args, pedestrians, render, discrete)
 
     upload_dir = args.upload_dir
     RUN_MODE = args.run_mode

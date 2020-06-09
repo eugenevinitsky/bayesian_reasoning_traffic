@@ -192,7 +192,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
         rt = np.random.randint(len(routes))
 
-        focus_1_3 = True
+        focus_1_3 = False
         if focus_1_3:
             rand = np.random.uniform(1)
             if rand > 0.8:

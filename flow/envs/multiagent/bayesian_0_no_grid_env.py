@@ -9,6 +9,7 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
+import tensorflow as tf
 # from bayesian_inference.bayesian_inference_PPO import create_black_box
 
 # TODO(KL) means KL's reminder for KL
@@ -161,7 +162,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
                 
                 if self.discrete:
-                    print(actions)
                     accel = self.discrete_actions_to_accels[actions]
                 else:
                     accel = actions[0]

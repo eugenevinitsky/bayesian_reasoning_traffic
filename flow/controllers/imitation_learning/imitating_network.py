@@ -70,6 +70,7 @@ class ImitatingNetwork():
         # setup placeholders for network input and labels for training, and hidden layers/output
         if self.stochastic:
             self.model = build_neural_net_stochastic(self.obs_dim, self.action_dim, self.fcnet_hiddens)
+            print(self.obs_dim, self.action_dim, self.fcnet_hiddens)
         else:
             self.model = build_neural_net_deterministic(self.obs_dim, self.action_dim, self.fcnet_hiddens)
 
