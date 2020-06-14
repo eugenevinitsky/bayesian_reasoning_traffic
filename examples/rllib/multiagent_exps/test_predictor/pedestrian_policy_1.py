@@ -196,7 +196,6 @@ def run_env(env, agent, config, flow_params):
                 num_pedestrian_crash += num_collision
         
         # plot_2_licnes(prob_action_given_ped, prob_action_given_no_ped)
-        import ipdb; ipdb.set_trace()
         plot_2_lines(probs_ped_given_action, probs_no_ped_given_action, updated_priors=True, viewable_ped=visible_pedestrian)
         plot_2_lines(probs_ped_given_action_fixed_priors, probs_no_ped_given_action_fixed_priors, updated_priors=False, viewable_ped=visible_pedestrian)
 
@@ -281,10 +280,13 @@ def create_agent(args, flow_params):
                   + 'differs from the one stored in params.json '
                   + '\'{}\''.format(config_run))
             sys.exit(1)
+
     if args.run:
         agent_cls = get_agent_class(args.run)
     elif config_run:
         agent_cls = get_agent_class(config_run)
+
+
     else:
         print('visualizer_rllib.py: error: could not find flow parameter '
               '\'run\' in params.json, '
@@ -312,7 +314,7 @@ def accel_pdf(mu, sigma, actual):
 
 def run_transfer(args):
     # run transfer on the bayesian 1 env first
-    from examples.rllib.multiagent_exps.bayesian_0_training_script import make_flow_params as bayesian_1_flow_params
+    from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params as bayesian_1_flow_params
     bayesian_1_params = bayesian_1_flow_params(pedestrians=True, render=True)
     env, env_name = create_env(args, bayesian_1_params)
     agent, config = create_agent(args, flow_params=bayesian_1_params)

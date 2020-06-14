@@ -100,6 +100,8 @@ class TraCIVehicle(KernelVehicle):
                 self.__vehicles[veh_id] = dict()
                 self.__vehicles[veh_id]['type'] = typ['veh_id']
                 self.__vehicles[veh_id]['initial_speed'] = typ['initial_speed']
+                self.__vehicles[veh_id]['depart_pos'] = typ['depart_pos']
+                self.__vehicles[veh_id]['depart_time'] = typ['depart_time']
                 self.num_vehicles += 1
                 if typ['acceleration_controller'][0] == RLController:
                     self.num_rl_vehicles += 1
@@ -179,7 +181,7 @@ class TraCIVehicle(KernelVehicle):
                     vals['depart'] = str(
                         float(vals['depart']) + 2 * self.sim_step)
                     self.kernel_api.vehicle.addFull(
-                        veh_id, 'route{}_0'.format(veh_id), **vals)
+                        veh_id, 'route{}_0'.format(veh_id), **vals) # TODO(KL) Check if this departtime breaks anything
         else:
             self.time_counter += 1
             # update the "last_lc" variable
@@ -325,6 +327,14 @@ class TraCIVehicle(KernelVehicle):
         self.__vehicles[veh_id]["initial_speed"] = \
             self.type_parameters[veh_type]["initial_speed"]
 
+        # specify the departure position
+        self.__vehicles[veh_id]["depart_pos"] = \
+            self.type_parameters[veh_type]["depart_pos"]
+
+        # specify the departure time
+        self.__vehicles[veh_id]["depart_time"] = \
+            self.type_parameters[veh_type]["depart_time"]
+
         # set the speed mode for the vehicle
         speed_mode = self.type_parameters[veh_type][
             "car_following_params"].speed_mode
@@ -415,6 +425,14 @@ class TraCIVehicle(KernelVehicle):
         """See parent class."""
         return self.__vehicles[veh_id]["timedelta"]
 
+    def get_depart_time(self, veh_id):
+        """See parent class."""
+        return self.__vehicles[veh_id]["depart_time"]
+
+    def get_depart_pos(self, veh_id):
+        """See parent class."""
+        return self.__vehicles[veh_id]["depart_pos"]
+
     def get_type(self, veh_id):
         """Return the type of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["type"]
@@ -422,7 +440,7 @@ class TraCIVehicle(KernelVehicle):
     def get_initial_speed(self, veh_id):
         """Return the initial speed of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["initial_speed"]
- 
+
     def set_speed_mode(self, veh_id, speed_mode):
         SPEED_MODES = {
                 "aggressive" : 0,
@@ -461,7 +479,7 @@ class TraCIVehicle(KernelVehicle):
         return crashed_pedestrians
 
 
-    def get_viewable_objects(self, veh_id, pedestrians=None, radius=50, visualize=False):
+    def get_viewable_objects(self, veh_id, pedestrians=None, lanes=None, radius=50, visualize=False):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.
 
         Return two lists of all vehicles and pedestrians that are within the viewing radius
@@ -473,14 +491,18 @@ class TraCIVehicle(KernelVehicle):
             unique identifier for the observation vehicle
         pedestrians : flow.core.kernel.pedestrian.KernelPedestrian
             KernelPedestrian object used to access pedestrian state info
+        lanes : flow.core.kernel.kernel_api.lane
+            kernel_api.lane object used to access lane state info
         radius : float
             the furthest distance the observation vehicle can see
 
         Return: list of (list of (str,), list of (str,))
             First list is comprised of the ids of the vehicles viewable by the observation vehicle
             Second list is comprised of the ids of the pedestrians viewable by the observation vehicle
+            Third list is comprised of the ids of the lanes fully viewable by the observation vehicle
+
         """
-        viewable_pedestrians, viewable_vehicles = [], []
+        viewable_pedestrians, viewable_vehicles, fully_viewable_lanes = [], [], []
         observed_vehicles = []
         blocked = {}
 
@@ -505,9 +527,26 @@ class TraCIVehicle(KernelVehicle):
 
         if pedestrians:
             for ped_id in pedestrians.get_ids():
-                if util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, ped_id):
+                if util.observed(position, orientation, pedestrians.get_position(ped_id), looking_distance=radius) and not util.check_blocked(position, pedestrians.get_position(ped_id), blocked, veh_id):
                     viewable_pedestrians.append(ped_id)
 
+        if lanes:
+            for lane in lanes.getIDList():
+                if 'c' in lane:
+                    pts = list(lanes.getShape(lane))
+                    pt_a, pt_b = pts[0], pts[1]
+                    pts.append(((pt_a[0] + pt_b[0]) / 2, (pt_a[1] + pt_b[1]) / 2))
+                    if all([util.observed(position, orientation, pt, looking_distance=radius) \
+                            and not util.check_blocked(position, pt, blocked, veh_id) for pt in pts]):
+                        fully_viewable_lanes.append(lane)
+                elif 'w' in lane:
+                    pts = lanes.getShape(lane)
+                    if all([util.observed(position, orientation, pt, looking_distance=radius) \
+                            and not util.check_blocked(position, pt, blocked, veh_id) for pt in pts]):
+                        fully_viewable_lanes.append(lane)
+                else:
+                    # ignore 'general' lanes
+                    continue
         # visualization
         if visualize:
 
@@ -520,6 +559,15 @@ class TraCIVehicle(KernelVehicle):
                 attributes['width'] = self.get_width(v_id)
                 attributes['viewed'] = v_id in viewable_vehicles
                 viewed_veh[v_id] = attributes
+
+            # add observing vehicle to the visualization
+            attributes = {}
+            attributes['xy'] = self.get_orientation(veh_id)[:2]
+            attributes['yaw'] = self.get_yaw(veh_id)
+            attributes['length'] = self.get_length(veh_id)
+            attributes['width'] = self.get_width(veh_id)
+            attributes['viewed'] = True
+            viewed_veh[veh_id] = attributes
 
             viewed_ped = {}
             for ped_id in viewable_pedestrians:
@@ -535,7 +583,7 @@ class TraCIVehicle(KernelVehicle):
 
             util.visualize_vision(observation_vehicle, blocked, viewed_veh, viewed_ped)
 
-        return viewable_vehicles, viewable_pedestrians
+        return viewable_vehicles, viewable_pedestrians, fully_viewable_lanes
 
     def get_ids(self):
         """See parent class."""
@@ -1162,7 +1210,7 @@ class TraCIVehicle(KernelVehicle):
             self.kernel_api.vehicle.setColor(
                 vehID=veh_id, color=(r, g, b, 255))
 
-    def add(self, veh_id, type_id, edge, pos, lane, speed):
+    def add(self, veh_id, type_id, edge, pos, lane, speed, depart_time="now"):
         """See parent class."""
         if veh_id in self.master_kernel.network.rts:
             # If the vehicle has its own route, use that route. This is used in
@@ -1172,6 +1220,7 @@ class TraCIVehicle(KernelVehicle):
             num_routes = len(self.master_kernel.network.rts[edge])
             frac = [val[1] for val in self.master_kernel.network.rts[edge]]
             route_id = 'route{}_{}'.format(edge, np.random.choice(
+                
                 [i for i in range(num_routes)], size=1, p=frac)[0])
 
         self.kernel_api.vehicle.addFull(
@@ -1180,7 +1229,9 @@ class TraCIVehicle(KernelVehicle):
             typeID=str(type_id),
             departLane=str(lane),
             departPos=str(pos),
-            departSpeed=str(speed))
+            departSpeed=str(speed),
+            depart=str(depart_time))
+            
 
     def get_max_speed(self, veh_id, error=-1001):
         """See parent class."""
@@ -1195,3 +1246,7 @@ class TraCIVehicle(KernelVehicle):
     def set_length(self, veh_id, length):
         """See parent class."""
         self.kernel_api.vehicle.setLength(veh_id, length)
+
+    def get_acceleration(self, veh_id):
+        """See parent class"""
+        return self.kernel_api.vehicle.getAcceleration(veh_id)

@@ -336,8 +336,6 @@ def run_transfer(args):
     from examples.rllib.multiagent_exps.exp_configs.bayesian_4_config import make_flow_params as bayesian_4_flow_params
     bayesian_4_params = bayesian_4_flow_params()
     config = get_config(args)
-    if config['env_config']['run'] == 'contrib/MADDPG':
-        bayesian_4_params['env'].additional_params.update({'maddpg': True})
     env, env_name = create_env(args, bayesian_4_params)
     agent, config = create_agent(args, flow_params=bayesian_4_params)
     run_env(env, agent, config, bayesian_4_params)

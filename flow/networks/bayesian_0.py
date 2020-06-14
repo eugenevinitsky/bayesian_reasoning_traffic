@@ -103,7 +103,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
                  pedestrians=None):
         """Initialize an n*m traffic light grid network."""
         super().__init__(name, vehicles, net_params, initial_config,
-                         traffic_lights, pedestrians, use_traffic_lights=False, nodes_radius=0.1)
+                         traffic_lights, pedestrians, use_traffic_lights=False)
         self.nodes = self._nodes
 
     @property
@@ -137,19 +137,82 @@ class Bayesian0Network(TrafficLightGridNetwork):
     def specify_routes(self, net_params):
 
         car_1_start_edge = "(0.1)--(1.1)"
-        car_1_end_edge = "(1.1)--(2.1)"
+        car_2_start_edge = "(2.1)--(1.1)"
+        car_3_start_edge = "(1.0)--(1.1)"
+        car_4_start_edge = "(1.2)--(1.1)"
 
-        car_2_start_edge = "(1.2)--(1.1)"
-        car_2_end_edge = "(1.2)--(1.1)"
+        car_3_end_edge = "(1.1)--(2.1)"
 
-        car_3_start_edge = "(2.1)--(1.1)"
-        car_3_end_edge = "(1.1)--(1.0)"
+        end_edges_lst = ["(1.1)--(2.1)",
+                        "(1.1)--(1.2)",
+                        "(1.1)--(0.1)",
+                        "(1.1)--(1.0)"]
 
-        rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
-               car_2_start_edge: [car_2_start_edge, car_2_end_edge],
-               car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
+        randomize_routes = True
+
+        rts = {}
+        if net_params.additional_params.get("randomize_routes", False):
+            start_edges = ['(1.2)--(1.1)',
+                        '(0.1)--(1.1)',
+                        '(1.0)--(1.1)',
+                        '(2.1)--(1.1)']
+            end_edges = ['(1.1)--(1.2)',
+                        '(1.1)--(0.1)',
+                        '(1.1)--(1.0)',
+                        '(1.1)--(2.1)']
+
+            for i in range(len(start_edges)):
+                start = start_edges[i]
+                end_index = np.random.randint(0, 4)
+                if end_index == i: # no u-turn routes
+                    end_index = (i + 1) % 4
+                end = end_edges[end_index]
+                rts[start] = [start, end]
+
+        rts["(0.1)--(1.1)"] = ["(0.1)--(1.1)", car_3_end_edge]
+
+        self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.9)
 
         return rts
+
+    def randomize_pedestrian_routes(self, pedestrians, appearance_prob=1):
+        """Randomly insert pedestrians into the experiment
+        **Simplifying Assumption**: pedestrians only traverse crossings counterclockwise:
+
+        We "don't include" the pedestrian by setting its departPos to a far away position - in this sense, the ped is still there, just irrelevant
+        """
+        if not pedestrians:
+            return None
+        rand_sd = 0
+        ped_spacing = 1.3
+        routes = [('(0.1)--(1.1)', '(1.0)--(1.1)'),
+                ('(1.0)--(1.1)', '(2.1)--(1.1)'),
+                ('(2.1)--(1.1)', '(1.2)--(1.1)'),
+                ('(1.2)--(1.1)', '(0.1)--(1.1)')]
+
+        rt = np.random.randint(len(routes))
+
+        focus_1_3 = False
+        if focus_1_3:
+            rand = np.random.uniform(1)
+            if rand > 0.8:
+                rt = 3 if np.random.uniform(1) > 0.5 else 1
+
+        if np.random.uniform() <= appearance_prob:
+            for ped_id in pedestrians.params:
+                pedestrians.params[ped_id]['from'] = routes[rt][0]
+                pedestrians.params[ped_id]['to'] = routes[rt][1]
+                # import ipdb; ipdb.set_trace()
+                ped_num = int(ped_id.split("ped_")[1])
+                # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
+                # guard against the vehicle from stochastically stopping
+                pedestrians.params[ped_id]['departPos'] = str(30.1 + ped_spacing*ped_num)
+
+        else:
+            for ped_id in pedestrians.params:
+                pedestrians.params[ped_id]['from'] = routes[rt][0]
+                pedestrians.params[ped_id]['to'] = routes[rt][1]
+                pedestrians.params[ped_id]['departPos'] = str(0)
 
     def specify_types(self, net_params):
         """See parent class."""
@@ -223,24 +286,28 @@ class Bayesian0Network(TrafficLightGridNetwork):
         2. list of start lanes [lane0, lane1, lane 2, ...]"""
 
         # pos = 0 starts from the starting node of the edge
-        car_1_start_edge = "(0.1)--(1.1)"
+        car_1_start_edge = "(1.0)--(1.1)"
         car_1_end_edge = "(1.1)--(2.1)"
-        car_1_start_pos = 30
+        car_1_start_pos = np.random.normal(25, 30)
 
-        # # let the top car say here forever as an obstacle
-        # car_2_start_edge = "(1.2)--(1.1)"
-        # car_2_end_edge = "(1.2)--(1.1)"
-        # car_2_start_pos = 49
+        car_2_start_edge = "(1.2)--(1.1)"
+        car_2_end_edge = "(1.1)--(2.1)"
+        car_2_start_pos = np.random.normal(25, 30)
 
-        # # 'thinking' car
-        # car_3_start_edge = "(2.1)--(1.1)"
-        # car_3_end_edge = "(1.1)--(1.0)"
-        # car_3_start_pos = 0
+        car_3_start_edge = "(0.1)--(1.1)"
+        car_3_end_edge = "(1.1)--(2.1)"
+        car_3_start_pos = 0
 
-        # start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
-        # # In SUMO, lanes are zero-indexed starting from the right-most lane
-        # start_lanes = [0, 0, 0]
+        car_4_start_edge = "(2.1)--(1.1)"
+        car_4_start_edge = "(1.2)--(1.1)"
+        car_4_end_edge = "(1.1)--(2.1)"
+        car_4_start_pos = np.random.normal(25, 30)        
+        
         start_pos = [(car_1_start_edge, car_1_start_pos)]
         start_lanes = [0]
+
+        if 2 == 2:
+            start_pos = [(car_4_start_edge, car_4_start_pos), (car_3_start_edge, car_3_start_pos), (car_2_start_edge, car_2_start_pos), (car_1_start_edge, car_1_start_pos)]
+            start_lanes = [0, 0, 0, 0]
 
         return start_pos, start_lanes
