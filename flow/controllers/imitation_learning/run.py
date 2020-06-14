@@ -70,7 +70,7 @@ def main():
 
     parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1500, help='Number of gradient steps for training policy.')  # number of gradient steps for training policy
     parser.add_argument('--n_bc_iter', type=int, default=200, help='Number of pure behavior cloning iterations to run')
-    parser.add_argument('--n_iter', type=int, default=220, help='Number of DAgger iterations to run (after pure bc iterations)')
+    parser.add_argument('--n_iter', type=int, default=300, help='Number of DAgger iterations to run (after pure bc iterations)')
 
     parser.add_argument('--batch_size', type=int, default=3000, help='Number of environment steps to collect in iteration of DAgger')
     parser.add_argument('--init_batch_size', type=int, default=4000, help='Number of environment steps to collect on 1st iteration of DAgger (behavioral cloning iteration)')
