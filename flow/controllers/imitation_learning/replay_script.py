@@ -17,7 +17,7 @@ class Args:
         self.horizon = 400
         self.algo = "PPO"
         self.load_model=True
-        self.load_path="flow/controllers/imitation_learning/model_files/bay0_Thu Jun  4 16:39:28 2020"
+        self.load_path="flow/controllers/imitation_learning/model_files/bay0_Sat Jun 13 16:30:11 2020"
 args = Args()
 bay_0_make_flow_params
 flow_params = bay_0_make_flow_params(args, pedestrians=True, render=True)
@@ -30,7 +30,7 @@ def run_experiment():
     action_dim = (1,)[0]
 
     sess = create_tf_session()
-    action_network = ImitatingNetwork(sess, action_dim, obs_dim, None, None, stochastic=True, load_model=args.load_model, load_path=args.load_path)
+    action_network = ImitatingNetwork(env, sess, action_dim, obs_dim, None, None, stochastic=True, load_model=args.load_model, load_path=args.load_path)
 
     # flow/controllers/imitation_learning/model_files/bay0
 

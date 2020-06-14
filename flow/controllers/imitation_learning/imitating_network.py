@@ -70,7 +70,6 @@ class ImitatingNetwork():
         # setup placeholders for network input and labels for training, and hidden layers/output
         if self.stochastic:
             self.model = build_neural_net_stochastic(self.obs_dim, self.action_dim, self.fcnet_hiddens)
-            print(self.obs_dim, self.action_dim, self.fcnet_hiddens)
         else:
             self.model = build_neural_net_deterministic(self.obs_dim, self.action_dim, self.fcnet_hiddens)
 
@@ -108,21 +107,21 @@ class ImitatingNetwork():
         the display labels for the scalar outputs.
         """
         # {"dense_3": weights}
-        prev_weights = self.sample_weight_array(observation_batch, state_info_batch, sample_weight="intersection_dist")
+        weights = self.sample_weight_array(observation_batch, state_info_batch, sample_weight="intersection_dist")
 
         # reshape action_batch to ensure a shape (batch_size, action_dim)
         action_batch = action_batch.reshape(action_batch.shape[0], self.action_dim)
         # one gradient step on batch
-        weights = np.ones(action_batch.shape)
-        import ipdb;ipdb.set_trace()
-        print(observation_batch.shape, action_batch.shape)
-        return self.model.train_on_batch(observation_batch, action_batch, \
-                                            sample_weight={"dense_3": weights})
+        # weights = np.ones(action_batch.shape)
+        return self.model.train_on_batch(observation_batch, action_batch, sample_weight=weights)
+        # return self.model.train_on_batch(observation_batch, action_batch, \
+        #                                     sample_weight={"dense_3": weights})
 
     def sample_weight_array(self, observation_batch, state_info_batch, sample_weight):
         """If sample_weight is None, weights default to 1.
         
-        Other, give big importance to when the vehicle is close to the intersection / inside the intersection"""
+        Other, weight training points when vehicle is close to or inside the intersection
+        """
         # import ipdb; ipdb.set_trace()
         if sample_weight == False:
             return None
@@ -133,15 +132,17 @@ class ImitatingNetwork():
                 veh_edge, veh_route, veh_pos, edge_len = state_info_batch[idx]
                 dist_from_intersection = edge_len - veh_pos
                 weight = 1
+                # car moving up to the intersection
                 if veh_edge == veh_route[0]:
                     if dist_from_intersection < 5:
                         weight = min(10, 2 + 1 / dist_from_intersection)
+                # car inside the intersection
                 if ":" in veh_edge:
                     weight = 1.5
 
                 weights.append(weight)
         
-        return np.array(weights)
+        return np.array(weights).reshape(len(weights), )
 
     def get_accel_from_observation(self, observation):
         """
@@ -167,8 +168,7 @@ class ImitatingNetwork():
             mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
             var = np.exp(2 * log_std)
             action = np.random.multivariate_normal(mean[0], var)
-            print("action", action, "mean", mean[0], "var", var[0])
-
+            # print("action", action, "mean", mean[0], "var", var[0])
             return action
         else:
             return network_output

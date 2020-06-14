@@ -94,8 +94,8 @@ def parse_args(args):
     parser.add_argument('--replay_buffer_size', type=int, default=1000000, help='Max size of replay buffer')
     parser.add_argument('--save_model', type=int, default=1, help='If true, save models in h5 format')
     parser.add_argument('--num_eval_episodes', type=int, default=0, help='Number of episodes on which to evaluate imitation model')
-    parser.add_argument('--stochastic', type=bool, default=False, help='If true, learn a stochastic policy (MV Gaussian)')
-    parser.add_argument('--multiagent', type=bool, default=False, help='If true, env is multiagent.')
+    parser.add_argument('--stochastic', type=bool, default=True, help='If true, learn a stochastic policy (MV Gaussian)')
+    parser.add_argument('--multiagent', type=bool, default=True, help='If true, env is multiagent.')
     parser.add_argument('--v_des', type=float, default=15, help='Desired velocity for follower-stopper')
     parser.add_argument('--variance_regularizer', type=float, default=0.5, help='Regularization hyperparameter to penalize variance in imitation learning loss, for stochastic policies.')
 
@@ -133,7 +133,6 @@ def main(args):
 
     # Imitation Done, start RL
     print("\n\n********** RL ************ \n")
-
     # import appropriate exp_config module
     if params['multiagent']:
         module = __import__("examples.rllib.multiagent_exps", fromlist=[params['exp_config']])
