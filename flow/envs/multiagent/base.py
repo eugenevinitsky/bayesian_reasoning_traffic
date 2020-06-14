@@ -210,7 +210,7 @@ class MultiEnv(MultiAgentEnv, Env):
 
         # reintroduce the initial vehicles to the network
         for veh_id in self.initial_ids:
-            type_id, edge, lane_index, pos, speed = \
+            type_id, edge, lane_index, pos, speed, depart_time = \
                 self.initial_state[veh_id]
 
             try:
