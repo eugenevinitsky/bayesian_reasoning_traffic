@@ -266,7 +266,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     rel_y = observed_y - veh_y
 
                     # Consider the first 3 visible vehicles
-                    if index <= self.max_num_objects:
+                    if index < self.max_num_objects:
                         observation[(index * num_veh_obs) + num_self_obs + num_ped_obs:
                                     num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
                                 [observed_yaw / 360, observed_speed / 20, 
@@ -548,7 +548,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 veh_id = self.initial_ids[i]
                 type_id, edge, lane_index, pos, speed, depart_time = \
                     self.initial_state[veh_id]
-                if self.net_params.additional_params.get("randomize_routes", False):
+                if self.net_params.additional_params["randomize_routes"]:
                     if i == rl_index:
                         type_id = 'rl'
                     else:

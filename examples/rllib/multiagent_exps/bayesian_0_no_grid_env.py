@@ -82,7 +82,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
-        veh_id='rl',
+        veh_id='rl_0',
         acceleration_controller=(RLController, {}),
         car_following_params=SumoCarFollowingParams(
             speed_mode='right_of_way',
@@ -229,6 +229,7 @@ def on_episode_start(info):
     episode.user_data['vehicle_leaving_time'] = []
     episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
 
+
 def on_episode_step(info):
     env = info['env'].get_unwrapped()[0]
     if isinstance(env, _GroupAgentsWrapper):
@@ -253,6 +254,7 @@ def on_episode_step(info):
         episode.user_data['vehicle_leaving_time'] += \
                 [episode.user_data['steps_elapsed']] * num_veh_left
         episode.user_data['num_rl_veh_active'] -= num_veh_left
+
 
 def on_episode_end(info):
     episode = info['episode']
