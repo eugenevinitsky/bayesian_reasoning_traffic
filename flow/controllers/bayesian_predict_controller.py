@@ -1,13 +1,12 @@
 from flow.controllers.base_controller import BaseController
-from examples.sumo.bayesian_1_runner import bayesian_1_example
 
 import numpy as np
 
 class BayesianPredictController(BaseController):
-    def __init__(self, veh_id, car_following_params):
+    def __init__(self, veh_id, car_following_params, query_env):
         BaseController.__init__(self, veh_id, car_following_params, delay=1.0)
 
-        self.query_env = bayesian_1_example(pedestrians=True).env
+        self.query_env = query_env.env
         self.query_env.reset()
         
         # Hacks to make fewer changes to bayesian_1_example

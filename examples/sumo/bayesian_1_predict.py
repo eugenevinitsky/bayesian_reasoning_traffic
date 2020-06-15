@@ -10,6 +10,7 @@ from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
 # from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
 from flow.networks import Bayesian1Network
 from flow.core.params import PedestrianParams
+from examples.sumo.bayesian_1_runner import bayesian_1_example
 import argparse
 
 
@@ -164,7 +165,7 @@ def bayesian_1_example(render=None, pedestrians=False):
     # TODO (@nliu) with aggressive speed_mode, vehicle still stops to avoid crashes
     vehicles.add(
         veh_id="agent",
-        acceleration_controller=(BayesianPredictController, {}),
+        acceleration_controller=(BayesianPredictController, {"query_env": bayesian_1_example(pedestrians=True)}),
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
