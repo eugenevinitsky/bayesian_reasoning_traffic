@@ -171,7 +171,11 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 # whether or not we have a discrete action space,
                 "discrete": discrete,
                 # whether to randomize which edge the vehicles are coming from
-                "randomize_vehicles": args.randomize_vehicles
+                "randomize_vehicles": args.randomize_vehicles,
+                # whether to append the prior into the state
+                "inference_in_state": False,
+                # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
+                "use_grid": False
             },
         ),
         # network-related parameters (see flow.core.params.NetParams and the

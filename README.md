@@ -31,6 +31,9 @@ We welcome your contributions.
 - Submit your contributions using [pull requests](https://github.com/flow-project/flow/pulls). Please use [this template](https://github.com/flow-project/flow/blob/master/.github/PULL_REQUEST_TEMPLATE.md) for your pull requests.
 
 # Guide to the code
+- We are actually on SUMO 1.6.0, so after installing everything visit https://github.com/eclipse/sumo and install 
+version 1.2.0 by looking at the versions for the right commit. Then follow the instructions here if you have a mac
+https://sumo.dlr.de/docs/Installing/MacOS_Build.html
 - The run scripts are located in examples/rllib/multiagent_exps.
 - The relevant environments that define step, reset, etc. are in flow/envs/multiagent/bayesian_0_no_grid_env.py
 - To replay a policy, look at flow/visualize/visualizer_rllib.py

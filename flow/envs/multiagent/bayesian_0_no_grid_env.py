@@ -8,8 +8,8 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-from bayesian_inference.get_agent import get_agent
-from bayesian_inference.inference import get_updated_priors
+# from bayesian_inference.get_agent import get_agent
+# from bayesian_inference.inference import get_updated_priors
 
 # TODO(KL) means KL's reminder for KL
 
@@ -146,8 +146,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
         self.inference_in_state = env_params.additional_params.get("inference_in_state", False)
         # TODO(@evinitsky) the inference code is not merged yet
-        if self.inference_in_state:
-            self.agent = get_agent("PPO")
+        # if self.inference_in_state:
+        #     self.agent = get_agent("PPO")
         self.max_num_objects = env_params.additional_params.get("max_num_objects", 3)
 
     @property
@@ -271,7 +271,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                                     num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
                                 [observed_yaw / 360, observed_speed / 20, 
                                         rel_x / 50, rel_y / 50, before / 5]
-                        # TODO(@evinitsky) update so taht this actually works
+                        # TODO(@evinitsky) update so that this actually works
                         if self.inference_in_state:
                             # only perform inference if the visible veh has arrived
                             if self.arrived_intersection(veh_id):
