@@ -123,13 +123,13 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     if pedestrians:
         initial_config = InitialConfig(
             spacing='custom',
-            shuffle=False, 
+            shuffle=True,
             sidewalks=True, 
             lanes_distribution=float('inf'))
     else:
         initial_config = InitialConfig(
             spacing='custom',
-            shuffle=False)
+            shuffle=True)
 
     flow_params = dict(
         # name of the experiment
