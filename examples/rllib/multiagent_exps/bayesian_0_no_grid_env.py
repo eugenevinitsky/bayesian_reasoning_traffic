@@ -1,8 +1,11 @@
 import argparse
+from datetime import datetime
 import json
 import numpy as np
+import subprocess
+import os
 
-from gym.spaces import Tuple
+import pytz
 import ray
 try:
     from ray.rllib.agents.agent import get_agent_class
@@ -11,8 +14,8 @@ except ImportError:
 from ray.rllib.env.group_agents_wrapper import _GroupAgentsWrapper
 from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
 from ray import tune
+from ray.tune import run as run_tune
 from ray.tune.registry import register_env
-from ray.tune import run_experiments
 
 from flow.envs.multiagent import Bayesian0NoGridEnv
 from flow.networks import Bayesian0Network
@@ -26,10 +29,6 @@ from flow.controllers import SimCarFollowingController, GridRouter, RLController
 
 from flow.utils.registry import make_create_env
 from flow.utils.rllib import FlowParamsEncoder
-
-# Experiment parameters
-N_ROLLOUTS = 20  # number of rollouts per training iteration
-N_CPUS = 8 # number of parallel workers
 
 # Environment parameters
 # TODO(@klin) make sure these parameters match what you've set up in the SUMO version here
@@ -495,6 +494,7 @@ def setup_exps_PPO(args, flow_params):
     config['env_config']['run'] = "CustomPPO"
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
+    config['env'] = env_name
 
     # Register as rllib env
     register_env(env_name, create_env)
@@ -535,8 +535,12 @@ if __name__ == '__main__':
         epilog=EXAMPLE_USAGE)
 
     # required input parameters
-    parser.add_argument("--upload_dir", type=str,
+    parser.add_argument("--exp_title", type=str, default="test",
+                        help="Where we store the experiment results")
+    parser.add_argument("--upload_dir", type=str, default="bayesian-traffic",
                         help="S3 Bucket for uploading results.")
+    parser.add_argument("--use_s3", action='store_true', default=False,
+                        help="If true, upload to s3")
     parser.add_argument("--n_iterations", type=int, default=100,
                         help="Number of training iterations")
     parser.add_argument("--n_rollouts", type=int, default=20,
@@ -567,6 +571,10 @@ if __name__ == '__main__':
     parser.add_argument("--discrete",
                         help="determine if policy has discrete actions",
                         action="store_true")
+    parser.add_argument("--run_transfer_tests",
+                        help="run the tests of generalization at the end of training",
+                        action="store_true",
+                        default=False)
 
     args = parser.parse_args()
 
@@ -595,10 +603,16 @@ if __name__ == '__main__':
     elif RUN_MODE == 'cluster':
         ray.init(redis_address="localhost:6379")
 
-    exp_tag = {
-        'run': alg_run,
-        'env': env_name,
+    # create a custom string that makes looking at the experiment names easier
+    def trial_str_creator(trial):
+        return "{}_{}".format(trial.trainable_name, trial.experiment_tag)
+
+    exp_dict = {
+        'name': args.exp_title,
+        'run_or_experiment': alg_run,
+        # 'env': env_name,
         'checkpoint_freq': CHECKPOINT_FREQ,
+        'trial_name_creator': trial_str_creator,
         "max_failures": 1,
         'stop': {
             'training_iteration': args.n_iterations
@@ -607,11 +621,39 @@ if __name__ == '__main__':
         "num_samples": 1,
     }
 
-    if upload_dir:
-        exp_tag["upload_dir"] = "s3://{}".format(upload_dir)
+    if args.use_s3:
+        date = datetime.now(tz=pytz.utc)
+        date = date.astimezone(pytz.timezone('US/Pacific')).strftime("%m-%d-%Y")
+        s3_string = upload_dir \
+                    + date + '/' + args.exp_title
+        exp_dict["upload_dir"] = "s3://{}".format(upload_dir)
 
-    run_experiments(
-        {
-            flow_params["exp_tag"]: exp_tag
-         },
-    )
+    run_tune(**exp_dict, queue_trials=False, raise_on_failed_trial=False)
+
+    if args.run_transfer_tests:
+        from flow.visualize.transfer_test import create_parser, run_transfer
+        for (dirpath, dirnames, filenames) in os.walk(os.path.expanduser("~/ray_results")):
+            if "checkpoint_{}".format(args.n_iterations) in dirpath and dirpath.split('/')[-3] == args.exp_title:
+                ray.shutdown()
+                ray.init()
+                parser = create_parser()
+                folder = os.path.dirname(dirpath)
+                tune_name = folder.split("/")[-1]
+                temp_args = parser.parse_args([folder, str(args.n_iterations), "--num_rollouts", "100",
+                                               "--render_mode", "no_render"])
+                run_transfer(temp_args)
+
+                if args.use_s3:
+                    # visualize_adversaries(config, checkpoint_path, 10, 100, output_path)
+                    for i in range(4):
+                        try:
+                            p1 = subprocess.Popen("aws s3 sync {} {}".format(os.path.expanduser("~/generalization"),
+                                                                             "s3://bayesian-traffic/transfer_results/{}/{}/{}".format(
+                                                                                 date,
+                                                                                 args.exp_title,
+                                                                                 tune_name)).split(
+                                ' '))
+                            p1.wait(50)
+                        except Exception as e:
+                            print('This is the error ', e)
+
