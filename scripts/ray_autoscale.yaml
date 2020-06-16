@@ -74,7 +74,9 @@ setup_commands:
     - pip install tensorflow==2.1.0
     - pip install ray==0.8.0
 
-head_setup_commands: []
+head_setup_commands:
+    - pip install boto3==1.10.45  # 1.4.8 adds InstanceMarketOptions
+    - pip install awscli==1.16.309
 
 # Custom commands that will be run on worker nodes after common setup.
 worker_setup_commands: []

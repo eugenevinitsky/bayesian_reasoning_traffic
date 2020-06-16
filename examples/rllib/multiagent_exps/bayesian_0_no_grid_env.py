@@ -630,7 +630,6 @@ if __name__ == '__main__':
         date = datetime.now(tz=pytz.utc)
         date = date.astimezone(pytz.timezone('US/Pacific')).strftime("%m-%d-%Y")
         s3_string = os.path.join(os.path.join(upload_dir, date), args.exp_title)
-        import ipdb; ipdb.set_trace()
         exp_dict["upload_dir"] = "s3://{}".format(s3_string)
 
     run_tune(**exp_dict, queue_trials=False, raise_on_failed_trial=False)
