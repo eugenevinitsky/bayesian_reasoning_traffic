@@ -81,7 +81,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         A rollout is terminated if the time horizon is reached or if two
         vehicles collide into one another.
     """
-    # TODO(KL) Not sure how to feed in params to the _init_: the envs object is created in registry.py (??)  Hard 
     def __init__(self, env_params, sim_params, network, simulator='traci', ):
         for p in ADDITIONAL_ENV_PARAMS.keys():
             if p not in env_params.additional_params:
@@ -100,6 +99,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos"]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
+
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
         # self.search_ped_radius = self.env_params.additional_params["search_ped_radius"]
         # variable to encourage vehicle to move in curriculum training
@@ -118,7 +118,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         # dict to store the counts for each possible transiion
         self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
 
-
+        # sets to track which vehicles have been rewarded for reaching 'checkpoints'
         self.near_intersection_rewarded_set_1 = set()
         self.near_intersection_rewarded_set_2 = set()
         self.near_intersection_rewarded_set_3 = set()
@@ -139,6 +139,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 "(0.1)--(1.1)",
                 "(1.0)--(1.1)"]
 
+        # discrete action space
         max_accel, max_decel = self.env_params.additional_params['max_decel'], -self.env_params.additional_params['max_decel']
         step_size = (max_accel - max_decel) / (DISCRETE_VALS + 1)
         self.discrete_actions_to_accels = [round(max_decel + i * step_size, 2) for i in range(DISCRETE_VALS)]
@@ -167,8 +168,8 @@ class Bayesian0NoGridEnv(MultiEnv):
     def action_space(self):
         """See class definition."""
         if self.discrete:
-            # 10 different accelerations
-            return Discrete(10)
+            # DISCRETE_VALS different accelerations
+            return Discrete(DISCRETE_VALS)
         else:
             return Box(
                 low=-np.abs(self.env_params.additional_params['max_decel']),
@@ -199,17 +200,30 @@ class Bayesian0NoGridEnv(MultiEnv):
             self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
-        """Return True if vehicle is at or past the intersection and false if not."""
+        """Determine if veh_id has arrived at the intersection.
+        
+        'Arrived' means: i) veh_id travelling towards the intersection and is < 20m from the intersection
+                         ii) veh_id is on or past the intersection
+        
+        Return True if vehicle has 'arrived', else return False
+        """
         intersection_length = self.net_params.additional_params['grid_array']['inner_length']
-        dist_to_intersection = intersection_length - self.k.vehicle.get_position(veh_id) 
-        return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
-                dist_to_intersection > 20)
-    
+        dist_to_intersection = intersection_length - self.k.vehicle.get_position(veh_id)
+        # TODO(KL) Check this
+        return (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and dist_to_intersection < 20) or \
+            self.k.vehicle.get_edge(veh_id) != self.k.vehicle.get_route(veh_id)[0]:
+            
     def past_intersection(self, veh_id):
-        """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
+        """Determine if veh_id has 'past' the intersection.
+        
+        'Past' means: i) veh_id travelling away from the intersection and is > 7m from the intersection
+
+        Return True if vehicle has 'past' intersection (give control back to SUMO at this point) & false if not
+        """ 
         on_post_intersection_edge = self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]       
-        if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 7: # vehicle arrived at final destination, 8 is a random distance
+        if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 7: 
             return True
+        # this mean the vehicle has been teleported off the grid :)
         elif self.k.vehicle.get_edge(veh_id) == '':
             return True
         return False
@@ -232,9 +246,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            # keep going until it's past the intersection
-            # if rl_id in self.past_intersection_rewarded_set:
-            #     continue
             if self.past_intersection(rl_id):
                 continue
                 
