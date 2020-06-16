@@ -463,6 +463,8 @@ def setup_exps_PPO(args, flow_params):
     config['gamma'] = 0.97  # discount rate
     config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    if args.use_lstm:
+        config['model']['use_lstm'] = True
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
         config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
@@ -576,6 +578,9 @@ if __name__ == '__main__':
                         action="store_true",
                         default=False)
 
+    # Model arguments
+    parser.add_argument("--use_lstm", action="store_true", default=False, help="Use LSTM")
+
     args = parser.parse_args()
 
     pedestrians = args.pedestrians
@@ -624,9 +629,8 @@ if __name__ == '__main__':
     if args.use_s3:
         date = datetime.now(tz=pytz.utc)
         date = date.astimezone(pytz.timezone('US/Pacific')).strftime("%m-%d-%Y")
-        s3_string = upload_dir \
-                    + date + '/' + args.exp_title
-        exp_dict["upload_dir"] = "s3://{}".format(upload_dir)
+        s3_string = os.path.join(os.path.join(upload_dir, date), args.exp_title)
+        exp_dict["upload_dir"] = "s3://{}".format(s3_string)
 
     run_tune(**exp_dict, queue_trials=False, raise_on_failed_trial=False)
 
