@@ -126,7 +126,9 @@ class MultiEnv(MultiAgentEnv, Env):
             reward = self.compute_reward(clipped_actions, fail=crash)
         else:
             reward = self.compute_reward(rl_actions, fail=crash)
-
+        if states.keys() != reward.keys():
+            reward = self.compute_reward(rl_actions, fail=crash)
+            states = self.get_state()
         return states, reward, done, infos
 
     def reset(self, new_inflow_rate=None):
@@ -150,6 +152,7 @@ class MultiEnv(MultiAgentEnv, Env):
         if self.should_render:
             # import ipdb; ipdb.set_trace()
             self.sim_params.render = True
+            self.should_render = False
             # got to restart the simulation to make it actually display anything
             # self.restart_simulation(self.sim_params)
 
@@ -208,7 +211,7 @@ class MultiEnv(MultiAgentEnv, Env):
 
         # reintroduce the initial vehicles to the network
         for veh_id in self.initial_ids:
-            type_id, edge, lane_index, pos, speed = \
+            type_id, edge, lane_index, pos, speed, depart_time = \
                 self.initial_state[veh_id]
 
             try:

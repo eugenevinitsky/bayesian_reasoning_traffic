@@ -956,3 +956,9 @@ class TraCIKernelNetwork(BaseKernelNetwork):
         connection_data = {'next': next_conn_data, 'prev': prev_conn_data}
 
         return net_data, connection_data
+
+    def get_lane_shape(self, laneID):
+        """getShape(string) -> list((double, double))
+        List of 2D positions (cartesian) describing the geometry of a lane.
+        """
+        return self.kernel_api.lane.getShape(laneID)

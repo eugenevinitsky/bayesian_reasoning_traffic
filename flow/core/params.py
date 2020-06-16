@@ -1,5 +1,5 @@
 """Objects that define the various meta-parameters of an experiment."""
-
+import numpy as np
 import logging
 import collections
 
@@ -241,7 +241,9 @@ class VehicleParams:
             initial_speed=0,
             num_vehicles=0,
             car_following_params=None,
-            lane_change_params=None):
+            lane_change_params=None,
+            depart_pos=0,
+            depart_time="now"):
         """Add a sequence of vehicles to the list of vehicles in the network.
 
         Parameters
@@ -290,7 +292,9 @@ class VehicleParams:
              "routing_controller": routing_controller,
              "initial_speed": initial_speed,
              "car_following_params": car_following_params,
-             "lane_change_params": lane_change_params}
+             "lane_change_params": lane_change_params,
+             "depart_pos": depart_pos,
+             "depart_time": depart_time}
 
         # TODO: delete?
         self.initial.append({
@@ -309,7 +313,11 @@ class VehicleParams:
             "car_following_params":
                 car_following_params,
             "lane_change_params":
-                lane_change_params
+                lane_change_params,
+            "depart_pos":
+                depart_pos,
+            "depart_time":
+                depart_time
         })
 
         # This is used to return the actual headways from the vehicles class.
@@ -360,7 +368,6 @@ class PedestrianParams:
         self.ids = []
         self.num_pedestrians = 0
         self.params = {}
-
         self.__pedestrians = collections.OrderedDict()
 
     def add(self, ped_id, depart_time, start, end, depart_pos='random', arrival_pos='random'):

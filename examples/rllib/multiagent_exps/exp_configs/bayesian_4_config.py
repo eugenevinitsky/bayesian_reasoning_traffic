@@ -5,7 +5,7 @@ from flow.controllers.velocity_controllers import FullStop
 from flow.controllers import GridRouter, RLController
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, PedestrianParams
-from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
+from flow.envs.multiagent.bayesian_0_no_grid_env import Bayesian0NoGridEnv, ADDITIONAL_ENV_PARAMS
 
 
 def make_flow_params():
@@ -98,7 +98,7 @@ def make_flow_params():
         exp_tag="hidden_pedestrian",
 
         # name of the flow environment the experiment is running on
-        env_name=Bayesian1Env,
+        env_name=Bayesian0NoGridEnv,
 
         # name of the network class the experiment is running on
         network=Bayesian4Network,
@@ -109,7 +109,7 @@ def make_flow_params():
         # sumo-related parameters (see flow.core.params.SumoParams)
         sim=SumoParams(sim_step=0.1,
                        render=False,
-                       restart_instance=True),
+                       restart_instance=False),
 
         # environment related parameters (see flow.core.params.EnvParams)
         env=EnvParams(

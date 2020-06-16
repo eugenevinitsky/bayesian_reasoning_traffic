@@ -15,8 +15,6 @@ from flow.envs.ring.wave_attenuation import WaveAttenuationEnv, \
 from flow.envs.merge import MergePOEnv
 from flow.envs.test import TestEnv
 from flow.envs.bayesian_1_env import Bayesian1Env
-
-
 # deprecated classes whose names have changed
 from flow.envs.bottleneck_env import BottleNeckAccelEnv
 from flow.envs.bottleneck_env import DesiredVelocityEnv

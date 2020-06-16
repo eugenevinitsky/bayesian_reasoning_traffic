@@ -43,14 +43,7 @@ Here the arguments are:
 2 - the number of the checkpoint
 """
 
-
-def visualizer_rllib(args):
-    """Visualizer for RLlib experiments.
-
-    This function takes args (see function create_parser below for
-    more detailed information on what information can be fed to this
-    visualizer), and renders the experiment associated with it.
-    """
+def construct_agent(args):
     result_dir = args.result_dir if args.result_dir[-1] != '/' \
         else args.result_dir[:-1]
 
@@ -69,11 +62,7 @@ def visualizer_rllib(args):
     config['num_workers'] = 0
 
     flow_params = get_flow_params(config)
-
-    # hack for old pkl files
-    # TODO(ev) remove eventually
     sim_params = flow_params['sim']
-    setattr(sim_params, 'num_clients', 1)
 
     # Determine agent and checkpoint
     config_run = config['env_config']['run'] if 'run' in config['env_config'] \
@@ -88,7 +77,11 @@ def visualizer_rllib(args):
     if args.run:
         agent_cls = get_agent_class(args.run)
     elif config_run:
-        agent_cls = get_agent_class(config_run)
+        if config_run == "CustomPPO":
+            from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
+            agent_cls = PPOTrainer
+        else:
+            agent_cls = get_agent_class(config_run)
     else:
         print('visualizer_rllib.py: error: could not find flow parameter '
               '\'run\' in params.json, '
@@ -152,6 +145,19 @@ def visualizer_rllib(args):
     checkpoint = result_dir + '/checkpoint_' + args.checkpoint_num
     checkpoint = checkpoint + '/checkpoint-' + args.checkpoint_num
     agent.restore(checkpoint)
+    return agent, env_name, multiagent, config
+
+
+def visualizer_rllib(agent, env_name, multiagent, config):
+    """Visualizer for RLlib experiments.
+
+    This function takes args (see function create_parser below for
+    more detailed information on what information can be fed to this
+    visualizer), and renders the experiment associated with it.
+    """
+    flow_params = get_flow_params(config)
+    sim_params = flow_params['sim']
+    env_params = flow_params['env']
 
     if hasattr(agent, "local_evaluator") and \
             os.environ.get("TEST_FLAG") != 'True':
@@ -390,5 +396,6 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
     ray.init(num_cpus=1)
+    agent, env_name, multiagent, config = construct_agent(args)
     for _ in range(10):
-        visualizer_rllib(args)
+        visualizer_rllib(agent, env_name, multiagent, config)
