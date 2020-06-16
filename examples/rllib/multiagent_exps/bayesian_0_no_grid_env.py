@@ -626,7 +626,7 @@ if __name__ == '__main__':
         date = date.astimezone(pytz.timezone('US/Pacific')).strftime("%m-%d-%Y")
         s3_string = upload_dir \
                     + date + '/' + args.exp_title
-        exp_dict["upload_dir"] = "s3://{}".format(upload_dir)
+        exp_dict["upload_dir"] = "s3://{}".format(s3_string)
 
     run_tune(**exp_dict, queue_trials=False, raise_on_failed_trial=False)
 
