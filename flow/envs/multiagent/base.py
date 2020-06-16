@@ -152,6 +152,7 @@ class MultiEnv(MultiAgentEnv, Env):
         if self.should_render:
             # import ipdb; ipdb.set_trace()
             self.sim_params.render = True
+            self.should_render = False
             # got to restart the simulation to make it actually display anything
             # self.restart_simulation(self.sim_params)
 

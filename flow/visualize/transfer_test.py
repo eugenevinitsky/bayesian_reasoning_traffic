@@ -43,7 +43,7 @@ Here the arguments are:
 2 - the number of the checkpoint
 """
 
-def run_env(env, agent, config, flow_params):
+def run_env(env, agent, config, flow_params, name):
 
     if config.get('multiagent', {}).get('policies', None):
         multiagent = True
@@ -83,7 +83,9 @@ def run_env(env, agent, config, flow_params):
     mean_speed = []
     std_speed = []
     num_pedestrian_crash = 0
+    completion = 0
     for i in range(args.num_rollouts):
+        collision = False
         vel = []
         state = env.reset()
         if multiagent:
@@ -113,14 +115,18 @@ def run_env(env, agent, config, flow_params):
                     ret[policy_map_fn(actor)][0] += rew
             else:
                 ret += reward
-            if multiagent and done['__all__']:
-                break
-            if not multiagent and done:
-                break
 
             for rl_id in vehicles.get_rl_ids():
                 num_collision = len(vehicles.get_pedestrian_crash(rl_id, pedestrian))
                 num_pedestrian_crash += num_collision
+                if num_collision > 0:
+                    collision = True
+
+            if multiagent and done['__all__'] or len(vehicles.get_rl_ids()) == 0 or collision:
+                # we made it to the end before the rollout terminated and we didn't collide
+                if env.time_counter * env.sim_step < 40.0 and not collision:
+                    completion += 1
+                break
 
         if multiagent:
             for key in rets.keys():
@@ -177,6 +183,17 @@ def run_env(env, agent, config, flow_params):
     print("Number of pedestrian crashes:")
     print(num_pedestrian_crash)
 
+    print("Completion fraction: {}/{}".format(completion, args.num_rollouts))
+
+    file_path = os.path.expanduser('~/generalization')
+    # write the results to a folder for keeping track
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    print("WRITING RESULTS TO {}".format(file_path))
+    with open(os.path.join(file_path, name), 'wb') as file:
+        np.savetxt(file, np.array([[args.num_rollouts], [completion], [num_pedestrian_crash]]),
+                   header="Num_trials, successes, collisions")
+
     # terminate the environment
     env.unwrapped.terminate()
 
@@ -200,20 +217,10 @@ def run_env(env, agent, config, flow_params):
         # delete the .xml version of the emission file
         os.remove(emission_path)
 
-def create_env(args, flow_params):
+def construct_env(args, flow_params, version_number):
     # Create and register a gym+rllib env
-    create_env, env_name = make_create_env(params=flow_params, version=0)
+    create_env, env_name = make_create_env(params=flow_params, version=version_number)
     register_env(env_name, create_env)
-
-    # check if the environment is a single or multiagent environment, and
-    # get the right address accordingly
-    # single_agent_envs = [env for env in dir(flow.envs)
-    #                      if not env.startswith('__')]
-
-    # if flow_params['env_name'] in single_agent_envs:
-    #     env_loc = 'flow.envs'
-    # else:
-    #     env_loc = 'flow.envs.multiagent'
 
     # Start the environment with the gui turned on and a path for the
     # emission file
@@ -256,7 +263,9 @@ def get_config(args):
 
     return get_rllib_config(result_dir)
 
-def create_agent(args, flow_params):
+
+# TODO(@ev) code duplication with visuallizer_rllib
+def create_agent(args, flow_params, version_number):
     """Visualizer for RLlib experiments.
 
     This function takes args (see function create_parser below for
@@ -290,7 +299,11 @@ def create_agent(args, flow_params):
     if args.run:
         agent_cls = get_agent_class(args.run)
     elif config_run:
-        agent_cls = get_agent_class(config_run)
+        if config_run == "CustomPPO":
+            from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
+            agent_cls = PPOTrainer
+        else:
+            agent_cls = get_agent_class(config_run)
     else:
         print('visualizer_rllib.py: error: could not find flow parameter '
               '\'run\' in params.json, '
@@ -300,7 +313,7 @@ def create_agent(args, flow_params):
         sys.exit(1)
 
     # TODO(@evinitsky) duplication
-    env, env_name = create_env(args, flow_params)
+    env, env_name = construct_env(args, flow_params, version_number=version_number)
 
     # create the agent that will be used to compute the actions
     agent = agent_cls(env=env_name, config=config)
@@ -313,32 +326,25 @@ def create_agent(args, flow_params):
 
 def run_transfer(args):
     # run transfer on the bayesian 1 env first
-    # from examples.rllib.multiagent_exps.bayesian_1_env import make_flow_params as bayesian_1_flow_params
-    # bayesian_1_params = bayesian_1_flow_params(pedestrians=True)
-    # config = get_config(args)
-    # if config['env_config']['run'] == 'contrib/MADDPG':
-    #     bayesian_1_params['env'].additional_params.update({'maddpg': True})
-    # env, env_name = create_env(args, bayesian_1_params)
-    # agent, config = create_agent(args, flow_params=bayesian_1_params)
-    # run_env(env, agent, config, bayesian_1_params)
+    from examples.rllib.multiagent_exps.exp_configs.bayesian_1_config import make_flow_params as bayesian_1_flow_params
+    bayesian_1_params = bayesian_1_flow_params()
+    env, env_name = construct_env(args, bayesian_1_params, version_number=0)
+    agent, config = create_agent(args, flow_params=bayesian_1_params, version_number=0)
+    run_env(env, agent, config, bayesian_1_params, name="bayesian_1_test")
 
     # run transfer on the bayesian 3 env
-    # from examples.rllib.multiagent_exps.exp_configs.bayesian_3_config import make_flow_params as bayesian_3_flow_params
-    # bayesian_3_params = bayesian_3_flow_params()
-    # config = get_config(args)
-    # if config['env_config']['run'] == 'contrib/MADDPG':
-    #     bayesian_3_params['env'].additional_params.update({'maddpg': True})
-    # env, env_name = create_env(args, bayesian_3_params)
-    # agent, config = create_agent(args, flow_params=bayesian_3_params)
-    # run_env(env, agent, config, bayesian_3_params)
+    from examples.rllib.multiagent_exps.exp_configs.bayesian_3_config import make_flow_params as bayesian_3_flow_params
+    bayesian_3_params = bayesian_3_flow_params()
+    env, env_name = construct_env(args, bayesian_3_params, version_number=1)
+    agent, config = create_agent(args, flow_params=bayesian_3_params, version_number=1)
+    run_env(env, agent, config, bayesian_3_params, name="bayesian_3_test")
 
     # run transfer on the bayesian 4 env
     from examples.rllib.multiagent_exps.exp_configs.bayesian_4_config import make_flow_params as bayesian_4_flow_params
     bayesian_4_params = bayesian_4_flow_params()
-    config = get_config(args)
-    env, env_name = create_env(args, bayesian_4_params)
-    agent, config = create_agent(args, flow_params=bayesian_4_params)
-    run_env(env, agent, config, bayesian_4_params)
+    env, env_name = construct_env(args, bayesian_4_params, version_number=2)
+    agent, config = create_agent(args, flow_params=bayesian_4_params, version_number=2)
+    run_env(env, agent, config, bayesian_4_params, name="bayesian_4_test")
 
 
 def create_parser():

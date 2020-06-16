@@ -146,7 +146,7 @@ def bayesian_1_example(render=None, pedestrians=False):
             depart_time='0.00',
             start='(1.0)--(1.1)',
             end='(1.1)--(1.2)',
-            depart_pos='30')
+            depart_pos='40')
 
     vehicles = VehicleParams()
     vehicles.add(

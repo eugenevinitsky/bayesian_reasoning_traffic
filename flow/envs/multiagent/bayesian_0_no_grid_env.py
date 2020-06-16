@@ -27,9 +27,9 @@ ADDITIONAL_ENV_PARAMS = {
     # # how large of a radius to search pedestrians in for a given vehicle in meters
     "search_ped_radius": 22,
     # whether or not we have a discrete action space (does discrete allow for decimal points?)
-    "discrete": True,
+    "discrete": False,
     # whether the state should be appended with the priors from the inference
-    "inference_in_state": True,
+    "inference_in_state": False,
     # whether the view in front of the vehicle should be gridded into some number of cells
     # where we check if there's a pedestrian in each one
     "use_grid": False,
