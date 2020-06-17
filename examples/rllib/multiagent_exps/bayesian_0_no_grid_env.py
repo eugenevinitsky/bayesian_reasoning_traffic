@@ -10,7 +10,7 @@ except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.agents.ddpg.td3 import TD3Trainer
 from ray.rllib.env.group_agents_wrapper import _GroupAgentsWrapper
-from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
+from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
 from ray import tune
 from ray.tune.registry import register_env
 from ray.tune import run_experiments
@@ -295,6 +295,7 @@ def setup_exps_DQN(args, flow_params):
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['prioritized_replay'] = True
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
 
@@ -378,7 +379,7 @@ def setup_exps_TD3(args, flow_params):
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     config['lr'] = 1e-5
-    config['sample_batch_size'] = 50
+    # config['sample_batch_size'] = 50
     if args.grid_search:
         #config['sample_batch_size'] = tune.grid_search([30, 50, 100])
         config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
@@ -448,9 +449,9 @@ def setup_exps_PPO(args, flow_params):
         training configuration parameters
     """
 
-    from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
-    alg_run = PPOTrainer
-    config = PPO_DEFAULT_CONFIG.copy()
+    alg_run = 'PPO'
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
 
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
@@ -458,11 +459,9 @@ def setup_exps_PPO(args, flow_params):
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
-    config['entropy_coeff'] = -0.01
-    config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['model'].update({'fcnet_hiddens': [32, 32, 32]})
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
-        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'

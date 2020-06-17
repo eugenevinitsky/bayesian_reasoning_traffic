@@ -123,7 +123,7 @@ class Trainer(object):
             # train controller
             self.train_controller()
 
-            if itr % 100 == 0 and itr > 1:
+            if itr % 3 == 0 and itr > 1:
                 self.evaluate_controller(self.params["num_eval_episodes"])
 
     def collect_training_trajectories(self, itr, batch_size):
@@ -175,7 +175,6 @@ class Trainer(object):
         """
 
         print("\n\n********** Evaluation ************ \n")
-
 
         # collect imitator driven trajectories (along with corresponding expert actions)
         trajectories = sample_n_trajectories(self.env, self.controllers, self.action_network, num_trajs, self.params['ep_len'], self.multiagent, False)

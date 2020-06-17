@@ -35,10 +35,10 @@ def parse_args(args):
     parser.add_argument(
         '--rl_trainer', type=str, default="rllib",
         help='the RL trainer to use. either rllib or Stable-Baselines')
-    parser.add_argument(
-        '--load_weights_path', type=str, default=None,
-        help='Path to h5 file containing a pretrained model. Relevent for PPO with RLLib'
-    )
+    # parser.add_argument(
+    #     '--load_weights_path', type=str, default=None,
+    #     help='Path to h5 file containing a pretrained model. Relevent for PPO with RLLib'
+    # )
     parser.add_argument(
         '--algorithm', type=str, default="PPO",
         help='RL algorithm to use. Options are PPO, TD3, MATD3 (MADDPG w/ TD3) right now.'
@@ -93,7 +93,7 @@ def parse_args(args):
     parser.add_argument('--tensorboard_path', type=str, default='/tensorboard/', help='Path to which tensorboard events should be written.')
     parser.add_argument('--replay_buffer_size', type=int, default=1000000, help='Max size of replay buffer')
     parser.add_argument('--save_model', type=int, default=1, help='If true, save models in h5 format')
-    parser.add_argument('--num_eval_episodes', type=int, default=0, help='Number of episodes on which to evaluate imitation model')
+    parser.add_argument('--num_eval_episodes', type=int, default=5, help='Number of episodes on which to evaluate imitation model')
     parser.add_argument('--stochastic', type=bool, default=True, help='If true, learn a stochastic policy (MV Gaussian)')
     parser.add_argument('--multiagent', type=bool, default=True, help='If true, env is multiagent.')
     parser.add_argument('--v_des', type=float, default=15, help='Desired velocity for follower-stopper')
@@ -101,13 +101,21 @@ def parse_args(args):
 
 
     time_now = time.ctime(time.clock_gettime(0))
-    parser.add_argument('--save_path', type=str, default=f'flow/controllers/imitation_learning/model_files/bay0_{time_now}', help='Filepath to h5 file in which imitation model should be saved')
+    parser.add_argument('--save_path', type=str, default=f'flow/controllers/imitation_learning/model_files/bay0_{time_now}.h5', help='Filepath to h5 file in which imitation model should be saved')
 
-
+    # parser.add_argument(
+    #     '--load_weights_path', type=str, default=f'flow/controllers/imitation_learning/model_files/bay0_{time_now}.h5',
+    #     help='Path to h5 file containing a pretrained model. Relevent for PPO with RLLib'
+    # )
+    parser.add_argument(
+        '--load_weights_path', type=str, default=None,
+        help='Path to h5 file containing a pretrained model. Relevent for PPO with RLLib'
+    )
     parsed_args = parser.parse_known_args(args)[0]
     dict_args = vars(parsed_args)
     dict_args['save_model'] = 1
     dict_args['save_path'] = dict_args['load_weights_path']
+    dict_args['save_path'] = f'flow/controllers/imitation_learning/model_files/bay0_{time_now}.h5'
 
     return parsed_args, dict_args
 
@@ -121,15 +129,18 @@ def main(args):
     params["fcnet_hiddens"] = [32, 32, 32]
     params['PPO_save_path'] = params['load_weights_path']
 
+    # time_now = time.ctime(time.clock_gettime(0))
+    # params['PPO_save_path'] = f'flow/controllers/imitation_learning/model_files/bay0_{time_now}.h5'
+
 
     print("\n\n********** IMITATION LEARNING ************ \n")
     # run training
     imitation_runner = Runner(params)
     # import ipdb; ipdb.set_trace()
-    # imitation_runner.run_training_loop()
+    imitation_runner.run_training_loop()
 
     # convert model to work for PPO and save for training
-    # imitation_runner.save_controller_for_PPO()
+    imitation_runner.save_controller_for_PPO()
 
     # Imitation Done, start RL
     print("\n\n********** RL ************ \n")

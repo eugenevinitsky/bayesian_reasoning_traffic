@@ -191,7 +191,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ('(1.2)--(1.1)', '(0.1)--(1.1)')]
 
         rt = np.random.randint(len(routes))
-
+        
         focus_1_3 = False
         if focus_1_3:
             rand = np.random.uniform(1)
@@ -276,7 +276,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
         return sorted(mapping.items(), key=lambda x: x[0])
 
-    # TODO necessary? KevinLin Note that initial_config isn't used here at all
     @staticmethod
     def gen_custom_start_pos(cls, net_params, initial_config, num_vehicles):
         """See parent class for full explanation

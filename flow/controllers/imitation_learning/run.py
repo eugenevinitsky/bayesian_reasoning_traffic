@@ -97,7 +97,6 @@ def main():
 
     assert args.n_iter>1, ('DAgger needs >1 iteration')
 
-
     # run training
     train = Runner(params)
     train.run_training_loop()
