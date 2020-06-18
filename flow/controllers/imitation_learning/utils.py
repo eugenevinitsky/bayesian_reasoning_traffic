@@ -292,6 +292,7 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
         observations = observations[:-1]
         next_observations = next_observations[:-1]
         state_infos = state_infos[:-1]
+        rewards = rewards[:-1]
 
     if not use_expert and expert_control == "SUMO":
         expert_actions = expert_actions[1:]
@@ -299,9 +300,9 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
         observations = observations[:-1]
         next_observations = next_observations[:-1]
         state_infos = state_infos[:-1]
+        rewards = rewards[:-1]
 
     return traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals, state_infos), traj_length
-
 
 def sample_trajectories(env, controllers, action_network, min_batch_timesteps, max_trajectory_length, multiagent, use_expert, max_decel=4.5):
     """

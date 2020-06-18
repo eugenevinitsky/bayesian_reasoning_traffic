@@ -288,7 +288,8 @@ def setup_exps_DQN(args, flow_params):
     alg_run = 'DQN'
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
-
+    print(config)
+    import ipdb; ipdb.set_trace()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['no_done_at_end'] = True
@@ -324,6 +325,8 @@ def setup_exps_DQN(args, flow_params):
         flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
     config['env_config']['flow_params'] = flow_json
     config['env_config']['run'] = alg_run
+    # increase buffer size
+    config['buffer_size'] = 200000
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
 

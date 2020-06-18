@@ -204,9 +204,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
         for rl_id in self.k.vehicle.get_rl_ids():
-            # keep going until it's past the intersection
-            # if rl_id in self.past_intersection_rewarded_set:
-            #     continue
+
             if self.past_intersection(rl_id):
                 continue
                 
@@ -716,8 +714,8 @@ class Bayesian0NoGridEnv(MultiEnv):
             turn_num = 2 # turn left
         # subtract by one since we're not including the pedestrian here
         observation[:len(self.self_obs_names) - 1] = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50]
-        ped_param = self.ped_params(visible_peds, visible_lanes)
-        observation.extend(ped_param)
+        ped_visibility = self.get_ped_visibility(visible_peds, visible_lanes)
+        observation.extend(ped_visibility)
         return observation
 
     def arrived_before(self, veh_1, veh_2):
@@ -744,12 +742,32 @@ class Bayesian0NoGridEnv(MultiEnv):
         
         return locs
 
-    def ped_params(self, visible_pedestrians, visible_lanes):
-        """Return length 4 ternary indicator array for an RL car's pedestrian visibility state vector.
+    def get_ped_visibility(self, visible_pedestrians, visible_lanes, ground_truth=False):
+        """For a given RL agent's visible pedestrians and visible lanes, return a 
+        length 4 ternary indicator array for that RL car's pedestrian visibility state vector.
+        If using ground truth, return a length 4 binary indicator array for that RL car.
         
-        1 = the car physically sees a pedestrian on that crosswalk
-        0 = the car physically sees no pedestrians on that crosswalk
-        -1 = the car can't tell if there's a pedestrian on that crosswalk (because crosswalk is not fully in view)
+        @Params:
+        visible_pedestrians : list[str]
+            list of all pedestrian id's visible to the rl car
+        visible_lanes: list[str]
+            list of all lane id's visible to the rl car
+            
+        N.B. visible pedestrians and visible lanes are lists corresponding to a particular rl car.
+
+        Definitions
+        -----------
+        SUMO has 3 types of pedestrian 'lanes':
+            i) sidewalk - these are the straight sideways, formatted as TODO(KL)
+            ii) walkway - these are the diagonal parts inside the intersection, formatted as "(1.1)_w[num]__0"
+            iii) crossing - these are the stripey zebra crossings, formatted as "(1.1)_c[num]" 
+
+        Let's define a 'crosswalk' as the strip of road consisting of a crossing and part of a walkway
+
+        We define three values for flags:
+            1 = the car physically sees a pedestrian on that crosswalk
+            0 = the car physically sees no pedestrians on that crosswalk
+            -1 = the car can't tell if there's a pedestrian on that crosswalk (because crosswalk is not fully in view)
 
         The 4 possible physical locations are indicated in the slide (?) currently in my journal.     
         **Simplifying Assumption** pedestrians only traverse crossings counterclockwise:
@@ -761,45 +779,67 @@ class Bayesian0NoGridEnv(MultiEnv):
         | 2               | c2, w3_0             |
         | 3               | c3, w0_0             |
         """
-        locs = [-1] * NUM_PED_LOCATIONS
-        lane_visible_arr = [[0,0] for _ in range(NUM_PED_LOCATIONS)]
         ped_kernel = self.k.pedestrian
-        for lane in visible_lanes:
-            # check if a lane is fully in view (i.e. need both)
-            junction = lane.split("_")[0][1:]
-            if JUNCTION_ID == junction:
-                loc = self.edge_to_loc(lane)
+
+        if ground_truth:
+            locs = [0] * NUM_PED_LOCATIONS
+
+        else:
+            locs = [-1] * NUM_PED_LOCATIONS
+            lane_visible_arr = [[0,0] for _ in range(NUM_PED_LOCATIONS)]
+
+            for lane in visible_lanes:
+                # check if a lane is fully in view (i.e. need both)
+                junction = lane.split("_")[0][1:]
+                if JUNCTION_ID == junction:
+                    loc = self.edge_to_loc(lane)
+                    if loc is not None:
+                        if 'c' in lane:
+                            lane_visible_arr[loc][0] = 1
+                        elif 'w' in lane:
+                            lane_visible_arr[loc][1] = 1
+
+            for idx, val in enumerate(lane_visible_arr):
+                if val[0] == val[1] == 1:
+                    locs[idx] = 0
+
+            for ped_id in visible_pedestrians:
+                ped_edge = ped_kernel.get_edge(ped_id)
+                loc = self.edge_to_loc(ped_edge, ped_id)
                 if loc is not None:
-                    if 'c' in lane:
-                        lane_visible_arr[loc][0] = 1
-                    elif 'w' in lane:
-                        lane_visible_arr[loc][1] = 1
+                    locs[loc] = 1
 
-        for idx, val in enumerate(lane_visible_arr):
-            if val[0] == val[1] == 1:
-                locs[idx] = 0
-
-        for ped_id in visible_pedestrians:
-            ped_edge = ped_kernel.get_edge(ped_id)
-            loc = self.edge_to_loc(ped_edge, ped_id)
-            if loc is not None:
-                locs[loc] = 1
         return locs
 
     def edge_to_loc(self, lane, ped_id=None):
-        """Return the number that a lane or pedestrian's physical location corresponds to. 
-        Return None if pedestrian isn't on one of the physical locations
+        """Map a lane id to its corresponding corresponds value. 
+
+        Parameters
+        -----------
+        lane: str
+            a SUMO lane
+        ped_id: str
+            id of a pedestrian
+
+        Return
+        ------
+        int
+            integer corresponding to a physical location
+        None if pedestrian isn't on one of the physical locations
 
         Also, to overcome the issue of a pedestrian being really far away along a walkway
         that it might as well be irrelevant, I'll check if the pedestrian is also within a 
         certain radius of the corresponding crosswalk.
         """
+        # check if the lane is within the intersection area / crosswalk
         if "c" not in lane and "w" not in lane:
             return None
         else:
+            # c corresponds to something inside an intersection area in SUMO
             if 'c' in lane:
                 lane = lane.split("_")[1]    
                 return int(lane[1])
+            # w corresponds to something else inside an intersection area in SUMO
             if 'w' in lane:
                 # Ugly code alert - there's a lot of random formatting to get things done in SUMO
                 if ped_id:

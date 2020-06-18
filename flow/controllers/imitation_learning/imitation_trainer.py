@@ -16,6 +16,7 @@ class Imitation_PPO_Trainable(tune.Trainable):
         """
         Sets up trainable. See superclass definition.
         """
+
         env_name = config['env']
         # agent_cls = get_agent_class(config['env_config']['run'])
         self.trainer = ppo.PPOTrainer(env=env_name, config=config)
@@ -26,8 +27,7 @@ class Imitation_PPO_Trainable(tune.Trainable):
         """
         Executes one training iteration on trainer. See superclass definition.
         """
-        print("TRAIN CALLED")
-        # return self.trainer.train()
+
         return self.trainer.train()
 
     def _save(self, tmp_checkpoint_dir):
