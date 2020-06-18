@@ -265,7 +265,7 @@ def on_episode_end(info):
         episode.user_data['vehicle_leaving_time'] += \
                 [episode.user_data['steps_elapsed']] * episode.user_data['num_rl_veh_active']
         episode.custom_metrics['avg_rl_veh_arrival'] = \
-            np.mean(episode.user_data['vehicle_leaving_time'])
+            np.nan_to_num(np.mean(episode.user_data['vehicle_leaving_time']))
     else:
         episode.custom_metrics['avg_rl_veh_arrival'] = 500
 
@@ -294,15 +294,17 @@ def setup_exps_DQN(args, flow_params):
 
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
+    # TODO(@ev) fix the done condition so you don't need this
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['buffer_size'] = int(5e5)
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['gamma'] = tune.grid_search([0.999, 0.99, 0.9])  # discount rate
 
     config['horizon'] = args.horizon
-    config['observation_filter'] = 'NoFilter'
+    config['observation_filter'] = 'MeanStdFilter'
 
     # define callbacks for tensorboard
 
@@ -328,6 +330,7 @@ def setup_exps_DQN(args, flow_params):
     config['env_config']['run'] = alg_run
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
+    config['env'] = env_name
 
     # Register as rllib env
     register_env(env_name, create_env)
@@ -458,6 +461,7 @@ def setup_exps_PPO(args, flow_params):
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
+    # TODO(@ev) fix the termination condition so you don't need this
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
@@ -466,8 +470,8 @@ def setup_exps_PPO(args, flow_params):
     if args.use_lstm:
         config['model']['use_lstm'] = True
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
-        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
+        config['gamma'] = tune.grid_search([.995, 0.99, 0.9])  # discount rate
+        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, 0])  # entropy coeff
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
@@ -586,6 +590,8 @@ if __name__ == '__main__':
     pedestrians = args.pedestrians
     render = args.render
     discrete = args.discrete
+    if args.algo == 'DQN':
+        discrete = True
     flow_params = make_flow_params(args, pedestrians, render, discrete)
 
     upload_dir = args.upload_dir

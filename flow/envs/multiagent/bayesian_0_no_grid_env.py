@@ -305,7 +305,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                     rewards[rl_id] = 25 / 100
                     self.past_intersection_rewarded_set.add(rl_id)
                     continue
-                continue
 
             if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
                 reward = 0
@@ -342,6 +341,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     reward = -1000
 
                 rewards[rl_id] = reward / 100
+                rewards[rl_id] += self.k.vehicle.get_speed(rl_id) / 100.0
 
         return rewards
 

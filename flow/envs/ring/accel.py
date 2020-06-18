@@ -181,3 +181,14 @@ class AccelEnv(Env):
             self.prev_pos[veh_id] = self.k.vehicle.get_x_by_id(veh_id)
 
         return obs
+
+
+class AccelWithQueryEnv(AccelEnv):
+    def __init__(self, env_params, sim_params, network, simulator='traci'):
+        super().__init__(env_params, sim_params, network, simulator)
+        self.query_env = None
+
+    def reset(self):
+        obs = super().reset()
+        self.query_env.reset()
+        return obs

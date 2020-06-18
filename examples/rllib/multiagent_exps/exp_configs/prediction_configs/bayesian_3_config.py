@@ -1,14 +1,15 @@
-"""Check if the AV learns to slow down and not hit a pedestrian that is invisible."""
+"""There is a line of stopped vehicles; we need to infer why they are stopped."""
 
-from flow.networks import Bayesian4Network
+from flow.envs.ring.accel import AccelEnv, AccelWithQueryEnv, ADDITIONAL_ENV_PARAMS
+from flow.controllers.bayesian_predict_controller import BayesianPredictController
+from flow.networks import Bayesian3Network
 from flow.controllers.velocity_controllers import FullStop
-from flow.controllers import GridRouter, RLController
+from flow.controllers import GridRouter
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, PedestrianParams
-from flow.envs.multiagent.bayesian_0_no_grid_env import Bayesian0NoGridEnv, ADDITIONAL_ENV_PARAMS
 
 
-def make_flow_params():
+def make_env():
     """
     Generate the flow params for the experiment.
 
@@ -55,9 +56,26 @@ def make_flow_params():
         depart_time='0.00',
         start='(1.2)--(1.1)',
         end='(2.1)--(1.1)',
-        depart_pos='48')
+        depart_pos='45')
+    pedestrian_params.add(
+        ped_id='ped_1',
+        depart_time='0.00',
+        start='(1.2)--(1.1)',
+        end='(2.1)--(1.1)',
+        depart_pos='50')
 
     vehicles = VehicleParams()
+
+    vehicles.add(
+        veh_id="av",
+        acceleration_controller=(BayesianPredictController, {}),
+        routing_controller=(GridRouter, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="aggressive",
+        ),
+        num_vehicles=1)
 
     vehicles.add(
         veh_id="obstacle",
@@ -69,39 +87,32 @@ def make_flow_params():
             max_speed=0.0000000000001
         ),
         acceleration_controller=(FullStop, {}),
-        num_vehicles=1)
-
-    vehicles.add(
-        veh_id="av",
-        routing_controller=(GridRouter, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        acceleration_controller=(RLController, {}),
-        num_vehicles=1)
+        num_vehicles=3)
 
     additional_net_params = {
         "grid_array": grid_array,
         "speed_limit": 35,
-        "horizontal_lanes": 1,
-        "vertical_lanes": 1
+        "horizontal_lanes": 2,
+        "vertical_lanes": 2
     }
 
     initial = InitialConfig(
         spacing='custom', sidewalks=True, lanes_distribution=float('inf'), shuffle=False)
     net = NetParams(additional_params=additional_net_params)
 
+    net = Bayesian3Network(
+        name="bayesian_3",
+        vehicles=vehicles,
+        net_params=net,
+        pedestrians=pedestrian_params,
+        initial_config=initial)
+
     flow_params = dict(
         # name of the experiment
-        exp_tag="hidden_pedestrian",
-
-        # name of the flow environment the experiment is running on
-        env_name=Bayesian0NoGridEnv,
+        exp_tag="why_are_they_stopped",
 
         # name of the network class the experiment is running on
-        network=Bayesian4Network,
+        network=Bayesian3Network,
 
         # simulator that is used by the experiment
         simulator='traci',
@@ -131,4 +142,7 @@ def make_flow_params():
         # or reset (see flow.core.params.InitialConfig)
         initial=initial,
     )
-    return flow_params
+
+    env = AccelWithQueryEnv(flow_params['env'], flow_params['sim'], flow_params['net'])
+    env.query_env = AccelEnv(flow_params['env'], flow_params['sim'], flow_params['net'])
+    return env

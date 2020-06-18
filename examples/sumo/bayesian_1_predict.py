@@ -1,16 +1,16 @@
 """Sets up and runs the basic bayesian example. This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
-from flow.controllers import GridRouter, BayesianPredictController
+from flow.controllers import GridRouter, BayesianPredictController, BayesianManualController
 from flow.core.experiment import Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, SumoLaneChangeParams
 from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
-from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
+from flow.envs.ring.accel import AccelEnv, AccelWithQueryEnv, ADDITIONAL_ENV_PARAMS
 # from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
 from flow.networks import Bayesian1Network
 from flow.core.params import PedestrianParams
-from examples.sumo.bayesian_1_runner import bayesian_1_example
+from examples.sumo.bayesian_1_runner import bayesian_1_example as query_env_generator
 import argparse
 
 
@@ -136,7 +136,6 @@ def bayesian_1_example(render=None, pedestrians=False):
         lc_pushy=0.8,
         lc_speed_gain=4.0,
         model="LC2013",
-        lane_change_mode="strategic",   # TODO: check-is there a better way to change lanes?
         lc_keep_right=0.8
     )
 
@@ -162,20 +161,17 @@ def bayesian_1_example(render=None, pedestrians=False):
         lane_change_params=lane_change_params,
         num_vehicles=2)
 
-    # TODO (@nliu) with aggressive speed_mode, vehicle still stops to avoid crashes
     vehicles.add(
-        veh_id="agent",
-        acceleration_controller=(BayesianPredictController, {"query_env": bayesian_1_example(pedestrians=True)}),
+        veh_id="av",
+        acceleration_controller=(BayesianPredictController, {}),
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
-            #speed_mode="right_of_way",
             speed_mode="aggressive",
         ),
         lane_change_params=lane_change_params,
         num_vehicles=1)
-
 
     env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
 
@@ -198,7 +194,8 @@ def bayesian_1_example(render=None, pedestrians=False):
         pedestrians=pedestrian_params,
         initial_config=initial_config)
 
-    env = AccelEnv(env_params, sim_params, network)
+    env = AccelWithQueryEnv(env_params, sim_params, network)
+    env.query_env = AccelEnv(env_params, sim_params, network)
 
     return Experiment(env)
 
@@ -209,11 +206,14 @@ if __name__ == "__main__":
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
+    parser.add_argument("--no_render",
+                        action="store_true",
+                        default=False)
 
     args = parser.parse_args()
     pedestrians = args.pedestrians
 
     # import the experiment variable
-    exp = bayesian_1_example(pedestrians=pedestrians)
+    exp = bayesian_1_example(pedestrians=pedestrians, render=not args.no_render)
     # run for a set number of rollouts / time steps
     exp.run(1, 1500)

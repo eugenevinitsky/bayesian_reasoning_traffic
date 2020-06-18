@@ -1,17 +1,19 @@
 name: bayesian_traffic
 
 dependencies:
-    - python==3.6.8
-    - scipy==1.1.0
-    - lxml==4.2.4
-    - six==1.11.0
-    - path.py
-    - python-dateutil==2.7.3
-    - tensorflow==1.9.0
-    - cloudpickle==1.2.1
-    - setuptools==41.0.0
+    - python==3.7.3
     - pip:
-        - gym==0.14.0
+        - gym==0.17.0
+        - pytz
+        - scipy==1.1.0
+        - lxml==4.2.4
+        - six
+        - path.py
+        - python-dateutil==2.7.3
+        - tensorflow==2.0.0
+        - cloudpickle==1.2.1
+        - setuptools==41.0.0
+        - numpy==1.18.4
         - pyprind==2.11.2
         - nose2==0.8.0
         - cached_property
@@ -19,9 +21,10 @@ dependencies:
         - matplotlib==3.0.0
         - dill
         - lz4
-        - ray==0.7.3
+        - ray==0.8.0
         - setproctitle
         - psutil
         - opencv-python
         - boto3==1.4.8
         - redis~=2.10.6
+        - tabulate

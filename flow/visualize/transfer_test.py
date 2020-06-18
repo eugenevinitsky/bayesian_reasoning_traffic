@@ -332,17 +332,17 @@ def run_transfer(args):
     default_flow_params = get_flow_params(default_config)
 
     # run transfer on the bayesian 1 env first
-    from examples.rllib.multiagent_exps.exp_configs.bayesian_1_config import make_flow_params as bayesian_1_flow_params
-    bayesian_1_params = bayesian_1_flow_params()
-    bayesian_1_params['env'] = default_flow_params['env']
-    if args.num_rollouts > 1:
-        sim_params = bayesian_1_params['sim']
-        sim_params.restart_instance = True
-        bayesian_1_params['sim'] = sim_params
-    env, env_name = construct_env(args, bayesian_1_params, version_number=1)
-    agent, config = create_agent(args, flow_params=bayesian_1_params, version_number=1)
-    run_env(args, env, agent, config, bayesian_1_params, name="bayesian_1_test")
-
+    # from examples.rllib.multiagent_exps.exp_configs.bayesian_1_config import make_flow_params as bayesian_1_flow_params
+    # bayesian_1_params = bayesian_1_flow_params()
+    # bayesian_1_params['env'] = default_flow_params['env']
+    # if args.num_rollouts > 1:
+    #     sim_params = bayesian_1_params['sim']
+    #     sim_params.restart_instance = True
+    #     bayesian_1_params['sim'] = sim_params
+    # env, env_name = construct_env(args, bayesian_1_params, version_number=1)
+    # agent, config = create_agent(args, flow_params=bayesian_1_params, version_number=1)
+    # run_env(args, env, agent, config, bayesian_1_params, name="bayesian_1_test")
+    #
     # run transfer on the bayesian 3 env
     from examples.rllib.multiagent_exps.exp_configs.bayesian_3_config import make_flow_params as bayesian_3_flow_params
     bayesian_3_params = bayesian_3_flow_params()
@@ -356,16 +356,16 @@ def run_transfer(args):
     run_env(args, env, agent, config, bayesian_3_params, name="bayesian_3_test")
 
     # run transfer on the bayesian 4 env
-    from examples.rllib.multiagent_exps.exp_configs.bayesian_4_config import make_flow_params as bayesian_4_flow_params
-    bayesian_4_params = bayesian_4_flow_params()
-    bayesian_4_params['env'] = default_flow_params['env']
-    if args.num_rollouts > 1:
-        sim_params = bayesian_4_params['sim']
-        sim_params.restart_instance = True
-        bayesian_4_params['sim'] = sim_params
-    env, env_name = construct_env(args, bayesian_4_params, version_number=3)
-    agent, config = create_agent(args, flow_params=bayesian_4_params, version_number=3)
-    run_env(args, env, agent, config, bayesian_4_params, name="bayesian_4_test")
+    # from examples.rllib.multiagent_exps.exp_configs.bayesian_4_config import make_flow_params as bayesian_4_flow_params
+    # bayesian_4_params = bayesian_4_flow_params()
+    # bayesian_4_params['env'] = default_flow_params['env']
+    # if args.num_rollouts > 1:
+    #     sim_params = bayesian_4_params['sim']
+    #     sim_params.restart_instance = True
+    #     bayesian_4_params['sim'] = sim_params
+    # env, env_name = construct_env(args, bayesian_4_params, version_number=3)
+    # agent, config = create_agent(args, flow_params=bayesian_4_params, version_number=3)
+    # run_env(args, env, agent, config, bayesian_4_params, name="bayesian_4_test")
 
 
 def create_parser():

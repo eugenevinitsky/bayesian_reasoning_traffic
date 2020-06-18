@@ -1,14 +1,15 @@
 """Check if the AV learns to slow down and not hit a pedestrian that is invisible."""
 
+from flow.envs.ring.accel import AccelEnv, AccelWithQueryEnv, ADDITIONAL_ENV_PARAMS
+from flow.controllers.bayesian_predict_controller import BayesianPredictController
 from flow.networks import Bayesian4Network
 from flow.controllers.velocity_controllers import FullStop
-from flow.controllers import GridRouter, RLController
+from flow.controllers import GridRouter
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, PedestrianParams
-from flow.envs.multiagent.bayesian_0_no_grid_env import Bayesian0NoGridEnv, ADDITIONAL_ENV_PARAMS
 
 
-def make_flow_params():
+def make_env():
     """
     Generate the flow params for the experiment.
 
@@ -73,13 +74,13 @@ def make_flow_params():
 
     vehicles.add(
         veh_id="av",
+        acceleration_controller=(BayesianPredictController, {}),
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
+            speed_mode="aggressive",
         ),
-        acceleration_controller=(RLController, {}),
         num_vehicles=1)
 
     additional_net_params = {
@@ -93,12 +94,16 @@ def make_flow_params():
         spacing='custom', sidewalks=True, lanes_distribution=float('inf'), shuffle=False)
     net = NetParams(additional_params=additional_net_params)
 
+    net = Bayesian4Network(
+        name="bayesian_4",
+        vehicles=vehicles,
+        net_params=net,
+        pedestrians=pedestrian_params,
+        initial_config=initial)
+
     flow_params = dict(
         # name of the experiment
         exp_tag="hidden_pedestrian",
-
-        # name of the flow environment the experiment is running on
-        env_name=Bayesian0NoGridEnv,
 
         # name of the network class the experiment is running on
         network=Bayesian4Network,
@@ -131,4 +136,7 @@ def make_flow_params():
         # or reset (see flow.core.params.InitialConfig)
         initial=initial,
     )
-    return flow_params
+
+    env = AccelWithQueryEnv(flow_params['env'], flow_params['sim'], flow_params['net'])
+    env.query_env = AccelEnv(flow_params['env'], flow_params['sim'], flow_params['net'])
+    return env
