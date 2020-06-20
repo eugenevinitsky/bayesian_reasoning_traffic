@@ -699,7 +699,6 @@ class Bayesian0NoGridEnv(MultiEnv):
             curr_edge = -1
             self.inside_intersection.add(rl_id)
         edge_pos = self.k.vehicle.get_position(rl_id)
-        # import ipdb; ipdb.set_trace()
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
         start, end = self.k.vehicle.get_route(rl_id)

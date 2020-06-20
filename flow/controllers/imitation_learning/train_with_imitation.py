@@ -77,8 +77,8 @@ def parse_args(args):
     parser.add_argument('--ep_len', type=int, default=5000, help='Max length of episodes for rollouts.')
 
     parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1000, help='Number of gradient steps for training imitation policy.')
-    parser.add_argument('--n_iter', type=int, default=3, help='Number of DAgger iterations to run (1st iteration is behavioral cloning')
-    parser.add_argument('--n_bc_iter', type=int, default=3, help='Number of DAgger iterations to run (1st iteration is behavioral cloning')
+    parser.add_argument('--n_iter', type=int, default=2, help='Number of DAgger iterations to run (1st iteration is behavioral cloning')
+    parser.add_argument('--n_bc_iter', type=int, default=2, help='Number of DAgger iterations to run (1st iteration is behavioral cloning')
 
     parser.add_argument('--batch_size', type=int, default=1000, help='Number of environment steps to collect in iteration of DAgger')
     parser.add_argument('--init_batch_size', type=int, default=2000, help='Number of environment steps to collect on 1st iteration of DAgger (behavioral cloning iteration)')
@@ -92,10 +92,10 @@ def parse_args(args):
     parser.add_argument('--tensorboard_path', type=str, default='/tensorboard/', help='Path to which tensorboard events should be written.')
     parser.add_argument('--replay_buffer_size', type=int, default=1000000, help='Max size of replay buffer')
     parser.add_argument('--imitation_save_path', type=str, default='flow/controllers/imitation_learning/model_files/a.h5', help='Filepath to h5 file in which imitation model should be saved')
-    parser.add_argument('--PPO_save_path', type=str, default='flow/controllers/imitation_learning/model_files/b.h5', help="Filepath to h5 file in which the ppo model should be saved")
+    parser.add_argument('--PPO_save_path', type=str, default='/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/b.h5', help="Filepath to h5 file in which the ppo model should be saved")
     parser.add_argument('--num_eval_episodes', type=int, default=0, help='Number of episodes on which to evaluate imitation model')
-    parser.add_argument('--stochastic', type=bool, default=False, help='If true, learn a stochastic policy (MV Gaussian)')
-    parser.add_argument('--multiagent', type=bool, default=False, help='If true, env is multiagent.')
+    parser.add_argument('--stochastic', type=bool, default=True, help='If true, learn a stochastic policy (MV Gaussian)')
+    parser.add_argument('--multiagent', type=bool, default=True, help='If true, env is multiagent.')
     parser.add_argument('--v_des', type=float, default=15, help='Desired velocity for follower-stopper')
     parser.add_argument('--variance_regularizer', type=float, default=0.5, help='Regularization hyperparameter to penalize variance in imitation learning loss, for stochastic policies.')
 
@@ -125,7 +125,6 @@ def main(args):
 
     # Imitation Done, start RL
     print("\n\n********** RL ************ \n")
-
     # Import relevant information from the exp_config script.
     if params['multiagent']:
         module = __import__("examples.rllib.multiagent_exps", fromlist=[params['exp_config']])
@@ -136,7 +135,7 @@ def main(args):
     # whether the environment is single agent or multi-agent.
     if hasattr(module, flags.exp_config):
         submodule = getattr(module, flags.exp_config)
-        multiagent = False
+        # multiagent = False
     elif hasattr(module_ma, flags.exp_config):
         submodule = getattr(module_ma, flags.exp_config)
         assert flags.rl_trainer.lower() in ["rllib", "h-baselines"], \

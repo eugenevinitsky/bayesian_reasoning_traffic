@@ -147,7 +147,6 @@ def warn_about_bad_reward_scales(trainer, result):
 
 
 def validate_config(config):
-    # import ipdb; ipdb.set_trace()
     if config["entropy_coeff"] < 0:
         print("Do not raise DeprecationWarning('entropy_coeff must be >= 0')")
     if isinstance(config["entropy_coeff"], int):

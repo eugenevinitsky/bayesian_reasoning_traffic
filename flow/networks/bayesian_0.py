@@ -202,7 +202,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
             for ped_id in pedestrians.params:
                 pedestrians.params[ped_id]['from'] = routes[rt][0]
                 pedestrians.params[ped_id]['to'] = routes[rt][1]
-                # import ipdb; ipdb.set_trace()
                 ped_num = int(ped_id.split("ped_")[1])
                 # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
                 # guard against the vehicle from stochastically stopping

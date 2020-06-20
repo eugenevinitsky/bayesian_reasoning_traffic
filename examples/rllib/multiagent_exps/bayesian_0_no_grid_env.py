@@ -506,7 +506,6 @@ def setup_exps_PPO(args, flow_params):
 
     # Setup PG with a single policy graph for all agents
     policy_graphs = {'av': gen_policy()}
-
     def policy_mapping_fn(_):
         return 'av'
 
@@ -684,6 +683,7 @@ if __name__ == '__main__':
         'stop': {
             'training_iteration': args.n_iterations
         },
+        "restore": "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/Imitation_PPO_Trainable_0_0_2020-06-19_00-55-400qnlkez6/checkpoint_1/checkpoint-1",
         'config': config,
         "num_samples": 1,
     }
@@ -696,3 +696,35 @@ if __name__ == '__main__':
             flow_params["exp_tag"]: exp_tag
          },
     )
+class Args:
+    def __init__(self):
+        self.horizon = 400
+        self.algo = 'PPO'
+args = Args()
+flow_params = make_flow_params(args, pedestrians=True)  
+    
+create_env, env_name = make_create_env(params=flow_params, version=0)
+
+# Register as rllib env
+register_env(env_name, create_env)
+
+test_env = create_env()
+obs_space = test_env.observation_space
+act_space = test_env.action_space
+
+
+def gen_policy():
+    """Generate a policy in RLlib."""
+    return PPOTFPolicy, obs_space, act_space, {}
+
+
+# Setup PG with an ensemble of `num_policies` different policy graphs
+POLICY_GRAPHS = {'av': gen_policy()}
+
+
+def policy_mapping_fn(_):
+    """Map a policy in RLlib."""
+    return 'av'
+
+
+POLICIES_TO_TRAIN = ['av']

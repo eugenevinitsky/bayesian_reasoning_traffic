@@ -34,7 +34,6 @@ class Bayesian0Experiment(Experiment):
             for j in range(num_steps):
                 # state is returned as an array
                 state, reward, done, _ = self.env.step(rl_actions(state))
-                # import ipdb; ipdb.set_trace()
                 state_data.append(state[0]['human_0_0'])
         with open('test.csv', 'w', newline='') as fp:
             writer = csv.writer(fp, delimiter=',')

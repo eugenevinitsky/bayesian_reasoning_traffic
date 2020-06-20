@@ -29,7 +29,6 @@ def run_experiment(args):
 
     create_env, _ = make_create_env(flow_params)
     env = create_env()
-    # import ipdb; ipdb.set_trace()
     obs_dim = env.observation_space.shape[0]
     action_dim = (1,)[0]
 
