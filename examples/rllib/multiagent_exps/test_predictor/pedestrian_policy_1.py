@@ -149,7 +149,6 @@ def run_env(env, agent, config, flow_params):
                         print('Prob of action from when there is a pedestrian vs prob from of action when there is no pedestrian')
                         # print(accel_pdf(actual_mu, actual_sigma, actual_action))
                         # print(accel_pdf(flipped_mu, flipped_sigma, actual_action))
-                        # import ipdb; ipdb.set_trace()
 
                         # actual mu and actual sigma are the mu/sigma values arising from assuming there is a pedestrian
                         unnormed_prob_action_given_ped = accel_pdf(actual_mu, actual_sigma, actual_action)
@@ -256,6 +255,57 @@ def create_agent(args, flow_params):
     more detailed information on what information can be fed to this
     visualizer), and renders the experiment associated with it.
     """
+    # result_dir = args.result_dir if args.result_dir[-1] != '/' \
+    #     else args.result_dir[:-1]
+
+    # config = get_rllib_config(result_dir)
+
+    # # check if we have a multiagent environment but in a
+    # # backwards compatible way
+    # if config.get('multiagent', {}).get('policies', None):
+    #     pkl = get_rllib_pkl(result_dir)
+    #     config['multiagent'] = pkl['multiagent']
+
+    # # Run on only one cpu for rendering purposes
+    # config['num_workers'] = 0
+
+    # # Determine agent and checkpoint
+    # config_run = config['env_config']['run'] if 'run' in config['env_config'] \
+    #     else None
+    # if args.run and config_run:
+    #     if args.run != config_run:
+    #         print('visualizer_rllib.py: error: run argument '
+    #               + '\'{}\' passed in '.format(args.run)
+    #               + 'differs from the one stored in params.json '
+    #               + '\'{}\''.format(config_run))
+    #         sys.exit(1)
+    
+    # if args.algo == 'MADDPG':
+    #     from flow.algorithms.maddpg import maddpg
+    #     agent_cls = maddpg.MADDPGTrainer
+    # else:
+    #     if args.run:
+    #         agent_cls = get_agent_class(args.run)
+    #     elif config_run:
+    #         agent_cls = get_agent_class(config_run)
+
+
+    #     else:
+    #         print('visualizer_rllib.py: error: could not find flow parameter '
+    #               '\'run\' in params.json, '
+    #               'add argument --run to provide the algorithm or model used '
+    #               'to train the results\n e.g. '
+    #               'python ./visualizer_rllib.py /tmp/ray/result_dir 1 --run PPO')
+    #         sys.exit(1)
+
+    # # TODO(@evinitsky) duplication
+    # env, env_name = create_env(args, flow_params)
+
+    # # create the agent that will be used to compute the actions
+    # agent = agent_cls(env=env_name, config=config)
+    # checkpoint = result_dir + '/checkpoint_' + args.checkpoint_num
+    # checkpoint = checkpoint + '/checkpoint-' + args.checkpoint_num
+    # agent.restore(checkpoint)
     result_dir = args.result_dir if args.result_dir[-1] != '/' \
         else args.result_dir[:-1]
 
@@ -264,13 +314,27 @@ def create_agent(args, flow_params):
     # check if we have a multiagent environment but in a
     # backwards compatible way
     if config.get('multiagent', {}).get('policies', None):
+        multiagent = True
         pkl = get_rllib_pkl(result_dir)
         config['multiagent'] = pkl['multiagent']
+    else:
+        multiagent = False
 
     # Run on only one cpu for rendering purposes
     config['num_workers'] = 0
+    
+    # hack for old pkl files
+    # TODO(ev) remove eventually
+    sim_params = flow_params['sim']
+    setattr(sim_params, 'num_clients', 1)
+
+    # for hacks for old pkl files TODO: remove eventually
+    if not hasattr(sim_params, 'use_ballistic'):
+        sim_params.use_ballistic = False
 
     # Determine agent and checkpoint
+    # TODO(akashvelu): remove this 
+    # print("NEW CONFIGGG: ", config['env_config']['run'])
     config_run = config['env_config']['run'] if 'run' in config['env_config'] \
         else None
     if args.run and config_run:
@@ -280,33 +344,78 @@ def create_agent(args, flow_params):
                   + 'differs from the one stored in params.json '
                   + '\'{}\''.format(config_run))
             sys.exit(1)
-    
-    if args.algo == 'MADDPG':
-        from flow.algorithms.maddpg import maddpg
-        agent_cls = maddpg.MADDPGTrainer
+    if args.run:
+        agent_cls = get_agent_class(args.run)
+    elif config['env_config']['run'] == "<class 'flow.controllers.imitation_learning.imitation_trainer.Imitation_PPO_Trainable'>":
+        from flow.controllers.imitation_learning.imitation_trainer import Imitation_PPO_Trainable
+        from flow.controllers.imitation_learning.ppo_model import PPONetwork
+        from ray.rllib.models import ModelCatalog
+        agent_cls = get_agent_class("PPO")
+        ModelCatalog.register_custom_model("imitation_ppo_trainable", Imitation_PPO_Trainable)
+        ModelCatalog.register_custom_model("PPO_loaded_weights", PPONetwork)
+
+    elif config['env_config']['run'] == "<class 'ray.rllib.agents.trainer_template.CCPPOTrainer'>":
+        from flow.algorithms.centralized_PPO import CCTrainer, CentralizedCriticModel
+        from ray.rllib.models import ModelCatalog
+        agent_cls = CCTrainer
+        ModelCatalog.register_custom_model("cc_model", CentralizedCriticModel)
+    elif config['env_config']['run'] == "<class 'ray.rllib.agents.trainer_template.CustomPPOTrainer'>":
+        from flow.algorithms.custom_ppo import CustomPPOTrainer
+        agent_cls = CustomPPOTrainer
+    elif config_run:
+        agent_cls = get_agent_class(config_run)
     else:
-        if args.run:
-            agent_cls = get_agent_class(args.run)
-        elif config_run:
-            agent_cls = get_agent_class(config_run)
+        print('visualizer_rllib.py: error: could not find flow parameter '
+              '\'run\' in params.json, '
+              'add argument --run to provide the algorithm or model used '
+              'to train the results\n e.g. '
+              'python ./visualizer_rllib.py /tmp/ray/result_dir 1 --run PPO')
+        sys.exit(1)
 
+    sim_params.restart_instance = True
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    emission_path = '{0}/test_time_rollout/'.format(dir_path)
+    sim_params.emission_path = emission_path if args.gen_emission else None
 
-        else:
-            print('visualizer_rllib.py: error: could not find flow parameter '
-                  '\'run\' in params.json, '
-                  'add argument --run to provide the algorithm or model used '
-                  'to train the results\n e.g. '
-                  'python ./visualizer_rllib.py /tmp/ray/result_dir 1 --run PPO')
-            sys.exit(1)
+    # pick your rendering mode
+    if args.render_mode == 'sumo_web3d':
+        sim_params.num_clients = 2
+        sim_params.render = False
+    elif args.render_mode == 'drgb':
+        sim_params.render = 'drgb'
+        sim_params.pxpm = 4
+    elif args.render_mode == 'sumo_gui':
+        sim_params.render = False  # will be set to True below
+    elif args.render_mode == 'no_render':
+        sim_params.render = False
+    if args.save_render:
+        if args.render_mode != 'sumo_gui':
+            sim_params.render = 'drgb'
+            sim_params.pxpm = 4
+        sim_params.save_render = True
 
-    # TODO(@evinitsky) duplication
-    env, env_name = create_env(args, flow_params)
+    # Create and register a gym+rllib env
+    create_env, env_name = make_create_env(params=flow_params, version=0)
+    register_env(env_name, create_env)
+
+    env_params = flow_params['env']
+    env_params.restart_instance = False
+    if args.evaluate:
+        env_params.evaluate = True
+
+    # lower the horizon if testing
+    if args.horizon:
+        config['horizon'] = args.horizon
+        env_params.horizon = args.horizon
 
     # create the agent that will be used to compute the actions
     agent = agent_cls(env=env_name, config=config)
     checkpoint = result_dir + '/checkpoint_' + args.checkpoint_num
     checkpoint = checkpoint + '/checkpoint-' + args.checkpoint_num
     agent.restore(checkpoint)
+    # TODO(KL) this is wayyy too hard code-y
+    agent.import_model('/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/b.h5', 'av')
+
 
     return agent, config
 

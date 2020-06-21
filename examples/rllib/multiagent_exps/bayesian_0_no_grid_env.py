@@ -10,7 +10,7 @@ except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.agents.ddpg.td3 import TD3Trainer
 from ray.rllib.env.group_agents_wrapper import _GroupAgentsWrapper
-from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
+from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
 from ray import tune
 from ray.tune.registry import register_env
 from ray.tune import run_experiments
@@ -288,13 +288,15 @@ def setup_exps_DQN(args, flow_params):
     alg_run = 'DQN'
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
-
+    print(config)
+    import ipdb; ipdb.set_trace()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['prioritized_replay'] = True
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
 
@@ -323,6 +325,8 @@ def setup_exps_DQN(args, flow_params):
         flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
     config['env_config']['flow_params'] = flow_json
     config['env_config']['run'] = alg_run
+    # increase buffer size
+    config['buffer_size'] = 200000
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
 
@@ -378,7 +382,7 @@ def setup_exps_TD3(args, flow_params):
     config['gamma'] = 0.999  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
     config['lr'] = 1e-5
-    config['sample_batch_size'] = 50
+    # config['sample_batch_size'] = 50
     if args.grid_search:
         #config['sample_batch_size'] = tune.grid_search([30, 50, 100])
         config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
@@ -448,9 +452,9 @@ def setup_exps_PPO(args, flow_params):
         training configuration parameters
     """
 
-    from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
-    alg_run = PPOTrainer
-    config = PPO_DEFAULT_CONFIG.copy()
+    alg_run = 'PPO'
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
 
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
@@ -458,11 +462,9 @@ def setup_exps_PPO(args, flow_params):
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
-    config['entropy_coeff'] = -0.01
-    config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['model'].update({'fcnet_hiddens': [32, 32, 32]})
     if args.grid_search:
         config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
-        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
@@ -504,7 +506,6 @@ def setup_exps_PPO(args, flow_params):
 
     # Setup PG with a single policy graph for all agents
     policy_graphs = {'av': gen_policy()}
-
     def policy_mapping_fn(_):
         return 'av'
 
@@ -682,6 +683,7 @@ if __name__ == '__main__':
         'stop': {
             'training_iteration': args.n_iterations
         },
+        "restore": "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/Imitation_PPO_Trainable_0_0_2020-06-19_00-55-400qnlkez6/checkpoint_1/checkpoint-1",
         'config': config,
         "num_samples": 1,
     }
@@ -694,3 +696,35 @@ if __name__ == '__main__':
             flow_params["exp_tag"]: exp_tag
          },
     )
+class Args:
+    def __init__(self):
+        self.horizon = 400
+        self.algo = 'PPO'
+args = Args()
+flow_params = make_flow_params(args, pedestrians=True)  
+    
+create_env, env_name = make_create_env(params=flow_params, version=0)
+
+# Register as rllib env
+register_env(env_name, create_env)
+
+test_env = create_env()
+obs_space = test_env.observation_space
+act_space = test_env.action_space
+
+
+def gen_policy():
+    """Generate a policy in RLlib."""
+    return PPOTFPolicy, obs_space, act_space, {}
+
+
+# Setup PG with an ensemble of `num_policies` different policy graphs
+POLICY_GRAPHS = {'av': gen_policy()}
+
+
+def policy_mapping_fn(_):
+    """Map a policy in RLlib."""
+    return 'av'
+
+
+POLICIES_TO_TRAIN = ['av']

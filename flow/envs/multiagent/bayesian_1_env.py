@@ -154,7 +154,6 @@ class Bayesian1Env(MultiEnv):
             #     rl_ids = []
             #     for rl_id, action in rl_actions.items():
             #         # 0 is the no-op
-            #         import ipdb; ipdb.set_trace()
             #         if action > 0:
             #             accel = self.action_values[action]
             #             accel_list.append(accel)

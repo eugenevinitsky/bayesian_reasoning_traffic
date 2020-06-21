@@ -122,7 +122,6 @@ class ImitatingNetwork():
         
         Other, weight training points when vehicle is close to or inside the intersection
         """
-        # import ipdb; ipdb.set_trace()
         if sample_weight == False:
             return None
         elif sample_weight == "intersection_dist":
@@ -135,8 +134,9 @@ class ImitatingNetwork():
                 # car moving up to the intersection
                 if veh_edge == veh_route[0]:
                     if dist_from_intersection < 5:
+                        # set 10 as the maximum weight
                         weight = min(10, 2 + 1 / dist_from_intersection)
-                # car inside the intersection
+                # car inside the intersection, weight = 1.5
                 if ":" in veh_edge:
                     weight = 1.5
 
@@ -284,15 +284,5 @@ class ImitatingNetwork():
             policy_layer.set_weights(self.model.layers[i + 1].get_weights())
         policy_output = ppo_model.get_layer("policy_output_layer")
         policy_output.set_weights(self.model.layers[-1].get_weights())
-
         # save the model (as a h5 file)
         ppo_model.save(save_path)
-
-
-
-
-
-
-
-
-

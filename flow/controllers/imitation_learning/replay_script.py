@@ -2,6 +2,8 @@ import time
 import numpy as np
 import gym
 import os
+import argparse
+
 from flow.utils.registry import make_create_env
 from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params as bay_0_make_flow_params
 from utils import *
@@ -11,21 +13,22 @@ from flow.core.experiment import Experiment
 from flow.core.params import SimParams
 
 
-# script for bay0_no_grid flow_params
-class Args:
-    def __init__(self):
-        self.horizon = 400
-        self.algo = "PPO"
-        self.load_model=True
-        self.load_path="flow/controllers/imitation_learning/model_files/bay0_Sat Jun 13 16:30:11 2020"
-args = Args()
-bay_0_make_flow_params
-flow_params = bay_0_make_flow_params(args, pedestrians=True, render=True)
+# # script for bay0_no_grid flow_params
+# class Args:
+#     def __init__(self):
+#         self.horizon = 400
+#         self.algo = "PPO"
+#         self.load_model=True
+#         self.load_path="flow/controllers/imitation_learning/model_files/bay0_Tue Jun 16 19:47:50 2020.h5"
 
-def run_experiment():
+# args = Args()
+
+def run_experiment(args):
+
+    flow_params = bay_0_make_flow_params(args, pedestrians=True, render=True)
+
     create_env, _ = make_create_env(flow_params)
     env = create_env()
-    # import ipdb; ipdb.set_trace()
     obs_dim = env.observation_space.shape[0]
     action_dim = (1,)[0]
 
@@ -93,4 +96,38 @@ def run_rollout():
     print("Final Reward: ", reward)
 
 if __name__ == "__main__":
-    run_experiment()
+    parser = argparse.ArgumentParser(
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description="Parse argument used when running a Flow simulation.",
+    epilog="python train.py EXP_CONFIG")
+
+    # required input parameters
+    parser.add_argument(
+        '--exp_config', type=str,
+        help='Name of the experiment configuration file, as located in '
+                'exp_configs/rl/singleagent or exp_configs/rl/multiagent.')
+    parser.add_argument(
+        '--load_path', type=str, default="",
+        help='The path from which to load the saved h5 model'
+    )
+    
+    parser.add_argument(
+        '--horizon', type=int, default=400, 
+        help='Hello'
+    )
+
+    parser.add_argument(
+        '--algo', type=str, default='PPO',
+        help = "PPO"
+    )
+
+    parser.add_argument(
+        '--load_model', type=bool, default=True,
+        help='Determine whether to load a model'
+    )
+
+
+
+    args = parser.parse_args()
+
+    run_experiment(args)

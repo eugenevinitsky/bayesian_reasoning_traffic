@@ -207,6 +207,8 @@ def setup_exps_rllib(flow_params,
         config["use_gae"] = True
         config["lambda"] = 0.97
         config["kl_target"] = 0.02
+        config['no_done_at_end'] = True
+
         # TODO: restore this to 10
         config["num_sgd_iter"] = 1
         # config["num_sgd_iter"] = 10
@@ -302,8 +304,6 @@ def setup_exps_rllib(flow_params,
         av_speed = np.mean([speed for speed in env.k.vehicle.get_speed(rl_ids) if speed >= 0])
         if not np.isnan(av_speed):
             episode.user_data["avg_speed_avs"].append(av_speed)
-        episode.user_data["avg_mpg"].append(miles_per_gallon(env, veh_ids, gain=1.0))
-        episode.user_data["avg_mpj"].append(miles_per_megajoule(env, veh_ids, gain=1.0))
 
 
     def on_episode_end(info):
@@ -312,16 +312,13 @@ def setup_exps_rllib(flow_params,
         episode.custom_metrics["avg_speed"] = avg_speed
         avg_speed_avs = np.mean(episode.user_data["avg_speed_avs"])
         episode.custom_metrics["avg_speed_avs"] = avg_speed_avs
-        episode.custom_metrics["avg_energy_per_veh"] = np.mean(episode.user_data["avg_energy"])
-        episode.custom_metrics["avg_mpg_per_veh"] = np.mean(episode.user_data["avg_mpg"])
-        episode.custom_metrics["avg_mpj_per_veh"] = np.mean(episode.user_data["avg_mpj"])
 
     def on_train_result(info):
         """Store the mean score of the episode, and increment or decrement how many adversaries are on"""
         trainer = info["trainer"]
-        trainer.workers.foreach_worker(
-            lambda ev: ev.foreach_env(
-                lambda env: env.set_iteration_num()))
+        # trainer.workers.foreach_worker(
+        #     lambda ev: ev.foreach_env(
+        #         lambda env: env.set_iteration_num()))
 
     config["callbacks"] = {"on_episode_start": tune.function(on_episode_start),
                            "on_episode_step": tune.function(on_episode_step),
@@ -399,8 +396,12 @@ def setup_exps_rllib(flow_params,
 
 def train_rllib(submodule, flags):
     """Train policies using the PPO algorithm in RLlib."""
-
-    flow_params = submodule.flow_params
+    class Args:
+        def __init__(self):
+            self.horizon = 400
+            self.algo = 'PPO'
+    args = Args()
+    flow_params = submodule.make_flow_params(args, pedestrians=True)    
     flow_params['sim'].render = flags.render
     policy_graphs = getattr(submodule, "POLICY_GRAPHS", None)
     policy_mapping_fn = getattr(submodule, "policy_mapping_fn", None)
