@@ -262,7 +262,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 if rl_id in self.past_intersection_rewarded_set:
                     continue
                 else:
-                    rewards[rl_id] = 25 / 100
+                    rewards[rl_id] = 400 / 100
                     self.past_intersection_rewarded_set.add(rl_id)
                     continue
                 continue
@@ -302,7 +302,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     reward = -1000
 
                 rewards[rl_id] = reward / 100
-
+        # print(rewards)
         return rewards
 
     def step(self, rl_actions):
@@ -738,10 +738,10 @@ class Bayesian0NoGridEnv(MultiEnv):
                 loc = self.edge_to_loc(ped_edge, ped_id)
                 if loc is not None:
                     locs[loc] = 1
-        
+                    
         return locs
 
-    def get_ped_visibility(self, visible_pedestrians, visible_lanes, ground_truth=False):
+    def get_ped_visibility(self, visible_pedestrians, visible_lanes, ground_truth=True):
         """For a given RL agent's visible pedestrians and visible lanes, return a 
         length 4 ternary indicator array for that RL car's pedestrian visibility state vector.
         If using ground truth, return a length 4 binary indicator array for that RL car.
@@ -781,7 +781,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         ped_kernel = self.k.pedestrian
 
         if ground_truth:
-            locs = [0] * NUM_PED_LOCATIONS
+            locs = self.curr_ped_state()
+
 
         else:
             locs = [-1] * NUM_PED_LOCATIONS
