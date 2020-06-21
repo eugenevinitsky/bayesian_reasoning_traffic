@@ -233,7 +233,7 @@ def setup_exps_PPO(flow_params):
         return PPOTFPolicy, obs_space, act_space, {}
 
     # Setup PG with a single policy graph for all agents
-    policy_graphs = {'av': gen_policy()}
+     = {'policy_graphsav': gen_policy()}
 
     def policy_mapping_fn(_):
         return 'av'

@@ -191,7 +191,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ('(1.2)--(1.1)', '(0.1)--(1.1)')]
 
         rt = np.random.randint(len(routes))
-        
         focus_1_3 = False
         if focus_1_3:
             rand = np.random.uniform(1)
