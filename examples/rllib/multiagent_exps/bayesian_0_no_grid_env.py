@@ -288,8 +288,8 @@ def setup_exps_DQN(args, flow_params):
     alg_run = 'DQN'
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
-    print(config)
-    import ipdb; ipdb.set_trace()
+    # print(config)
+    # import ipdb; ipdb.set_trace()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['no_done_at_end'] = True
@@ -683,14 +683,12 @@ if __name__ == '__main__':
         'stop': {
             'training_iteration': args.n_iterations
         },
-        "restore": "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/Imitation_PPO_Trainable_0_0_2020-06-19_00-55-400qnlkez6/checkpoint_1/checkpoint-1",
         'config': config,
         "num_samples": 1,
     }
 
     if upload_dir:
         exp_tag["upload_dir"] = "s3://{}".format(upload_dir)
-
     run_experiments(
         {
             flow_params["exp_tag"]: exp_tag
