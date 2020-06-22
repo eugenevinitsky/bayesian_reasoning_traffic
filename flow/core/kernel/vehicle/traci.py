@@ -506,12 +506,11 @@ class TraCIVehicle(KernelVehicle):
         viewable_pedestrians, viewable_vehicles, fully_viewable_lanes = [], [], []
         observed_vehicles = []
         blocked = {}
-
+        # get_orientation(v_id) returns a triple (x, y, orientation)
         position = self.get_orientation(veh_id)[:2]
         orientation = self.get_orientation(veh_id)[2]
 
         for v_id in self.get_ids():
-
             if util.observed(position, orientation, self.get_orientation(v_id)[:2], looking_distance=radius) and v_id != veh_id:
 
                 observed_vehicles.append(v_id)
@@ -548,6 +547,7 @@ class TraCIVehicle(KernelVehicle):
                 else:
                     # ignore 'general' lanes
                     continue
+
         # visualization
         if visualize:
 

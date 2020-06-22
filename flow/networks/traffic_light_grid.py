@@ -100,7 +100,7 @@ class TrafficLightGridNetwork(Network):
                  traffic_lights=TrafficLightParams(),
                  pedestrians=None,
                  use_traffic_lights=True,
-                 nodes_radius=None):
+                 nodes_radius=0):
         """Initialize an n*m traffic light grid network."""
         optional = ["tl_logic"]
         for p in ADDITIONAL_NET_PARAMS.keys():
@@ -805,6 +805,4 @@ class TrafficLightGridNetwork(Network):
                                            size=cars_heading_left + cars_heading_right).tolist()
             start_lanes += horz_lanes
 
-        print(start_pos, start_lanes)
-        print("\n")
         return start_pos, start_lanes
