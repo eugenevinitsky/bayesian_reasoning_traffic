@@ -109,21 +109,25 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.near_intersection_rewarded_set_2 = set()
         self.near_intersection_rewarded_set_3 = set()
 
-        self.edge_to_int = {
-                "(1.1)--(2.1)" : 0,
-                "(2.1)--(1.1)" : 1,
-                "(1.1)--(1.2)" : 2,
-                "(1.2)--(1.1)" : 3,
-                "(1.1)--(0.1)" : 4,
-                "(0.1)--(1.1)" : 5,
-                "(1.1)--(1.0)" : 6,
-                "(1.0)--(1.1)" : 7
+        self.edge_to_num = {
+                "(1.2)--(1.1)" : 0,
+                "(1.1)--(1.2)" : 1,
+                "(2.1)--(1.1)" : 2,
+                "(1.1)--(2.1)" : 3,
+                "(1.0)--(1.1)" : 4,
+                "(1.1)--(1.0)" : 5,
+                "(0.1)--(1.1)" : 6,
+                "(1.1)--(0.1)" : 7
+        }
+
+        self.num_to_edge = {
+            num : edge for edge, num in self.edge_to_num.items()
         }
 
         self.in_edges = ["(2.1)--(1.1)",
-                "(1.2)--(1.1)",
-                "(0.1)--(1.1)",
-                "(1.0)--(1.1)"]
+                        "(1.2)--(1.1)",
+                        "(0.1)--(1.1)",
+                        "(1.0)--(1.1)"]
 
         max_accel, max_decel = self.env_params.additional_params['max_decel'], -self.env_params.additional_params['max_decel']
         step_size = (max_accel - max_decel) / (DISCRETE_VALS + 1)
@@ -246,6 +250,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                                 [observed_yaw / 360, observed_speed / 20, 
                                         rel_x / 50, rel_y / 50, before / 5]
                 obs.update({rl_id: observation})
+
+        ped_kernel = self.k.pedestrian
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -277,12 +283,12 @@ class Bayesian0NoGridEnv(MultiEnv):
                         reward = 200
                         self.near_intersection_rewarded_set_1.add(rl_id)
 
-                if 44 < edge_pos <= 47:
-                    if rl_id in self.near_intersection_rewarded_set_2:
-                        pass
-                    else:
-                        reward = 250
-                        self.near_intersection_rewarded_set_2.add(rl_id)
+                # if 44 < edge_pos <= 47:
+                #     if rl_id in self.near_intersection_rewarded_set_2:
+                #         pass
+                #     else:
+                #         reward = 250
+                #         self.near_intersection_rewarded_set_2.add(rl_id)
             
                 if 47 < edge_pos < 50:
                     if rl_id in self.near_intersection_rewarded_set_3:
@@ -302,7 +308,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                     reward = -1000
 
                 rewards[rl_id] = reward / 100
-        # print(rewards)
         return rewards
 
     def step(self, rl_actions):
@@ -691,8 +696,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         speed = self.k.vehicle.get_speed(rl_id)
 
         curr_edge = self.k.vehicle.get_edge(rl_id)
-        if curr_edge in self.edge_to_int:
-            curr_edge = self.edge_to_int[curr_edge]
+        if curr_edge in self.edge_to_num:
+            curr_edge = self.edge_to_num[curr_edge]
             if rl_id in self.inside_intersection: 
                 self.inside_intersection.remove(rl_id)
         else:
@@ -702,8 +707,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
         start, end = self.k.vehicle.get_route(rl_id)
-        start = self.edge_to_int[start]
-        end = self.edge_to_int[end]
+        start = self.edge_to_num[start]
+        end = self.edge_to_num[end]
         turn_num = (end - start) % 8
         if turn_num == 1:
             turn_num = 0 # turn right
@@ -738,38 +743,60 @@ class Bayesian0NoGridEnv(MultiEnv):
                 loc = self.edge_to_loc(ped_edge, ped_id)
                 if loc is not None:
                     locs[loc] = 1
-                    
+
         return locs
 
-    def get_ped_visibility(self, visible_pedestrians, visible_lanes, ground_truth=True):
+    def get_ped_visibility(self, visible_pedestrians, visible_lanes, ground_truth=True, veh_id="1"):
         """For a given RL agent's visible pedestrians and visible lanes, return a 
-        length 4 ternary indicator array for that RL car's pedestrian visibility state vector.
-        If using ground truth, return a length 4 binary indicator array for that RL car.
+        length 4 ternary indicator array for the 'source' car's pedestrian visibility state vector.
+        If using ground truth, return a length 4 binary indicator array of whether there are pedestrians
+        on each of the crosswalks, regardless of the actual source vehicle.
         
-        @Params:
+        Parameters
+        ----------
         visible_pedestrians : list[str]
-            list of all pedestrian id's visible to the rl car
+            list of all pedestrian id's visible to the source rl car
         visible_lanes: list[str]
-            list of all lane id's visible to the rl car
-            
-        N.B. visible pedestrians and visible lanes are lists corresponding to a particular rl car.
+            list of all lane id's visible to the source rl car
+        ground_truth: boolean
+            flag for whether we should return ground truth pedestrian-crosswalk states
+
+        Returns
+        -------
+        cross_walk: list[int]
+            a length NUM_PED_LOCATIONS list denoting pedestrian visibility w.r.t. a source car,
+            or the ground truth for pedestrian-on-crosswalk state
 
         Definitions
         -----------
-        SUMO has 3 types of pedestrian 'lanes':
-            i) sidewalk - these are the straight sideways, formatted as TODO(KL)
-            ii) walkway - these are the diagonal parts inside the intersection, formatted as "(1.1)_w[num]__0"
+        SUMO has 3 types of pedestrian 'edges':
+            i) sidewalk - these are the straight sideways, formatted as (1.1)--(0.1)
+            ii) walkway - these are the diagonal parts inside the intersection, formatted as "(1.1)_w[num]"
             iii) crossing - these are the stripey zebra crossings, formatted as "(1.1)_c[num]" 
 
-        Let's define a 'crosswalk' as the strip of road consisting of a crossing and part of a walkway
+        Let's define a 'crosswalk' as follows (check google slides)
 
+        For a stripey zebra crossing (location 0), crosswalk 0 would be the regions with the stars
+
+                 |  |    |    |  |
+                 |  |    |    |  |        
+                 |  |    |    |  |
+                 |  |    |    |  |        
+                 |  |    |    |  |
+                 |**|    |    |**|   
+        _________|**||*||*||*||**|
+        _________       
+        
+        _________
+
+        _________
+        _________
+    
+ 
         We define three values for flags:
             1 = the car physically sees a pedestrian on that crosswalk
             0 = the car physically sees no pedestrians on that crosswalk
             -1 = the car can't tell if there's a pedestrian on that crosswalk (because crosswalk is not fully in view)
-
-        The 4 possible physical locations are indicated in the slide (?) currently in my journal.     
-        **Simplifying Assumption** pedestrians only traverse crossings counterclockwise:
         
         | Crossing number | Sumo Edge location   |
         | --------------- | -------------------- |
@@ -778,39 +805,143 @@ class Bayesian0NoGridEnv(MultiEnv):
         | 2               | c2, w3_0             |
         | 3               | c3, w0_0             |
         """
+
+        # ped_kernel = self.k.pedestrian
+        # # import ipdb; ipdb.set_trace()
+        # if ground_truth:
+        #     locs = self.curr_ped_state()
+
+
+        # else:
+        #     locs = [-1] * NUM_PED_LOCATIONS
+        #     lane_visible_arr = [[0,0] for _ in range(NUM_PED_LOCATIONS)]
+
+        #     for lane in visible_lanes:
+        #         # check if a lane is fully in view (i.e. need both)
+        #         junction = lane.split("_")[0][1:]
+        #         if JUNCTION_ID == junction:
+        #             loc = self.edge_to_loc(lane)
+        #             if loc is not None:
+        #                 if 'c' in lane:
+        #                     lane_visible_arr[loc][0] = 1
+        #                 elif 'w' in lane:
+        #                     lane_visible_arr[loc][1] = 1
+
+        #     for idx, val in enumerate(lane_visible_arr):
+        #         if val[0] == val[1] == 1:
+        #             locs[idx] = 0
+
+        #     for ped_id in visible_pedestrians:
+        #         ped_edge = ped_kernel.get_edge(ped_id)
+        #         loc = self.edge_to_loc(ped_edge, ped_id)
+        #         if loc is not None:
+        #             locs[loc] = 1
+
+        # return locs
+
+        cross_walk = [0] * NUM_PED_LOCATIONS
         ped_kernel = self.k.pedestrian
 
         if ground_truth:
-            locs = self.curr_ped_state()
+            pedestrians = ped_kernel.get_ids()
+            for ped in pedestrians:  # pedestrians = all pedestrians in the simulation
+                for cw in range(NUM_PED_LOCATIONS):
+                    if self.is_ped_on_cross_walk(ped, cw):
+                        cross_walk[cw] = 1
+                print(ped_kernel.get_edge(ped))                
+            print(cross_walk)
+        else:
+            for ped in visible_pedestrians:  # pedestrians = all pedestrians in the simulation visible to source vehicle
+                for cw in range(NUM_PED_LOCATIONS):
+                    if self.is_ped_on_cross_walk(ped, cw):
+                        cross_walk[cw] = 1
 
+            # check why we can’t see a ped on cross_walk[cw]: is it because the ‘source’ vehicle can’t see the entirety of the cross_walk?
+            # In that case, the pedestrian’s obscured and we set cross_walk[cw] = -1. Else, we keep cross_walk[cw] = 0.
+
+            for cw in range(NUM_PED_LOCATIONS):
+                if cross_walk[cw] == 0:
+                    if not self.is_cross_walk_visible(veh_id, cw):
+                        cross_walk[cw] = -1
+        print(cross_walk)
+        return cross_walk
+
+    def is_ped_on_cross_walk(self, ped_id, cw):
+        """Check if there's a pedestrian ped_id on crosswalk cw
+
+        crossing cw: i) zebra crossing "c" or waiting walkway platform "w"
+                     ii) <= 1m on sidewalk edge away from walkway platform
+
+        Parameters
+        ----------
+        ped_id: str
+            ped_id is the pedestrian we care about
+        cw: int
+            relevant crosswalk's number
+        
+        Returns
+        -------
+        True if ped_id is on cw, False if ped_id isn't on cw
+        """
+        ped_kernel = self.k.pedestrian
+        # check :(1.1)_w2, (1.0)--(1.1), :(1.1)_c2
+        cw_edges = self.get_cross_walk_edge_names(cw) 
+        ped_edge = ped_kernel.get_edge(ped_id)
+
+        if ped_edge in cw_edges: 
+            if "c" in ped_edge or "w" in ped_edge:
+                return True
+            elif "-" in ped_edge:
+                edge_num = self.edge_to_num[ped_edge]
+                edge_pos = ped_kernel.get_lane_position(ped_id)
+                return (edge_num % 2 == 0 and edge_pos >= 49) or (edge_num % 2 == 1 and edge_pos <= 1)
 
         else:
-            locs = [-1] * NUM_PED_LOCATIONS
-            lane_visible_arr = [[0,0] for _ in range(NUM_PED_LOCATIONS)]
+            return False
 
-            for lane in visible_lanes:
-                # check if a lane is fully in view (i.e. need both)
-                junction = lane.split("_")[0][1:]
-                if JUNCTION_ID == junction:
-                    loc = self.edge_to_loc(lane)
-                    if loc is not None:
-                        if 'c' in lane:
-                            lane_visible_arr[loc][0] = 1
-                        elif 'w' in lane:
-                            lane_visible_arr[loc][1] = 1
+    def get_cross_walk_edge_names(self, cw):
+        """Return the names of edges corresponding to crosswalk cw
+        
+        crossing cw: i) zebra crossing "c" or waiting walkway platform "w"
+                     ii) <= 1m on sidewalk edge away from walkway platform
 
-            for idx, val in enumerate(lane_visible_arr):
-                if val[0] == val[1] == 1:
-                    locs[idx] = 0
+                     OR
 
-            for ped_id in visible_pedestrians:
-                ped_edge = ped_kernel.get_edge(ped_id)
-                loc = self.edge_to_loc(ped_edge, ped_id)
-                if loc is not None:
-                    locs[loc] = 1
+                     cross_walk i: ci, corner_i, corner_{i+1} (mod 4)
+                     and, corner_i: w_i, edge_{2i}, edge_{2i - 1} (mod 8)
 
-        return locs
+        Parameters
+        ----------
+        cw: int
+            number of the crosswalk in question
+        
+        Returns
+        -------
+        cw_names: list[str]
+            string of all edges related to crosswalk cw
 
+        NB, format of edge string names are as follows
+        
+        ":(1.1)_w2", "(1.0)--(1.1)", ":(1.1)_c2"
+        """
+
+        cw_names = []
+        c = ":" + JUNCTION_ID + "_c" + str(cw)
+        cw_names.append(c)
+
+        for j in range(2):
+            i = (cw + j) % 4
+            w = ":" + JUNCTION_ID + "_w" + str(i)
+            edge_1 = self.num_to_edge[2 * i]
+            edge_2 = self.num_to_edge[(2 * i - 1) % 8]
+            cw_names.extend([w, edge_1, edge_2])
+        
+        return cw_names
+
+    def is_cross_walk_visible(self, veh_id, cw):
+        pass
+
+    @DeprecationWarning
     def edge_to_loc(self, lane, ped_id=None):
         """Map a lane id to its corresponding corresponds value. 
 
