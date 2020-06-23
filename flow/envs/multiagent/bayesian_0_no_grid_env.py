@@ -209,7 +209,7 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         for rl_id in self.k.vehicle.get_rl_ids():
 
-            if self.past_intersection(rl_id):
+            if self.past_intersection(rl_id) and rl_id in self.past_intersection_rewarded_set:
                 continue
                 
             if self.arrived_intersection(rl_id):
