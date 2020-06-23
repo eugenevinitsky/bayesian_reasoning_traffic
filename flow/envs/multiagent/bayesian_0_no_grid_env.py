@@ -266,13 +266,10 @@ class Bayesian0NoGridEnv(MultiEnv):
         for rl_id in self.k.vehicle.get_rl_ids():   
             # reward rl slightly earlier than when control is given back to SUMO
             if self.past_intersection(rl_id): # vehicle arrived at final destination, 5.5 is a random distance
-                if rl_id in self.past_intersection_rewarded_set:
-                    continue
-                else:
+                if rl_id not in self.past_intersection_rewarded_set:
                     print('got past the intersection and got the reward')
                     rewards[rl_id] = 400 / 100
                     self.past_intersection_rewarded_set.add(rl_id)
-                    continue
                 continue
 
             if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
@@ -306,9 +303,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 inside_intersection = rl_id in self.inside_intersection
 
                 if len(collision_pedestrians) > 0:
-                    reward = -1000
+                    reward = -5000
                 elif rl_id in collision_vehicles:
-                    reward = -1000
+                    reward = -5000
 
                 # reward shaping to encourage going forwards
                 reward += self.k.vehicle.get_speed(rl_id) / 80.0
@@ -318,7 +315,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                         accel = self.discrete_actions_to_accels[rl_actions[rl_id]]
                     else:
                         accel = rl_actions[rl_id][0]
-                    reward -= np.abs(accel) / 100.0
+                    reward -= np.abs(accel)
+                if inside_intersection and self.k.vehicle.get_speed(rl_id) < 1.0:
+                    reward -= 1.0
                 rewards[rl_id] = reward / 100
         return rewards
 

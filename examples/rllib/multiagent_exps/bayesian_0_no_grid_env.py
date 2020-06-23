@@ -10,7 +10,7 @@ except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.agents.ddpg.td3 import TD3Trainer
 from ray.rllib.env.group_agents_wrapper import _GroupAgentsWrapper
-from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
+from ray.rllib.agents.ppo.ppo import PPOTFPolicy
 from ray import tune
 from ray.tune.registry import register_env
 from ray.tune import run_experiments
@@ -633,7 +633,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=400,
+    parser.add_argument("--horizon", type=int, default=500,
                         help="Horizon length of a rollout")
 
     # optional input parameters
