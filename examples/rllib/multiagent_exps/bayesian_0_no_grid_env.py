@@ -84,10 +84,10 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
-        veh_id='rl',
+        veh_id='av',
         acceleration_controller=(RLController, {}),
         car_following_params=SumoCarFollowingParams(
-            speed_mode='right_of_way',
+            speed_mode='aggressive',
         ),
         routing_controller=(GridRouter, {}),
         depart_time='3.5',    #TODO change back to 3.5s
@@ -226,6 +226,7 @@ def on_episode_start(info):
     episode.user_data['steps_elapsed'] = 0
     episode.user_data['vehicle_leaving_time'] = []
     episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
+    episode.user_data['past_intersection'] = 0
 
 def on_episode_step(info):
     env = info['env'].get_unwrapped()[0]
@@ -251,6 +252,9 @@ def on_episode_step(info):
         episode.user_data['vehicle_leaving_time'] += \
                 [episode.user_data['steps_elapsed']] * num_veh_left
         episode.user_data['num_rl_veh_active'] -= num_veh_left
+    rl_ids = env.k.vehicle.get_rl_ids()
+    if 'av_0' in rl_ids:
+        episode.user_data['past_intersection'] = int(env.past_intersection('av_0'))
 
 def on_episode_end(info):
     episode = info['episode']
@@ -265,6 +269,7 @@ def on_episode_end(info):
             np.mean(episode.user_data['vehicle_leaving_time'])
     else:
         episode.custom_metrics['avg_rl_veh_arrival'] = 500
+    episode.custom_metrics['past_intersection'] = episode.user_data['past_intersection']
 
 
 def setup_exps_DQN(args, flow_params):
@@ -292,16 +297,21 @@ def setup_exps_DQN(args, flow_params):
     # import ipdb; ipdb.set_trace()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['no_done_at_end'] = True
+    # config['no_done_at_end'] = True
     config['lr'] = 1e-4
-    config['gamma'] = 0.97  # discount rate
+    config['n_step'] = 10
+    config['gamma'] = 0.99  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['learning_starts'] = 20000
     config['prioritized_replay'] = True
+    # increase buffer size
+    config['buffer_size'] = 200000
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['n_step'] = tune.grid_search([1, 10])
+        config['gamma'] = tune.grid_search([0.999, 0.99, 0.9])  # discount rate
 
     config['horizon'] = args.horizon
-    config['observation_filter'] = 'NoFilter'
+    config['observation_filter'] = 'MeanStdFilter'
 
     # define callbacks for tensorboard
 
@@ -325,8 +335,6 @@ def setup_exps_DQN(args, flow_params):
         flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
     config['env_config']['flow_params'] = flow_json
     config['env_config']['run'] = alg_run
-    # increase buffer size
-    config['buffer_size'] = 200000
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
 
