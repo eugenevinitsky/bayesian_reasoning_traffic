@@ -165,10 +165,15 @@ class ImitatingNetwork():
         # "batch size" is 1, so just get single acceleration/acceleration vector
         network_output = self.model.predict(observation)
         if self.stochastic:
-            mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
-            var = np.exp(2 * log_std)
-            action = np.random.multivariate_normal(mean[0], var)
-            return action
+            try:
+
+                mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
+                var = np.exp(2 * log_std)
+                action = np.random.multivariate_normal(mean[0], var)
+                print(var)
+                return action
+            except:
+                import ipdb; ipdb.set_trace()
         else:
             return network_output
 
