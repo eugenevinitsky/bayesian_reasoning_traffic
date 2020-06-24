@@ -273,7 +273,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
                 for index, veh_id in enumerate(visible_vehicles):
 
-                    before = self.arrived_before(rl_id, veh_id)
+                    before = self.arrived_before(veh_id, rl_id)
 
                     observed_yaw = self.k.vehicle.get_yaw(veh_id)
                     observed_speed = self.k.vehicle.get_speed(veh_id)
