@@ -3,6 +3,7 @@ from examples.train import *
 
 def parse_args(args):
     """Parse training options user can specify in command line.
+
     Returns
     -------
     argparse.Namespace
@@ -11,7 +12,7 @@ def parse_args(args):
         dictionary version of the argparse
     """
 
-    # **** TRAIN.PY ARGS ****
+    # train.py args
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -68,7 +69,6 @@ def parse_args(args):
         '--checkpoint_path', type=str, default=None,
         help='Directory with checkpoint to restore training from.')
 
-
     parser.add_argument(
         '--load_weights_path', type=str, default=None,
         help='Path to h5 file containing a pretrained model. Relevent for PPO with RLLib'
@@ -113,7 +113,6 @@ def main(args):
     flags, params = parse_args(args)
     params["fcnet_hiddens"] = [32, 32, 32]
     params['load_weights_path'] = params["PPO_save_path"]
-
 
     print("\n\n********** IMITATION LEARNING ************ \n")
     # run training
@@ -160,6 +159,4 @@ def main(args):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-    
-    
 

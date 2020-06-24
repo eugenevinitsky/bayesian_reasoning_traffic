@@ -88,9 +88,6 @@ class PPONetwork(TFModelV2):
         # build model from layers
         self.base_model = tf.keras.Model(inp_layer, [output_layer_policy, output_layer_vf])
 
-
-
-
     def forward(self, input_dict, state, seq_lens):
         """
         Overrides parent class's method. Used to pass a input through model and get policy/vf output.
@@ -102,12 +99,13 @@ class PPONetwork(TFModelV2):
             list of state tensors with sizes matching those returned by get_initial_state + the batch dimension
         seq_lens: tensor
             1d tensor holding input sequence lengths
+
         Returns
         _______
         (outputs, state)
             Tuple, first element is policy output, second element state
         """
-        # print(self.base_model.get_weights())
+
         policy_out, value_out = self.base_model(input_dict["obs_flat"])
         self.value_out = value_out
         return policy_out, state
@@ -115,13 +113,13 @@ class PPONetwork(TFModelV2):
     def value_function(self):
         """
         Returns the value function output for the most recent forward pass.
+
         Returns
         _______
         tensor
             value estimate tensor of shape [BATCH].
         """
         return tf.reshape(self.value_out, [-1])
-
 
     def import_from_h5(self, import_file):
         """

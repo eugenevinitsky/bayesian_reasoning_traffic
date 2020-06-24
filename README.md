@@ -30,6 +30,16 @@ We welcome your contributions.
 - Please report bugs and improvements by submitting [GitHub issue](https://github.com/flow-project/flow/issues).
 - Submit your contributions using [pull requests](https://github.com/flow-project/flow/pulls). Please use [this template](https://github.com/flow-project/flow/blob/master/.github/PULL_REQUEST_TEMPLATE.md) for your pull requests.
 
+# Guide to the code
+- We are actually on SUMO 1.6.0, so after installing everything visit https://github.com/eclipse/sumo and install 
+version 1.6.0 by looking at the versions for the right commit. Then follow the instructions here if you have a mac
+https://sumo.dlr.de/docs/Installing/MacOS_Build.html. If they haven't upgraded SUMO yet, you can also
+follow the Brew instructions to install it via Brew.
+- The run scripts are located in examples/rllib/multiagent_exps.
+- The relevant environments that define step, reset, etc. are in flow/envs/multiagent/bayesian_0_no_grid_env.py
+- To replay a policy, look at flow/visualize/visualizer_rllib.py
+- For an example that uses future state prediction run examples/sumo/bayesian_1_predict.py
+
 # Citing Flow
 
 If you use Flow for academic research, you are highly encouraged to cite our paper:

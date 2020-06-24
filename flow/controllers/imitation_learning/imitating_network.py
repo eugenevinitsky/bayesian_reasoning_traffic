@@ -168,7 +168,6 @@ class ImitatingNetwork():
             mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
             var = np.exp(2 * log_std)
             action = np.random.multivariate_normal(mean[0], var)
-            # print("action", action, "mean", mean[0], "var", var[0])
             return action
         else:
             return network_output
