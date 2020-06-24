@@ -344,6 +344,7 @@ def create_agent(args, flow_params):
                   + 'differs from the one stored in params.json '
                   + '\'{}\''.format(config_run))
             sys.exit(1)
+
     if args.run:
         agent_cls = get_agent_class(args.run)
     elif config['env_config']['run'] == "<class 'flow.controllers.imitation_learning.imitation_trainer.Imitation_PPO_Trainable'>":
@@ -364,6 +365,8 @@ def create_agent(args, flow_params):
         agent_cls = CustomPPOTrainer
     elif config_run:
         agent_cls = get_agent_class(config_run)
+
+
     else:
         print('visualizer_rllib.py: error: could not find flow parameter '
               '\'run\' in params.json, '
@@ -413,9 +416,6 @@ def create_agent(args, flow_params):
     checkpoint = result_dir + '/checkpoint_' + args.checkpoint_num
     checkpoint = checkpoint + '/checkpoint-' + args.checkpoint_num
     agent.restore(checkpoint)
-    # TODO(KL) this is wayyy too hard code-y
-    agent.import_model('/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/b.h5', 'av')
-
 
     return agent, config
 
@@ -427,7 +427,7 @@ def accel_pdf(mu, sigma, actual):
 
 def run_transfer(args):
     # run transfer on the bayesian 1 env first
-    from examples.rllib.multiagent_exps.bayesian_0_training_script import make_flow_params as bayesian_1_flow_params
+    from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params as bayesian_1_flow_params
     bayesian_1_params = bayesian_1_flow_params(pedestrians=True, render=True)
     env, env_name = create_env(args, bayesian_1_params)
     agent, config = create_agent(args, flow_params=bayesian_1_params)

@@ -1,30 +1,14 @@
 """Get the agent to model the behaviour of vehicles"""
 import argparse
-from datetime import datetime
-import gym
-import os
-import sys
-import time
-import matplotlib.pyplot as plt
-import numpy as np
-import PyQt5
 
 import ray
 try:
     from ray.rllib.agents.agent import get_agent_class
 except ImportError:
     from ray.rllib.agents.registry import get_agent_class
-from ray.tune.registry import register_env
-
-
-from flow.core.util import emission_to_csv
-from flow.utils.registry import make_create_env
-from flow.utils.rllib import get_flow_params
-from flow.utils.rllib import get_rllib_config
-from flow.utils.rllib import get_rllib_pkl
 
 from examples.rllib.multiagent_exps.test_predictor.pedestrian_policy_1 import create_agent
-from examples.rllib.multiagent_exps.bayesian_1_env import make_flow_params as bayesian_1_flow_params
+from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params as bayesian_1_flow_params
 
 EXAMPLE_USAGE = """
 example usage:

@@ -135,7 +135,7 @@ class ImitatingNetwork():
                 if veh_edge == veh_route[0]:
                     if dist_from_intersection < 5:
                         # set 10 as the maximum weight
-                        weight = min(10, 2 + 1 / dist_from_intersection)
+                        weight = min(10, 2 + 1 / max(0.05, dist_from_intersection)) # numerical hack to avoid division by zero
                 # car inside the intersection, weight = 1.5
                 if ":" in veh_edge:
                     weight = 1.5
@@ -168,11 +168,40 @@ class ImitatingNetwork():
             mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
             var = np.exp(2 * log_std)
             action = np.random.multivariate_normal(mean[0], var)
-            # print("action", action, "mean", mean[0], "var", var[0])
             return action
         else:
             return network_output
 
+    def get_accel_gaussian_params_from_observation(self, observation):
+        """
+        Gets the network's mean and sd prediction based on given observation/state
+
+        ONLY WORKS FOR STOCHASTIC POLICIES
+
+        Parameters
+        ----------
+        observation : numpy array
+            numpy array containing a single observation
+
+        Returns
+        -------
+        numpy array
+            one element numpy array containing mean and sd
+        """
+        assert self.stochastic == True
+        
+        # network expects an array of arrays (matrix); if single observation (no batch), convert to array of arrays
+        if len(observation.shape)<=1:
+            observation = observation[None]
+
+        # "batch size" is 1, so just get single acceleration/acceleration vector
+        network_output = self.model.predict(observation)
+        
+        mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
+        sd = np.exp(2 * log_std)
+        
+        return (mean[0], sd)
+    
     def get_accel(self, env):
         """
         Get network's acceleration prediction(s) based on given env

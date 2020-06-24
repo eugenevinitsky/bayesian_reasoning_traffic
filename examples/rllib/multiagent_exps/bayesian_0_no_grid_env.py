@@ -1,19 +1,21 @@
 import argparse
+from datetime import datetime
 import json
 import numpy as np
+import subprocess
+import os
 
-from gym.spaces import Tuple
+import pytz
 import ray
 try:
     from ray.rllib.agents.agent import get_agent_class
 except ImportError:
     from ray.rllib.agents.registry import get_agent_class
-from ray.rllib.agents.ddpg.td3 import TD3Trainer
 from ray.rllib.env.group_agents_wrapper import _GroupAgentsWrapper
 from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
 from ray import tune
+from ray.tune import run as run_tune
 from ray.tune.registry import register_env
-from ray.tune import run_experiments
 
 from flow.envs.multiagent import Bayesian0NoGridEnv
 from flow.networks import Bayesian0Network
@@ -28,10 +30,6 @@ from flow.controllers import SimCarFollowingController, GridRouter, RLController
 from flow.utils.registry import make_create_env
 from flow.utils.rllib import FlowParamsEncoder
 
-# Experiment parameters
-N_ROLLOUTS = 20  # number of rollouts per training iteration
-N_CPUS = 8 # number of parallel workers
-
 # Environment parameters
 # TODO(@klin) make sure these parameters match what you've set up in the SUMO version here
 V_ENTER = 0  # enter speed for departing vehicles
@@ -39,7 +37,7 @@ MAX_SPEED = 30
 INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 # number of vehicles originating in the left, right, top, and bottom edges
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
-NUM_PEDS = 15
+NUM_PEDS = 2
 
 
 def make_flow_params(args, pedestrians=False, render=False, discrete=False):
@@ -54,7 +52,6 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     dict
         flow_params object
     """
-    pedestrian_params = None
     pedestrian_params = PedestrianParams()
     for i in range(NUM_PEDS):
         pedestrian_params.add(
@@ -87,36 +84,35 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         veh_id='rl',
         acceleration_controller=(RLController, {}),
         car_following_params=SumoCarFollowingParams(
-            speed_mode='right_of_way',
+            speed_mode='aggressive',
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='3.5',    #TODO change back to 3.5s
+        # depart_time='3.5',    #TODO change back to 3.5s
         num_vehicles=1,
         )
+    if args.randomize_vehicles:
+        vehicles.add(
+            veh_id="human_1",
+            acceleration_controller=(SimCarFollowingController, {}),
+            car_following_params=SumoCarFollowingParams(
+                min_gap=2.5,
+                decel=7.5,  # avoid collisions at emergency stops
+                speed_mode="right_of_way",
+            ),
+            routing_controller=(GridRouter, {}),
+            num_vehicles=1)
 
-    
-    # vehicles.add(
-    #     veh_id="human_1",
-    #     acceleration_controller=(SimCarFollowingController, {}),
-    #     car_following_params=SumoCarFollowingParams(
-    #         min_gap=2.5,
-    #         decel=7.5,  # avoid collisions at emergency stops
-    #         speed_mode="right_of_way",
-    #     ),
-    #     routing_controller=(GridRouter, {}),
-    #     num_vehicles=1)
+        vehicles.add(
+            veh_id="human_2",
+            acceleration_controller=(SimCarFollowingController, {}),
+            car_following_params=SumoCarFollowingParams(
+                min_gap=2.5,
+                decel=7.5,  # avoid collisions at emergency stops
+                speed_mode="right_of_way",
+            ),
+            routing_controller=(GridRouter, {}),
+            num_vehicles=1)
 
-    # vehicles.add(
-    #     veh_id="human_2",
-    #     acceleration_controller=(SimCarFollowingController, {}),
-    #     car_following_params=SumoCarFollowingParams(
-    #         min_gap=2.5,
-    #         decel=7.5,  # avoid collisions at emergency stops
-    #         speed_mode="right_of_way",
-    #     ),
-    #     routing_controller=(GridRouter, {}),
-    #     num_vehicles=1)    
-    
 
     n_rows = 1
     n_columns = 1
@@ -125,7 +121,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     if pedestrians:
         initial_config = InitialConfig(
             spacing='custom',
-            shuffle=False, 
+            shuffle=True,
             sidewalks=True, 
             lanes_distribution=float('inf'))
     else:
@@ -170,10 +166,14 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 "search_veh_radius": 50,
                 # how large of a radius to search for pedestrians in for a given vehicle in meters (create effect of only seeing pedestrian only when relevant)
                 "search_ped_radius": 22,
-                # whether we use the multi-agent algorithm QMIX
-                "maddpg": args.algo == "MADDPG",
                 # whether or not we have a discrete action space,
-                "discrete": discrete
+                "discrete": discrete,
+                # whether to randomize which edge the vehicles are coming from
+                "randomize_vehicles": args.randomize_vehicles,
+                # whether to append the prior into the state
+                "inference_in_state": False,
+                # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
+                "use_grid": False
             },
         ),
         # network-related parameters (see flow.core.params.NetParams and the
@@ -226,6 +226,7 @@ def on_episode_start(info):
     episode.user_data['steps_elapsed'] = 0
     episode.user_data['vehicle_leaving_time'] = []
     episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
+    episode.user_data['past_intersection'] = 0
 
 def on_episode_step(info):
     env = info['env'].get_unwrapped()[0]
@@ -251,6 +252,10 @@ def on_episode_step(info):
         episode.user_data['vehicle_leaving_time'] += \
                 [episode.user_data['steps_elapsed']] * num_veh_left
         episode.user_data['num_rl_veh_active'] -= num_veh_left
+    rl_ids = env.k.vehicle.get_rl_ids()
+    if 'av_0' in rl_ids:
+        episode.user_data['past_intersection'] = int(env.past_intersection('av_0'))
+
 
 def on_episode_end(info):
     episode = info['episode']
@@ -265,6 +270,7 @@ def on_episode_end(info):
             np.mean(episode.user_data['vehicle_leaving_time'])
     else:
         episode.custom_metrics['avg_rl_veh_arrival'] = 500
+    episode.custom_metrics['past_intersection'] = episode.user_data['past_intersection']
 
 
 def setup_exps_DQN(args, flow_params):
@@ -294,11 +300,18 @@ def setup_exps_DQN(args, flow_params):
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
-    config['gamma'] = 0.97  # discount rate
-    config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['n_step'] = 10
+    config['gamma'] = 0.99  # discount rate
+    config['model'].update({'fcnet_hiddens': [64, 64, 64]})
+    config['learning_starts'] = 20000
     config['prioritized_replay'] = True
+    # increase buffer size
+    config['buffer_size'] = 200000
+    config['model']['fcnet_activation'] = 'relu'
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['n_step'] = tune.grid_search([1, 10])
+        config['lr'] = tune.grid_search([1e-3, 1e-2, 1e-4])
+        config['gamma'] = tune.grid_search([0.999, 0.99])  # discount rate
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
@@ -325,10 +338,9 @@ def setup_exps_DQN(args, flow_params):
         flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
     config['env_config']['flow_params'] = flow_json
     config['env_config']['run'] = alg_run
-    # increase buffer size
-    config['buffer_size'] = 200000
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
+    config['env'] = env_name
 
     # Register as rllib env
     register_env(env_name, create_env)
@@ -355,84 +367,6 @@ def setup_exps_DQN(args, flow_params):
     })
 
     return alg_run, env_name, config
-
-def setup_exps_TD3(args, flow_params):
-    """
-    Experiment setup with TD3 using RLlib.
-
-    Parameters
-    ----------
-    flow_params : dictionary of flow parameters
-
-    Returns
-    -------
-    str
-        name of the training algorithm
-    str
-        name of the gym environment to be trained
-    dict
-        training configuration parameters
-    """
-    alg_run = 'TD3'
-    agent_cls = get_agent_class(alg_run)
-    config = agent_cls._default_config.copy()
-    # config['simple_optimizer'] = True
-    config["num_workers"] = min(args.n_cpus, args.n_rollouts)
-    config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['gamma'] = 0.999  # discount rate
-    config['model'].update({'fcnet_hiddens': [256, 256]})
-    config['lr'] = 1e-5
-    # config['sample_batch_size'] = 50
-    if args.grid_search:
-        #config['sample_batch_size'] = tune.grid_search([30, 50, 100])
-        config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-        #config['gamma'] = tune.grid_search([0.99, 0.999, 0.9999])
-        #config['actor_lr'] = tune.grid_search([1e-5, 1e-4])
-        #config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
-        #config['prioritized_replay'] = tune.grid_search([True, False])
-    config['horizon'] = args.horizon
-    config['no_done_at_end'] = True
-    config['observation_filter'] = 'NoFilter'
-
-    config['callbacks'] = {
-            "on_episode_start":tune.function(on_episode_start),
-            "on_episode_step":tune.function(on_episode_step),
-            "on_episode_end":tune.function(on_episode_end)}
-
-    # save the flow params for replay
-    flow_json = json.dumps(
-        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
-    config['env_config']['flow_params'] = flow_json
-    config['env_config']['run'] = alg_run
-
-    create_env, env_name = make_create_env(params=flow_params, version=0)
-
-    # Register as rllib env
-    register_env(env_name, create_env)
-
-    test_env = create_env()
-    obs_space = test_env.observation_space
-    act_space = test_env.action_space
-
-    def gen_policy():
-        return None, obs_space, act_space, {}
-
-    # Setup PG with a single policy graph for all agents
-    policy_graphs = {'av': gen_policy()}
-
-    def policy_mapping_fn(_):
-        return 'av'
-
-    config.update({
-        'multiagent': {
-            'policies': policy_graphs,
-            'policy_mapping_fn': tune.function(policy_mapping_fn),
-            'policies_to_train': ['av']
-        }
-    })
-
-    return alg_run, env_name, config
-
 
 def setup_exps_PPO(args, flow_params):
     """
@@ -452,19 +386,24 @@ def setup_exps_PPO(args, flow_params):
         training configuration parameters
     """
 
-    alg_run = 'PPO'
-    agent_cls = get_agent_class(alg_run)
-    config = agent_cls._default_config.copy()
+    from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
+    alg_run = PPOTrainer
+    config = PPO_DEFAULT_CONFIG.copy()
 
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
+    # TODO(@ev) fix the termination condition so you don't need this
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
-    config['model'].update({'fcnet_hiddens': [32, 32, 32]})
+    config['entropy_coeff'] = -0.01
+    config['model'].update({'fcnet_hiddens': [256, 256]})
+    if args.use_lstm:
+        config['model']['use_lstm'] = True
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['gamma'] = tune.grid_search([.995, 0.99, 0.9])  # discount rate
+        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, 0])  # entropy coeff
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
@@ -490,9 +429,10 @@ def setup_exps_PPO(args, flow_params):
     flow_json = json.dumps(
         flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
     config['env_config']['flow_params'] = flow_json
-    config['env_config']['run'] = alg_run
+    config['env_config']['run'] = "CustomPPO"
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
+    config['env'] = env_name
 
     # Register as rllib env
     register_env(env_name, create_env)
@@ -506,6 +446,7 @@ def setup_exps_PPO(args, flow_params):
 
     # Setup PG with a single policy graph for all agents
     policy_graphs = {'av': gen_policy()}
+
     def policy_mapping_fn(_):
         return 'av'
 
@@ -515,89 +456,6 @@ def setup_exps_PPO(args, flow_params):
             'policy_mapping_fn': tune.function(policy_mapping_fn),
             'policies_to_train': ['av']
         }
-    })
-
-    return alg_run, env_name, config
-
-
-def setup_exps_MADDPG(args, flow_params):
-    """
-    Experiment setup with PPO using RLlib.
-
-    Parameters
-    ----------
-    flow_params : dictionary of flow parameters
-
-    Returns
-    -------
-    str
-        name of the training algorithm
-    str
-        name of the gym environment to be trained
-    dict
-        training configuration parameters
-    """
-
-    from flow.algorithms.maddpg.maddpg import DEFAULT_CONFIG as MADDPG_DEFAULT_CONFIG, MADDPGTrainer
-    alg_run = MADDPGTrainer
-    config = MADDPG_DEFAULT_CONFIG.copy()
-    config['no_done_at_end'] = True
-    config['gamma'] = 0.999  # discount rate
-
-    config['buffer_size'] = 10000
-    config['actor_lr'] = 1e-3
-    config['critic_lr'] = 1e-3
-    config['n_step'] = 1
-
-    if args.grid_search:
-        config['gamma'] = tune.grid_search([0.94, 0.93])  # discount rate
-        config['lr'] = tune.grid_search([1e-4, 1e-5])
-    config['horizon'] = args.horizon
-    config['observation_filter'] = 'NoFilter'
-
-    # define callbacks for tensorboard
-
-    config['callbacks'] = {
-            "on_episode_start":tune.function(on_episode_start),
-            "on_episode_step":tune.function(on_episode_step),
-            "on_episode_end":tune.function(on_episode_end)}
-
-    # save the flow params for replay
-    flow_json = json.dumps(
-        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
-    config['env_config']['flow_params'] = flow_json
-    config['env_config']['run'] = alg_run
-
-    create_env, env_name = make_create_env(params=flow_params, version=0)
-
-    # Register as rllib env
-    register_env(env_name, create_env)
-
-    env = create_env()
-    observation_space_dict = {i: env.observation_space for i in range(env.max_num_agents)}
-    action_space_dict = {i: env.action_space for i in range(env.max_num_agents)}
-
-    def gen_policy(i):
-        return (
-            None,
-            env.observation_space,
-            env.action_space,
-            {
-                "agent_id": i,
-                "use_local_critic": False,
-                "obs_space_dict": observation_space_dict,
-                "act_space_dict": action_space_dict,
-            }
-        )
-
-    policies = {"policy_%d" %i: gen_policy(i) for i in range(env.max_num_agents)}
-    policy_ids = list(policies.keys())
-    config.update({"multiagent": {
-                    "policies": policies,
-                    "policy_mapping_fn": ray.tune.function(
-                        lambda i: policy_ids[i]
-                    )
-                }
     })
 
     return alg_run, env_name, config
@@ -615,8 +473,12 @@ if __name__ == '__main__':
         epilog=EXAMPLE_USAGE)
 
     # required input parameters
-    parser.add_argument("--upload_dir", type=str,
+    parser.add_argument("--exp_title", type=str, default="test",
+                        help="Where we store the experiment results")
+    parser.add_argument("--upload_dir", type=str, default="bayesian-traffic",
                         help="S3 Bucket for uploading results.")
+    parser.add_argument("--use_s3", action='store_true', default=False,
+                        help="If true, upload to s3")
     parser.add_argument("--n_iterations", type=int, default=100,
                         help="Number of training iterations")
     parser.add_argument("--n_rollouts", type=int, default=20,
@@ -625,7 +487,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=400,
+    parser.add_argument("--horizon", type=int, default=500,
                         help="Horizon length of a rollout")
 
     # optional input parameters
@@ -638,18 +500,29 @@ if __name__ == '__main__':
     parser.add_argument("--pedestrians", default=True,
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
+    parser.add_argument("--randomize_vehicles", default=True,
+                        help="randomize the number of vehicles in the system and where they come from",
+                        action="store_true")
     parser.add_argument("--render",
                         help="render SUMO simulation",
                         action="store_true")
     parser.add_argument("--discrete",
                         help="determine if policy has discrete actions",
                         action="store_true")
+    parser.add_argument("--run_transfer_tests",
+                        help="run the tests of generalization at the end of training",
+                        action="store_true",
+                        default=False)
 
+    # Model arguments
+    parser.add_argument("--use_lstm", action="store_true", default=False, help="Use LSTM")
     args = parser.parse_args()
 
     pedestrians = args.pedestrians
     render = args.render
     discrete = args.discrete
+    if args.algo == 'DQN':
+        discrete = True
     flow_params = make_flow_params(args, pedestrians, render, discrete)
 
     upload_dir = args.upload_dir
@@ -659,11 +532,6 @@ if __name__ == '__main__':
 
     if ALGO == 'PPO':
         alg_run, env_name, config = setup_exps_PPO(args, flow_params)
-    elif ALGO == 'TD3':
-        alg_run, env_name, config = setup_exps_TD3(args, flow_params)
-    elif ALGO == 'MADDPG':
-        alg_run, env_name, config = setup_exps_MADDPG(args, flow_params)
-        CHECKPOINT_FREQ *= 10
     elif ALGO == 'DQN':
         alg_run, env_name, config = setup_exps_DQN(args, flow_params)
 
@@ -675,10 +543,16 @@ if __name__ == '__main__':
     elif RUN_MODE == 'cluster':
         ray.init(redis_address="localhost:6379")
 
-    exp_tag = {
-        'run': alg_run,
-        'env': env_name,
+    # create a custom string that makes looking at the experiment names easier
+    def trial_str_creator(trial):
+        return "{}_{}".format(trial.trainable_name, trial.experiment_tag)
+
+    exp_dict = {
+        'name': args.exp_title,
+        'run_or_experiment': alg_run,
+        # 'env': env_name,
         'checkpoint_freq': CHECKPOINT_FREQ,
+        'trial_name_creator': trial_str_creator,
         "max_failures": 1,
         'stop': {
             'training_iteration': args.n_iterations
@@ -687,42 +561,37 @@ if __name__ == '__main__':
         "num_samples": 1,
     }
 
-    if upload_dir:
-        exp_tag["upload_dir"] = "s3://{}".format(upload_dir)
-    run_experiments(
-        {
-            flow_params["exp_tag"]: exp_tag
-         },
-    )
-class Args:
-    def __init__(self):
-        self.horizon = 400
-        self.algo = 'PPO'
-args = Args()
-flow_params = make_flow_params(args, pedestrians=True)  
-    
-create_env, env_name = make_create_env(params=flow_params, version=0)
+    if args.use_s3:
+        date = datetime.now(tz=pytz.utc)
+        date = date.astimezone(pytz.timezone('US/Pacific')).strftime("%m-%d-%Y")
+        s3_string = os.path.join(os.path.join(upload_dir, date), args.exp_title)
+        exp_dict["upload_dir"] = "s3://{}".format(s3_string)
 
-# Register as rllib env
-register_env(env_name, create_env)
+    run_tune(**exp_dict, queue_trials=False, raise_on_failed_trial=False)
 
-test_env = create_env()
-obs_space = test_env.observation_space
-act_space = test_env.action_space
+    if args.run_transfer_tests:
+        from flow.visualize.transfer_test import create_parser, run_transfer
+        for (dirpath, dirnames, filenames) in os.walk(os.path.expanduser("~/ray_results")):
+            if "checkpoint_{}".format(args.n_iterations) in dirpath and dirpath.split('/')[-3] == args.exp_title:
+                ray.shutdown()
+                ray.init()
+                parser = create_parser()
+                folder = os.path.dirname(dirpath)
+                tune_name = folder.split("/")[-1]
+                temp_args = parser.parse_args([folder, str(args.n_iterations), "--num_rollouts", "100",
+                                               "--render_mode", "no_render"])
+                run_transfer(temp_args)
 
-
-def gen_policy():
-    """Generate a policy in RLlib."""
-    return PPOTFPolicy, obs_space, act_space, {}
-
-
-# Setup PG with an ensemble of `num_policies` different policy graphs
-POLICY_GRAPHS = {'av': gen_policy()}
-
-
-def policy_mapping_fn(_):
-    """Map a policy in RLlib."""
-    return 'av'
-
-
-POLICIES_TO_TRAIN = ['av']
+                if args.use_s3:
+                    # visualize_adversaries(config, checkpoint_path, 10, 100, output_path)
+                    for i in range(4):
+                        try:
+                            p1 = subprocess.Popen("aws s3 sync {} {}".format(os.path.expanduser("~/generalization"),
+                                                                             "s3://bayesian-traffic/transfer_results/{}/{}/{}".format(
+                                                                                 date,
+                                                                                 args.exp_title,
+                                                                                 tune_name)).split(
+                                ' '))
+                            p1.wait(50)
+                        except Exception as e:
+                            print('This is the error ', e)

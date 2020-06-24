@@ -143,6 +143,14 @@ class TraCIPedestrian(KernelPedestrian):
             return [self.get_edge(pedID, error) for pedID in ped_id]
         return self.__sumo_obs.get(ped_id, {}).get(tc.VAR_ROAD_ID, error)
 
+    def get_xy(self, ped_id, error=-1001):
+        if isinstance(ped_id, (list, np.ndarray)):
+            return [self.get_edge(pedID, error) for pedID in ped_id]
+        return self.get_position(ped_id)
+
+    def set_xy(self, ped_id, edge, x, y):
+        self.kernel_api.person.moveToXY(ped_id, edge, x, y)
+
     def get_yaw(self, ped_id, error=-1001):
         """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
@@ -153,9 +161,9 @@ class TraCIPedestrian(KernelPedestrian):
         """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_next_edge(pedID, error) for pedID in ped_id]
-        return self.kernel_api.person.getNextEdge(ped_id) 
+        return self.kernel_api.person.getNextEdge(ped_id)
 
-    def get_lane_position(self, ped_id, error=-1001):
+    def get_lane_position(self, ped_id):
         """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_lane_position(pedID, error) for pedID in ped_id]

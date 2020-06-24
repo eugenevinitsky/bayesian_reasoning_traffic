@@ -17,7 +17,6 @@ import numpy as np
 import pytz
 
 from flow.core.util import ensure_dir
-from flow.core.rewards import miles_per_gallon, miles_per_megajoule
 from flow.utils.registry import env_constructor
 from flow.utils.rllib import FlowParamsEncoder, get_flow_params
 from flow.utils.registry import make_create_env
@@ -186,6 +185,7 @@ def setup_exps_rllib(flow_params,
         horizon = flow_params['env'].horizon
 
         config["num_workers"] = n_cpus
+        config["no_done_at_end"] = True
         config["horizon"] = horizon
         config["model"].update({"fcnet_hiddens": [32, 32, 32]})
         config["train_batch_size"] = horizon * n_rollouts
@@ -289,8 +289,8 @@ def setup_exps_rllib(flow_params,
         av_speed = np.mean([speed for speed in env.k.vehicle.get_speed(rl_ids) if speed >= 0])
         if not np.isnan(av_speed):
             episode.user_data["avg_speed_avs"].append(av_speed)
-        episode.user_data["avg_mpg"].append(miles_per_gallon(env, veh_ids, gain=1.0))
-        episode.user_data["avg_mpj"].append(miles_per_megajoule(env, veh_ids, gain=1.0))
+        # episode.user_data["avg_mpg"].append(miles_per_gallon(env, veh_ids, gain=1.0))
+        # episode.user_data["avg_mpj"].append(miles_per_megajoule(env, veh_ids, gain=1.0))
 
     def on_episode_end(info):
         episode = info["episode"]
@@ -298,16 +298,16 @@ def setup_exps_rllib(flow_params,
         episode.custom_metrics["avg_speed"] = avg_speed
         avg_speed_avs = np.mean(episode.user_data["avg_speed_avs"])
         episode.custom_metrics["avg_speed_avs"] = avg_speed_avs
-        episode.custom_metrics["avg_energy_per_veh"] = np.mean(episode.user_data["avg_energy"])
-        episode.custom_metrics["avg_mpg_per_veh"] = np.mean(episode.user_data["avg_mpg"])
-        episode.custom_metrics["avg_mpj_per_veh"] = np.mean(episode.user_data["avg_mpj"])
+        # episode.custom_metrics["avg_energy_per_veh"] = np.mean(episode.user_data["avg_energy"])
+        # episode.custom_metrics["avg_mpg_per_veh"] = np.mean(episode.user_data["avg_mpg"])
+        # episode.custom_metrics["avg_mpj_per_veh"] = np.mean(episode.user_data["avg_mpj"])
 
     def on_train_result(info):
         """Store the mean score of the episode, and adjust the number of adversaries."""
         trainer = info["trainer"]
-        trainer.workers.foreach_worker(
-            lambda ev: ev.foreach_env(
-                lambda env: env.set_iteration_num()))
+        # trainer.workers.foreach_worker(
+        #     lambda ev: ev.foreach_env(
+        #         lambda env: env.set_iteration_num()))
 
     config["callbacks"] = {"on_episode_start": tune.function(on_episode_start),
                            "on_episode_step": tune.function(on_episode_step),
@@ -342,6 +342,7 @@ def train_rllib(submodule, flags):
         def __init__(self):
             self.horizon = 400
             self.algo = 'PPO'
+            self.randomize_vehicles = True
     args = Args()
     flow_params = submodule.make_flow_params(args, pedestrians=True)   
 
@@ -1207,5 +1208,3 @@ if __name__ == "__main__":
 #                          "or 'stable-baselines'.")
 
 
-# if __name__ == "__main__":
-#     main(sys.argv[1:])

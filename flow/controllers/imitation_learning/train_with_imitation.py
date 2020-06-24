@@ -3,6 +3,7 @@ from examples.train import *
 
 def parse_args(args):
     """Parse training options user can specify in command line.
+
     Returns
     -------
     argparse.Namespace
@@ -11,7 +12,7 @@ def parse_args(args):
         dictionary version of the argparse
     """
 
-    # **** TRAIN.PY ARGS ****
+    # train.py args
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -38,6 +39,9 @@ def parse_args(args):
         '--algorithm', type=str, default="PPO",
         help='RL algorithm to use. Options are PPO, TD3, MATD3 (MADDPG w/ TD3) right now.'
     )
+    parser.add_argument("--randomize_vehicles", default=True,
+                    help="randomize the number of vehicles in the system and where they come from",
+                    action="store_true")
     parser.add_argument(
         '--num_cpus', type=int, default=1,
         help='How many CPUs to use')
@@ -67,7 +71,6 @@ def parse_args(args):
     parser.add_argument(
         '--checkpoint_path', type=str, default=None,
         help='Directory with checkpoint to restore training from.')
-
 
     parser.add_argument(
         '--load_weights_path', type=str, default=None,
@@ -114,7 +117,6 @@ def main(args):
     params["fcnet_hiddens"] = [32, 32, 32]
     params['load_weights_path'] = params["PPO_save_path"]
 
-
     print("\n\n********** IMITATION LEARNING ************ \n")
     # run training
     imitation_runner = Runner(params)
@@ -160,6 +162,4 @@ def main(args):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-    
-    
 
