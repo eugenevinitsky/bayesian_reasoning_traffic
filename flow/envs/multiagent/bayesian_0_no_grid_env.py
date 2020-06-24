@@ -318,7 +318,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         rewards = {}
         for rl_id in self.k.vehicle.get_rl_ids():   
             # reward rl slightly earlier than when control is given back to SUMO
-            if rl_id in self.inside_intersection or rl_id in self.got_to_intersection and rl_id not in self.past_intersection_rewarded_set:
+            if rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set:
                 # print('arrived past intersection and got reward')
                 # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
                 # print('state is ', self.get_state())
@@ -333,13 +333,13 @@ class Bayesian0NoGridEnv(MultiEnv):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
             
-                # if 47 < edge_pos < 50:
-                #     # slow down near the intersection
-                #     if rl_id in self.near_intersection_rewarded_set_3 or self.k.vehicle.get_speed(rl_id) > 1.0:
-                #         pass
-                #     else:
-                #         reward = 0.3
-                #         self.near_intersection_rewarded_set_3.add(rl_id)
+                if 47 < edge_pos < 50 and self.k.vehicle.get_speed(rl_id) < 0.5:
+                    # slow down near the intersection
+                    if rl_id in self.near_intersection_rewarded_set_3 or self.k.vehicle.get_speed(rl_id) > 1.0:
+                        pass
+                    else:
+                        reward = 0.3
+                        self.near_intersection_rewarded_set_3.add(rl_id)
 
                 # TODO(@evinitsky) pick the right reward
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
@@ -765,7 +765,6 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         edge_pos = self.k.vehicle.get_position(rl_id)
         curr_edge = self.k.vehicle.get_edge(rl_id)
-        print('curr_edge is ', curr_edge)
         if curr_edge in self.edge_to_int:
             curr_edge = self.edge_to_int[curr_edge]
             if rl_id in self.inside_intersection:
