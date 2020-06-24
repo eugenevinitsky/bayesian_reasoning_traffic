@@ -13,7 +13,6 @@ from ray.rllib.utils import try_import_tf
 tf = try_import_tf()
 logger = logging.getLogger(__name__)
 
-# remove this
 # yapf: disable
 # __sphinx_doc_begin__
 DEFAULT_CONFIG = with_common_config({

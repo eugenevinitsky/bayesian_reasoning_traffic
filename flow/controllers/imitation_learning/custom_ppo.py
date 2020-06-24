@@ -9,7 +9,7 @@ from ray.rllib.evaluation.postprocessing import compute_advantages, \
     Postprocessing
 from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.policy.tf_policy import LearningRateSchedule, \
-    EntropyCoeffSchedule, ACTION_LOGP
+    EntropyCoeffSchedule #, ACTION_LOGP
 from ray.rllib.policy.tf_policy_template import build_tf_policy
 from ray.rllib.utils.explained_variance import explained_variance
 from ray.rllib.utils.tf_ops import make_tf_callable
@@ -18,7 +18,11 @@ from ray.rllib.utils import try_import_tf
 from ray.rllib.agents.trainer_template import build_trainer
 from ray.rllib.agents.ppo.ppo import choose_policy_optimizer, DEFAULT_CONFIG
 from ray.rllib.agents.ppo.ppo import warn_about_bad_reward_scales
-from ray.rllib.agents.impala.vtrace_policy import BEHAVIOUR_LOGITS
+# from ray.rllib.agents.impala.vtrace_tf_policy import BEHAVIOUR_LOGITS
+BEHAVIOUR_LOGITS = "behaviour_logits"
+
+# ray upgraded to 0.8.5 hack
+ACTION_LOGP = "action_logp"
 
 tf = try_import_tf()
 
@@ -124,7 +128,6 @@ def ppo_surrogate_loss(policy, model, dist_class, train_batch):
         max_seq_len = tf.reduce_max(train_batch["seq_lens"])
         mask = tf.sequence_mask(train_batch["seq_lens"], max_seq_len)
         mask = tf.reshape(mask, [-1])
-
     policy.loss_obj = PPOLoss(
         dist_class,
         model,

@@ -48,6 +48,7 @@ class MultiEnv(MultiAgentEnv, Env):
         info : dict
             contains other diagnostic information from the previous action
         """
+        done = {}
         for _ in range(self.env_params.sims_per_step):
             self.time_counter += 1
             self.step_counter += 1
@@ -111,9 +112,11 @@ class MultiEnv(MultiAgentEnv, Env):
             if crash:
                 break
 
+            done.update({key: True for key in self.k.vehicle.get_arrived_ids()})
+
         states = self.get_state()
-        done = {key: key in self.k.vehicle.get_arrived_ids()
-                for key in states.keys()}
+        done.update({key: key in self.k.vehicle.get_arrived_ids()
+                    for key in states.keys()})
         if crash:
             done['__all__'] = True
         else:
@@ -129,6 +132,13 @@ class MultiEnv(MultiAgentEnv, Env):
         if states.keys() != reward.keys():
             reward = self.compute_reward(rl_actions, fail=crash)
             states = self.get_state()
+
+        # handle exited vehicles
+        valid_ids = [key for key, val in done.items() if val]
+        for rl_id in valid_ids:
+            done[rl_id] = True
+            reward[rl_id] = 0
+            states[rl_id] = -1 * np.ones(self.observation_space.shape[0])
         return states, reward, done, infos
 
     def reset(self, new_inflow_rate=None):
@@ -152,6 +162,7 @@ class MultiEnv(MultiAgentEnv, Env):
         if self.should_render:
             # import ipdb; ipdb.set_trace()
             self.sim_params.render = True
+            self.should_render = False
             # got to restart the simulation to make it actually display anything
             # self.restart_simulation(self.sim_params)
 
@@ -210,7 +221,7 @@ class MultiEnv(MultiAgentEnv, Env):
 
         # reintroduce the initial vehicles to the network
         for veh_id in self.initial_ids:
-            type_id, edge, lane_index, pos, speed = \
+            type_id, edge, lane_index, pos, speed, depart_time = \
                 self.initial_state[veh_id]
 
             try:
@@ -283,6 +294,9 @@ class MultiEnv(MultiAgentEnv, Env):
         # ignore if no actions are issued
         if rl_actions is None:
             return None
+        if 'rl_0' in rl_actions:
+            if rl_actions['rl_0'] is None:
+                return None
 
         # clip according to the action space requirements
         if isinstance(self.action_space, Box):
@@ -307,7 +321,15 @@ class MultiEnv(MultiAgentEnv, Env):
         # ignore if no actions are issued
         if rl_actions is None:
             return
+        if 'rl_0' in rl_actions:
+            if rl_actions['rl_0'] is None:
+                return None
 
         # clip according to the action space requirements
-        clipped_actions = self.clip_actions(rl_actions)
+        try:
+            clipped_actions = self.clip_actions(rl_actions)
+        except:
+            import ipdb; ipdb.set_trace()
+            clipped_actions = self.clip_actions(rl_actions)
+
         self._apply_rl_actions(clipped_actions)

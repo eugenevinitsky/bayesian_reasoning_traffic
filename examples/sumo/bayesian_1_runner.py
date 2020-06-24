@@ -7,7 +7,6 @@ from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, Su
 from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
 from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
-# from flow.envs.multiagent.bayesian_1_env import Bayesian1Env, ADDITIONAL_ENV_PARAMS
 from flow.networks import Bayesian1Network
 from flow.core.params import PedestrianParams
 import argparse
@@ -125,7 +124,7 @@ def bayesian_1_example(render=None, pedestrians=False):
         "cars_bot": num_cars_bot
     }
 
-    sim_params = SumoParams(sim_step=0.1, render=True)
+    sim_params = SumoParams(sim_step=1, render=True)
 
     if render is not None:
         sim_params.render = render
@@ -147,11 +146,11 @@ def bayesian_1_example(render=None, pedestrians=False):
             depart_time='0.00',
             start='(1.0)--(1.1)',
             end='(1.1)--(1.2)',
-            depart_pos='30')
+            depart_pos='40')
 
     vehicles = VehicleParams()
     vehicles.add(
-        veh_id="human_0",
+        veh_id="human",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
@@ -159,7 +158,17 @@ def bayesian_1_example(render=None, pedestrians=False):
             speed_mode="right_of_way",
         ),
         lane_change_params=lane_change_params,
-        num_vehicles=tot_cars)
+        num_vehicles=2)
+    vehicles.add(
+        veh_id="av",
+        routing_controller=(GridRouter, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="aggressive",
+        ),
+        lane_change_params=lane_change_params,
+        num_vehicles=1)
 
 
     env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)

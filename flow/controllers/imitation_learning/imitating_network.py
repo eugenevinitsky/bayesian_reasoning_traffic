@@ -135,7 +135,7 @@ class ImitatingNetwork():
                 if veh_edge == veh_route[0]:
                     if dist_from_intersection < 5:
                         # set 10 as the maximum weight
-                        weight = min(10, 2 + 1 / dist_from_intersection)
+                        weight = min(10, 2 + 1 / max(0.05, dist_from_intersection)) # numerical hack to avoid division by zero
                 # car inside the intersection, weight = 1.5
                 if ":" in veh_edge:
                     weight = 1.5
@@ -168,7 +168,6 @@ class ImitatingNetwork():
             mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
             var = np.exp(2 * log_std)
             action = np.random.multivariate_normal(mean[0], var)
-            # print("action", action, "mean", mean[0], "var", var[0])
             return action
         else:
             return network_output

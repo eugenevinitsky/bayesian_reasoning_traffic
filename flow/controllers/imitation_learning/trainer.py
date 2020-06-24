@@ -33,7 +33,7 @@ class Trainer(object):
             def __init__(self):
                 self.horizon = 400
                 self.algo = "PPO"
-                
+                self.randomize_vehicles = True
 
         args = Args()
 
@@ -69,7 +69,7 @@ class Trainer(object):
         self.params['obs_dim'] = obs_dim
 
         # initialize neural network class and tf variables
-        # self.action_network = ImitatingNetwork(self.sess, self.params['action_dim'], self.params['obs_dim'], self.params['fcnet_hiddens'], 
+        # self.action_network = ImitatingNetwork(self.sess, self.params['action_dim'], self.params['obs_dim'], self.params['fcnet_hiddens'],
         #                                         self.params['replay_buffer_size'], stochastic=self.params['stochastic'], 
         #                                         variance_regularizer=self.params['variance_regularizer'], 
         #                                         load_model=self.params['load_imitation_model']) #, load_path=self.params['load_imitation_path']), tensorboard_path=self.params['tensorboard_path'])
@@ -91,6 +91,7 @@ class Trainer(object):
     def run_training_loop(self, n_iter):
         """
         Trains imitator for n_iter iterations (each iteration collects new trajectories to put in replay buffer)
+
         Parameters
         __________
         n_iter :
@@ -137,7 +138,6 @@ class Trainer(object):
         envsteps_this_batch: int
             the sum over the numbers of environment steps in paths (total number of env transitions in trajectories collected)
         """
-
         print("\nCollecting data to be used for training...")
         max_decel = self.flow_params['env'].additional_params['max_decel']
         trajectories, envsteps_this_batch = sample_trajectories(self.env, self.controllers, self.action_network, batch_size, self.params['ep_len'], self.multiagent, use_expert= itr<self.params['n_bc_iter'], max_decel=max_decel)
@@ -147,7 +147,6 @@ class Trainer(object):
         """
         Trains controller for specified number of steps, using data sampled from replay buffer; each step involves running optimizer (i.e. Adam) once
         """
-
         print("Training controller using sampled data from replay buffer...")
         for train_step in range(self.params['num_agent_train_steps_per_iter']):
             # sample data from replay buffer
@@ -322,7 +321,6 @@ class Trainer(object):
 
         # save the model (as a h5 file)
         ppo_model.save(self.params['PPO_save_path'])
-
 
     def save_controller_network(self):
         """

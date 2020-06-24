@@ -39,10 +39,12 @@ class ImitatingController(BaseController):
         """
         # observation is a dictionary for multiagent envs, list for singleagent envs
         if self.multiagent:
-            try:
-                observation = env.get_state()[self.veh_id]
-            except:
-                observation = env.get_state()[self.veh_id]
+            env_state = env.get_state()
+            if env_state == {}:
+                import ipdb; ipdb.set_trace()
+
+                return None            
+            observation = env_state[self.veh_id]
 
         else:
             observation = env.get_state()
