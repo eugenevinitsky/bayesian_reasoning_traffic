@@ -33,7 +33,6 @@ def sample_trajectory_singleagent(env, controllers, action_network, max_trajecto
     dict
         Dictionary of numpy arrays, where matching indeces of each array given (state, action, expert_action, reward, next_state, terminal) tuples
     """
-    # import ipdb; ipdb.set_trace()
     # reset and initialize arrays to store trajectory
     observation = env.reset()
 
@@ -229,10 +228,6 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
                     action = controller.get_action(env, allow_junction_control=True)
                 else:
                     action = None
-                    
-                # if action == None:
-                #     import ipdb; ipdb.set_trace()
-                #     action = controller.get_action(env)
 
                 expert_action = env.k.vehicle.get_acceleration(vehicle_id)
                 expert_action_dict[vehicle_id] = expert_action
@@ -292,13 +287,14 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
         observations = observations[:-1]
         next_observations = next_observations[:-1]
         state_infos = state_infos[:-1]
-
+        rewards = rewards[:-1]
     if not use_expert and expert_control == "SUMO":
         expert_actions = expert_actions[1:]
         actions = actions[:-1]
         observations = observations[:-1]
         next_observations = next_observations[:-1]
         state_infos = state_infos[:-1]
+        rewards = rewards[:-1]
 
     return traj_dict(observations, actions, expert_actions, rewards, next_observations, terminals, state_infos), traj_length
 

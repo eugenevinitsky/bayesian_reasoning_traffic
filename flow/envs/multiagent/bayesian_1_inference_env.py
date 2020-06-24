@@ -9,7 +9,8 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-# from bayesian_inference.bayesian_inference_PPO import create_black_box
+from bayesian_inference.get_agent import get_agent
+from bayesian_inference.inference import get_updated_priors
 
 # TODO(KL) means KL's reminder for KL
 
@@ -20,18 +21,46 @@ ADDITIONAL_ENV_PARAMS = {
     'max_decel': -2.6,
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
-    # how many objects in our local radius we want to return
+    # how many objects in our local radius we want to return # TODO(KL) 'max_num_*vehicles*'?, objects is vague, unless we're super humane and consider cars as definitely objects and people as non-objects
     "max_num_objects": 3,
     # how large of a radius to search in for a given vehicle in meters
     "search_radius": 50,
+    # whether we use an observation space configured for MADDPG
+    "maddpg": False
 }
 
-HARD_BRAKE_PENALTY = 0.04
 
-class Bayesian1Env(MultiEnv):
+class Bayesian1InferenceEnv(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
     in scenario 1 of Jakob's diagrams. Please refer to the sketch for more details. Basically,
     inferring that the human is going to cross allows one of the vehicles to succesfully cross.
+
+    Attributes
+    ----------
+    agent: ray.rllib object
+        agent object used to model the behaviour of vehicles and perform inference on pedestrian existence
+            
+    speed_reward_coefficient: int
+        coeff for rewarding positive speed to encourage vehicle to move in curriculum training
+
+    observation_names: list
+        list of observations regarding visible vehicles within search_radius of rl car
+    
+    search_radius: float
+        radius that the rl car searches on for visible objects
+
+    num_grid_cells: int
+        the number of cells we divide the rl car's field of view into, default is 6 as in Nick's diagram
+
+    arrival_order: dict (str: int)
+        (key : value) = (veh_id : order of arrival)
+        first car arriving at intersection gets value 0, 2nd car gets value 1, 3rd gets value 2, ...
+        TODO(KL) handle case when there are more and more cars?
+
+    priors: dict (str: dict (str : float))
+        (veh_id : prior-prob-ped-obs-combo dict)
+            prior-prob-ped-obs-combo dict: (ped_obs : probability)
+        information used to get updated prior / posterior probabilities
 
     Required from env_params:
 
@@ -42,17 +71,10 @@ class Bayesian1Env(MultiEnv):
     The following states, actions and rewards are considered for one autonomous
     vehicle only, as they will be computed in the same way for each of them.
 
-    Attributes
-    ----------
-    updated_probs_fn: function
-        black-box policy the updated probabilities of pedestrians being in grid i
-        inputs: action, the acceleration of vehicle
-        six previous probabilities of pedestrian being in grid i
-        
-        (veh_id, action, non_ped_states, prev_probs) 
-
     States
-        TBD
+        [self_states] + [other_veh_states]
+        self_states: [yaw, speed, turn_num, edge_pos, ped_1, ..., ped_6]
+        other_veh_states: ["rel_x", "rel_y", "speed", "yaw", "arrive_before", "prob_ped_in_grid_1", ..., "prob_ped_in_grid_6"]
 
     Actions
         The action consists of an acceleration, bound according to the
@@ -75,18 +97,33 @@ class Bayesian1Env(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
 
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
-        
-        # self.updated_probs_fn = create_black_box("PPO")
-        self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
+        self.agent = get_agent("PPO")
+        self.num_self_no_ped_obs = 4
+        self.num_grid_cells = 6
+        self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] + self.prob_ped_in_grid_names(self.num_grid_cells)
         self.search_radius = self.env_params.additional_params["search_radius"]
-        # variable to encourage vehicle to move in curriculum training
+        self.maddpg = self.env_params.additional_params["maddpg"]
+        if self.maddpg:
+            self.max_num_agents = 3
+            self.num_actions = 5
+            self.action_values = np.linspace(start=-np.abs(self.env_params.additional_params['max_decel']),
+                                             stop=self.env_params.additional_params['max_accel'], num=self.num_actions)
+            # self.default_state = {idx: {"obs": np.zeros(self.observation_space.spaces['obs'].shape[0]),
+            #                             "action_mask": self.get_action_mask(valid_agent=False)}
+            #                       for idx in range(self.max_num_agents)}
+            self.default_state = {idx: -1 * np.ones(self.observation_space.shape[0])
+                                  for idx in range(self.max_num_agents)}
+
         self.speed_reward_coefficient = 1
         # track all rl_vehicles: hack to compute the last reward of an rl vehicle (reward for arriving, set states to 0)
         self.rl_set = set()
-        # feature for arrival
         self.arrival_order = {}
-        # set to store vehicles currently inside the intersection
-        self.inside_intersection = set()
+        self.priors = {}
+        # TODO hardcoding
+        # this is used for maddpg
+        if self.maddpg:
+            self.idx_to_av_id = {i: 'rl_{}'.format(i) for i in range(self.max_num_agents)}
+            self.av_id_to_idx = {'rl_{}'.format(i): i for i in range(self.max_num_agents)}
 
         self.edge_to_int = {
                 "(1.1)--(2.1)" : 0,
@@ -100,17 +137,21 @@ class Bayesian1Env(MultiEnv):
         }
 
         self.in_edges = ["(2.1)--(1.1)",
-                "(1.2)--(1.1)",
-                "(0.1)--(1.1)",
-                "(1.0)--(1.1)"]
+                        "(1.2)--(1.1)",
+                        "(0.1)--(1.1)",
+                        "(1.0)--(1.1)"]
 
     @property
     def observation_space(self):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
-        # the items per object are relative X, relative Y, speed, whether it is a pedestrian, and its yaw TODO(@nliu no magic 5 number)
-        obs_space = Box(-float('inf'), float('inf'), shape=(11 + max_objects * len(self.observation_names),), dtype=np.float32)
-        return obs_space
+        obs_space = Box(-float('inf'), float('inf'), shape=(10 + max_objects * len(self.observation_names),), dtype=np.float32)
+        if self.maddpg:
+            # TODO(@evinitsky) put back the action mask
+            # return Dict({"obs": obs_space, "action_mask": Box(0, 1, shape=(self.action_space.n,))})
+            return obs_space
+        else:
+            return obs_space
 
     @property
     def action_space(self):
@@ -125,6 +166,17 @@ class Bayesian1Env(MultiEnv):
         """See class definition."""
         # in the warmup steps, rl_actions is None
         if rl_actions:
+            # if self.maddpg:
+            #     accel_list = []
+            #     rl_ids = []
+            #     for rl_id, action in rl_actions.items():
+            #         # 0 is the no-op
+            #         if action > 0:
+            #             accel = self.action_values[action]
+            #             accel_list.append(accel)
+            #             rl_ids.append(self.idx_to_av_id[rl_id])
+            #     self.k.vehicle.apply_acceleration(rl_ids, accel_list)
+            # else:
             rl_ids = []
             accels = []
             for rl_id, actions in rl_actions.items():
@@ -138,10 +190,10 @@ class Bayesian1Env(MultiEnv):
             self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
-        """Return True if vehicle is at or past the intersection and false if not."""
+        """Return True if vehicle is at or past the intersection. Return false otherwise."""
         # When vehicle exits, route is []
-        # if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
-        #     return True
+        if len(self.k.vehicle.get_route(veh_id)) == 0: # vehicle arrived to final destination
+            return True
         return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
                 self.k.vehicle.get_position(veh_id) < 49)
                 
@@ -150,17 +202,39 @@ class Bayesian1Env(MultiEnv):
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
         obs = {}
 
+        # MADDPG hack
+        for rl_id in self.rl_set:
+            if rl_id in self.k.vehicle.get_arrived_ids():
+                if isinstance(self.observation_space, Dict):
+                    temp_dict = {}
+                    for k, space in self.observation_space.spaces.items():
+                        if isinstance(space, Discrete):
+                            temp_dict.update({k: 0})
+                        else:
+                            temp_dict.update({k: np.zeros(space.shape[0])})
+
+                else:
+                    obs.update({rl_id: np.zeros(self.observation_space.shape[0])})
+        
+        # set each vehicles' order of arrival 
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
+
         for rl_id in self.k.vehicle.get_rl_ids():
+            # hand over control from SUMO to RL agent / policy
             if self.arrived_intersection(rl_id):
                 self.rl_set.add(rl_id)
 
                 assert rl_id in self.arrival_order
 
-                observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
+                # MADDPG hack
+                if isinstance(self.observation_space, Dict):
+                    observation = np.zeros(self.observation_space["obs"].shape[0])
+                else:
+                    observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
+                    
                 visible_vehicles, visible_pedestrians = self.find_visible_objects(rl_id, self.search_radius)
 
                 # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
@@ -169,12 +243,12 @@ class Bayesian1Env(MultiEnv):
                         self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-                observation[:11] = self.get_self_obs(veh_id, visible_pedestrians)
+                observation[:10] = self.get_self_obs(veh_id, visible_pedestrians)
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
-                for index, veh_id in enumerate(visible_vehicles):
-
+                for idx, veh_id in enumerate(visible_vehicles):
+                    
                     before = self.arrived_before(rl_id, veh_id)
 
                     observed_yaw = self.k.vehicle.get_yaw(veh_id)
@@ -184,17 +258,30 @@ class Bayesian1Env(MultiEnv):
                     rel_y = observed_y - veh_y
 
                     # Consider the first 3 visible vehicles
-                    if index <= 2:
-                        observation[(index * 5) + 11: 5 * (index + 1) + 11] = \
-                                [observed_yaw / 360, observed_speed / 20, 
-                                        rel_x / 50, rel_y / 50, before / 5]
-                    if max(observation) > 1 or min(observation) < -1:
-                        print(observation)
-
-                    # append updated prob of ped in grid i to state vector
-                    # self 
-
+                    num = len(self.observation_names) # TODO(KL) How to describe these states? States from observing other vehicles / pedestrians.
+                    if idx <= 2:
+                        # only perform inference if the visible veh has arrived
+                        if self.arrived_intersection(veh_id):
+                            acceleration = self.k.vehicle.get_acceleration(veh_id)
+                            visible_veh_non_ped_obs= self.get_non_ped_obs(veh_id)
+                            updated_ped_probs, self.priors[veh_id] = get_updated_priors(acceleration, visible_veh_non_ped_obs, self.priors.get(veh_id, {}), self.agent)
+                        else:
+                            # probabilities set to -1 if not performing inference
+                            updated_ped_probs = [-1 for _ in range(self.num_grid_cells)]
+                        observation[(idx * num) + 10: num * (idx + 1) + 10] = \
+                                [observed_yaw, observed_speed, rel_x, rel_y, before] + updated_ped_probs
+                   
                 obs.update({rl_id: observation})
+
+        if self.maddpg and len(self.rl_set) > 0:
+
+            # TODO(@evinitsky) think this doesn't have to be a deepcopy
+            veh_info_copy = deepcopy(self.default_state)
+            # veh_info_copy.update({self.av_id_to_idx[rl_id]: {"obs": obs[rl_id],
+            #                                   "action_mask": self.get_action_mask(valid_agent=True)}
+            #                       for rl_id in obs.keys()})
+            veh_info_copy.update({self.av_id_to_idx[rl_id]: obs[rl_id] for rl_id in obs.keys()})
+            obs = veh_info_copy
 
         return obs
 
@@ -213,7 +300,6 @@ class Bayesian1Env(MultiEnv):
 
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
-                inside_intersection = rl_id in self.inside_intersection
 
                 if len(collision_pedestrians) > 0:
                     reward = -300
@@ -228,10 +314,6 @@ class Bayesian1Env(MultiEnv):
                     '''
                     # TODO(@nliu & evinitsky) positive reward?
                     # reward = rl_actions[rl_id][0] / 10 # small reward for going forward
-                if rl_id in self.inside_intersection:
-                    # TODO(KL) 'hard-brake' as negative acceleration?
-                    if self.k.vehicle.get_acceleration(rl_id) < -0.8:
-                        reward -= HARD_BRAKE_PENALTY
 
                 rewards[rl_id] = reward / 100
 
@@ -242,7 +324,13 @@ class Bayesian1Env(MultiEnv):
                     rewards[rl_id] = 50 / 100
             '''
             if rl_id in self.k.vehicle.get_arrived_ids():
-                rewards[rl_id] = 25 / 100
+                rewards[rl_id] = 25
+
+        if self.maddpg:
+            if len(self.rl_set) > 0:
+                temp_rewards = {self.av_id_to_idx[rl_id]: 0 for rl_id in self.av_id_to_idx.keys()}
+                temp_rewards.update({self.av_id_to_idx[rl_id]: reward for rl_id, reward in rewards.items()})
+                rewards = temp_rewards
 
         return rewards
 
@@ -436,6 +524,31 @@ class Bayesian1Env(MultiEnv):
         else:
             self.speed_reward_coefficient = 1
 
+    def get_action_mask(self, valid_agent):
+        """If a valid agent, return a 0 in the position of the no-op action. If not, return a 1 in that position
+        and a zero everywhere else."""
+        if valid_agent:
+            temp_list = np.array([1 for _ in range(self.action_space.n)])
+            temp_list[0] = 0
+        else:
+            temp_list = np.array([0 for _ in range(self.action_space.n)])
+            temp_list[0] = 1
+        return temp_list
+
+    ################################
+    ## __init__() helper methods ##
+    ################################
+
+    def prob_ped_in_grid_names(self, num_cells_in_grid=6):
+        """Returns a list of names for state variables indicating the probability a ped is in grid i of a vehicle"""
+
+        return [f'prob_ped in grid{i}' for i in range(1, num_cells_in_grid + 1)]
+
+
+    ################################
+    ## get_state() helper methods ##
+    ################################
+
     def find_visible_objects(self, veh_id, radius):
         """For a given vehicle ID, find the IDs of all the objects that are within a radius of them
 
@@ -458,22 +571,7 @@ class Bayesian1Env(MultiEnv):
                 radius)
 
         return visible_vehicles, visible_pedestrians
-
-    def get_action_mask(self, valid_agent):
-        """If a valid agent, return a 0 in the position of the no-op action. If not, return a 1 in that position
-        and a zero everywhere else."""
-        if valid_agent:
-            temp_list = np.array([1 for _ in range(self.action_space.n)])
-            temp_list[0] = 0
-        else:
-            temp_list = np.array([0 for _ in range(self.action_space.n)])
-            temp_list[0] = 1
-        return temp_list
-
-    ############################
-    # get_state() helper methods #
-    ############################
-
+        
     def get_self_obs(self, rl_id, visible_peds):
         """For a given vehicle ID, get the observation info related explicitly to the given vehicle itself
         
@@ -496,16 +594,6 @@ class Bayesian1Env(MultiEnv):
         veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
         yaw = self.k.vehicle.get_yaw(rl_id)
         speed = self.k.vehicle.get_speed(rl_id)
-
-        curr_edge = self.k.vehicle.get_edge(rl_id)
-        if curr_edge in self.edge_to_int:
-            curr_edge = self.edge_to_int[curr_edge]
-            if rl_id in self.inside_intersection: 
-                self.inside_intersection.remove(rl_id)
-        else:
-            curr_edge = -1
-            self.inside_intersection.add(rl_id)
-
         edge_pos = self.k.vehicle.get_position(rl_id)
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
@@ -520,7 +608,7 @@ class Bayesian1Env(MultiEnv):
         else:
             turn_num = 2 # turn left
 
-        observation[:5] = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50]
+        observation[:4] = [yaw, speed, turn_num, edge_pos]
 
         ped_param = [0, 0, 0, 0, 0, 0]
         # we assuming there's only 1 ped?
@@ -548,7 +636,7 @@ class Bayesian1Env(MultiEnv):
                     ped_param[5] = 1
             else:
                 raise RuntimeError("Relative Angle is Invalid")
-        observation[5:11] = ped_param
+        observation[4:10] = ped_param
 
         return observation
 
@@ -560,3 +648,47 @@ class Bayesian1Env(MultiEnv):
             return 1
         else:
             return 0
+
+    def get_non_ped_obs(self, veh_id):
+        """Return all the obs for vehicle veh_id aside from the updated probabilities and pedestrian grid visibilities
+        
+        Returns
+        -------
+        non_ped_obs : list
+            [yaw, speed, turn_num, edge_pos] + ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] x (max_num_objects - 1)
+        """
+        max_objects = self.env_params.additional_params["max_num_objects"]
+        num_self_no_ped_obs = self.num_self_no_ped_obs
+        num_other_no_ped_obs = len(self.observation_names) - self.num_grid_cells
+        non_ped_obs = np.zeros(num_self_no_ped_obs + num_other_no_ped_obs * max_objects)
+
+        visible_vehicles, visible_pedestrians = self.find_visible_objects(veh_id, self.search_radius)
+
+        # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
+        visible_vehicles = sorted(visible_vehicles, key=lambda v: \
+                (self.k.vehicle.get_relative_angle(veh_id, \
+                self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
+
+        # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+        non_ped_obs[:num_self_no_ped_obs] = self.get_self_obs(veh_id, visible_pedestrians)[:num_self_no_ped_obs]
+        veh_x, veh_y = self.k.vehicle.get_orientation(veh_id)[:2]
+
+        # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
+        for idx, obs_veh_id in enumerate(visible_vehicles):
+            
+            before = self.arrived_before(veh_id, obs_veh_id)
+
+            observed_yaw = self.k.vehicle.get_yaw(obs_veh_id)
+            observed_speed = self.k.vehicle.get_speed(obs_veh_id)
+            observed_x, observed_y = self.k.vehicle.get_orientation(obs_veh_id)[:2]
+            rel_x = observed_x - veh_x
+            rel_y = observed_y - veh_y
+
+            # Consider the first 3 visible vehicles
+            if idx <= 2:
+                non_ped_obs[(idx * num_other_no_ped_obs) + num_self_no_ped_obs: num_other_no_ped_obs * (idx + 1) + num_self_no_ped_obs] = \
+                        [observed_yaw, observed_speed, rel_x, rel_y, before]
+
+        return non_ped_obs
+
+        

@@ -22,7 +22,6 @@ EXAMPLE_USAGE = 'plot_ray_results.py ' + \
     '~/ray_results/experiment-tag/experiment-name/seed-id/progress.csv ' + \
     'evaluation/return-average training/return-average'
 
-
 def plot_progress(filepath, columns):
     """Plot ray results from a csv file.
 

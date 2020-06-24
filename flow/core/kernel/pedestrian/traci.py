@@ -161,13 +161,13 @@ class TraCIPedestrian(KernelPedestrian):
         """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_next_edge(pedID, error) for pedID in ped_id]
-        return self.kernel_api._person.getNextEdge(ped_id) 
+        return self.kernel_api.person.getNextEdge(ped_id)
 
     def get_lane_position(self, ped_id):
         """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_lane_position(pedID, error) for pedID in ped_id]
-        return self.kernel_api._person.getLanePosition(ped_id)
+        return self.kernel_api.person.getLanePosition(ped_id)
 
     def is_pedestrian(self, obj_id):
         """See parent class"""

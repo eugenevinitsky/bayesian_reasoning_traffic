@@ -29,7 +29,6 @@ class ImitatingController(BaseController):
         self.multiagent = multiagent # whether env is multiagent or singleagent
         self.veh_id = veh_id # vehicle id that controller is controlling
 
-
     def get_accel(self, env):
         """
         Get acceleration for vehicle in the environment. Overrides superclass method.
@@ -43,7 +42,6 @@ class ImitatingController(BaseController):
             try:
                 observation = env.get_state()[self.veh_id]
             except:
-                import ipdb; ipdb.set_trace()
                 observation = env.get_state()[self.veh_id]
 
         else:

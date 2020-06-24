@@ -441,6 +441,7 @@ class TraCIVehicle(KernelVehicle):
         """Return the initial speed of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["initial_speed"]
 
+
     def set_speed_mode(self, veh_id, speed_mode):
         SPEED_MODES = {
                 "aggressive" : 0,
@@ -505,12 +506,11 @@ class TraCIVehicle(KernelVehicle):
         viewable_pedestrians, viewable_vehicles, fully_viewable_lanes = [], [], []
         observed_vehicles = []
         blocked = {}
-
+        # get_orientation(v_id) returns a triple (x, y, orientation)
         position = self.get_orientation(veh_id)[:2]
         orientation = self.get_orientation(veh_id)[2]
 
         for v_id in self.get_ids():
-
             if util.observed(position, orientation, self.get_orientation(v_id)[:2], looking_distance=radius) and v_id != veh_id:
 
                 observed_vehicles.append(v_id)
@@ -658,7 +658,7 @@ class TraCIVehicle(KernelVehicle):
         if len(self._departed_ids) > 0:
             return self._departed_ids[-1]
         else:
-            return 0
+            return []
 
     def get_speed(self, veh_id, error=-1001):
         """See parent class."""

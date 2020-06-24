@@ -5,7 +5,7 @@ from __future__ import print_function
 import logging
 
 from ray.rllib.agents import with_common_config
-from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
+from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
 from ray.rllib.agents.trainer_template import build_trainer
 from ray.rllib.optimizers import SyncSamplesOptimizer, LocalMultiGPUOptimizer
 from ray.rllib.utils import try_import_tf
@@ -146,7 +146,6 @@ def warn_about_bad_reward_scales(trainer, result):
 
 
 def validate_config(config):
-    # import ipdb; ipdb.set_trace()
     if config["entropy_coeff"] < 0:
         print("Do not raise DeprecationWarning('entropy_coeff must be >= 0')")
     if isinstance(config["entropy_coeff"], int):

@@ -103,7 +103,7 @@ def negative_log_likelihood_loss(variance_regularizer):
         dist = tfp.distributions.MultivariateNormalDiag(loc=means, scale_diag=variances)
         loss = dist.log_prob(y)
         loss = tf.negative(loss)
-        loss = tf.reduce_mean(loss) + (variance_regularizer * tf.norm(variances))
+        loss = loss + (variance_regularizer * tf.norm(variances))
         return loss
 
     return nll_loss

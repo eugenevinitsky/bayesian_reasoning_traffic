@@ -55,7 +55,7 @@ def make_flow_params():
         depart_time='0.00',
         start='(1.2)--(1.1)',
         end='(2.1)--(1.1)',
-        depart_pos='43')
+        depart_pos='48')
 
     vehicles = VehicleParams()
 

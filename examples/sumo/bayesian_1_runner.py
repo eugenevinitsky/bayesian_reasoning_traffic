@@ -150,7 +150,7 @@ def bayesian_1_example(render=None, pedestrians=False):
 
     vehicles = VehicleParams()
     vehicles.add(
-        veh_id="human_0",
+        veh_id="human",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
@@ -160,7 +160,7 @@ def bayesian_1_example(render=None, pedestrians=False):
         lane_change_params=lane_change_params,
         num_vehicles=2)
     vehicles.add(
-        veh_id="agent",
+        veh_id="av",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,

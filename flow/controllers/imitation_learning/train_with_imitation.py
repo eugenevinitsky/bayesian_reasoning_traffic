@@ -36,10 +36,6 @@ def parse_args(args):
         '--rl_trainer', type=str, default="rllib",
         help='the RL trainer to use. either rllib or Stable-Baselines')
     parser.add_argument(
-        '--load_weights_path', type=str, default=None,
-        help='Path to h5 file containing a pretrained model. Relevent for PPO with RLLib'
-    )
-    parser.add_argument(
         '--algorithm', type=str, default="PPO",
         help='RL algorithm to use. Options are PPO, TD3, MATD3 (MADDPG w/ TD3) right now.'
     )
@@ -73,41 +69,38 @@ def parse_args(args):
         '--checkpoint_path', type=str, default=None,
         help='Directory with checkpoint to restore training from.')
 
+    parser.add_argument(
+        '--load_weights_path', type=str, default=None,
+        help='Path to h5 file containing a pretrained model. Relevent for PPO with RLLib'
+    )
     # Imitation Learning args
-
     parser.add_argument('--ep_len', type=int, default=5000, help='Max length of episodes for rollouts.')
 
-    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1000, help='Number of gradient steps for training policy.')  # number of gradient steps for training policy
-    parser.add_argument('--n_bc_iter', type=int, default=200, help='Number of pure behavior cloning iterations to run')
-    parser.add_argument('--n_iter', type=int, default=220, help='Number of DAgger iterations to run (after pure bc iterations)')
+    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1000, help='Number of gradient steps for training imitation policy.')
+    parser.add_argument('--n_iter', type=int, default=2, help='Number of DAgger iterations to run (1st iteration is behavioral cloning')
+    parser.add_argument('--n_bc_iter', type=int, default=2, help='Number of DAgger iterations to run (1st iteration is behavioral cloning')
 
     parser.add_argument('--batch_size', type=int, default=1000, help='Number of environment steps to collect in iteration of DAgger')
     parser.add_argument('--init_batch_size', type=int, default=2000, help='Number of environment steps to collect on 1st iteration of DAgger (behavioral cloning iteration)')
     parser.add_argument('--vf_batch_size', type=int, default=2000, help='Number of environment steps to collect to learn value function for a policy')
-    parser.add_argument('--num_vf_iters', type=int, default=100, help='Number of iterations to run vf training') # TODO: better help description for this
+    parser.add_argument('--num_vf_iters', type=int, default=100, help='Number of iterations to run value function learning, after imitation')
 
-    parser.add_argument('--train_batch_size', type=int, default=100, help='Batch size to train on')
+    parser.add_argument('--train_batch_size', type=int, default=100, help='Batch size to run SGD on during imitation learning.')
 
     parser.add_argument('--load_imitation_model', type=bool, default=False, help='Whether to load an existing imitation neural net')
-    parser.add_argument('--load_imitation_path', type=str, default='', help='Path to h5 file from which to load existing imitation neural net')
+    parser.add_argument('--load_imitation_path', type=str, default='', help='Path to h5 file from which to load existing imitation neural net. load_imitation_model must be True')
     parser.add_argument('--tensorboard_path', type=str, default='/tensorboard/', help='Path to which tensorboard events should be written.')
     parser.add_argument('--replay_buffer_size', type=int, default=1000000, help='Max size of replay buffer')
-    parser.add_argument('--save_model', type=int, default=1, help='If true, save models in h5 format')
+    parser.add_argument('--imitation_save_path', type=str, default='flow/controllers/imitation_learning/model_files/a.h5', help='Filepath to h5 file in which imitation model should be saved')
+    parser.add_argument('--PPO_save_path', type=str, default='/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/b.h5', help="Filepath to h5 file in which the ppo model should be saved")
     parser.add_argument('--num_eval_episodes', type=int, default=0, help='Number of episodes on which to evaluate imitation model')
-    parser.add_argument('--stochastic', type=bool, default=False, help='If true, learn a stochastic policy (MV Gaussian)')
-    parser.add_argument('--multiagent', type=bool, default=False, help='If true, env is multiagent.')
+    parser.add_argument('--stochastic', type=bool, default=True, help='If true, learn a stochastic policy (MV Gaussian)')
+    parser.add_argument('--multiagent', type=bool, default=True, help='If true, env is multiagent.')
     parser.add_argument('--v_des', type=float, default=15, help='Desired velocity for follower-stopper')
     parser.add_argument('--variance_regularizer', type=float, default=0.5, help='Regularization hyperparameter to penalize variance in imitation learning loss, for stochastic policies.')
 
-
-    time_now = time.ctime(time.clock_gettime(0))
-    parser.add_argument('--save_path', type=str, default=f'flow/controllers/imitation_learning/model_files/bay0_{time_now}', help='Filepath to h5 file in which imitation model should be saved')
-
-
     parsed_args = parser.parse_known_args(args)[0]
     dict_args = vars(parsed_args)
-    dict_args['save_model'] = 1
-    dict_args['save_path'] = dict_args['load_weights_path']
 
     return parsed_args, dict_args
 
@@ -119,22 +112,19 @@ def main(args):
 
     flags, params = parse_args(args)
     params["fcnet_hiddens"] = [32, 32, 32]
-    params['PPO_save_path'] = params['load_weights_path']
-
+    params['load_weights_path'] = params["PPO_save_path"]
 
     print("\n\n********** IMITATION LEARNING ************ \n")
     # run training
     imitation_runner = Runner(params)
-    # import ipdb; ipdb.set_trace()
-    # imitation_runner.run_training_loop()
+    imitation_runner.run_training_loop()
 
     # convert model to work for PPO and save for training
-    # imitation_runner.save_controller_for_PPO()
+    imitation_runner.save_controller_for_PPO()
 
     # Imitation Done, start RL
     print("\n\n********** RL ************ \n")
-
-    # import appropriate exp_config module
+    # Import relevant information from the exp_config script.
     if params['multiagent']:
         module = __import__("examples.rllib.multiagent_exps", fromlist=[params['exp_config']])
     else:
@@ -144,7 +134,7 @@ def main(args):
     # whether the environment is single agent or multi-agent.
     if hasattr(module, flags.exp_config):
         submodule = getattr(module, flags.exp_config)
-        multiagent = False
+        # multiagent = False
     elif hasattr(module_ma, flags.exp_config):
         submodule = getattr(module_ma, flags.exp_config)
         assert flags.rl_trainer.lower() in ["rllib", "h-baselines"], \
@@ -169,3 +159,4 @@ def main(args):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+

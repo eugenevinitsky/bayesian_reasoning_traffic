@@ -1,19 +1,16 @@
 """Visualizer for rllib experiments.
-
 Attributes
 ----------
 EXAMPLE_USAGE : str
     Example call to the function, which is
     ::
-
         python ./visualizer_rllib.py /tmp/ray/result_dir 1
-
 parser : ArgumentParser
     Command-line argument parser
 """
 
 import argparse
-from datetime import datetime
+import collections
 import gym
 import numpy as np
 import os
@@ -26,6 +23,10 @@ try:
 except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 from ray.tune.registry import register_env
+from ray.rllib.evaluation.worker_set import WorkerSet
+from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID
+from ray.rllib.env import MultiAgentEnv
+from ray.rllib.env.base_env import _DUMMY_AGENT_ID
 
 from flow.core.util import emission_to_csv
 from flow.utils.registry import make_create_env
@@ -37,11 +38,19 @@ from flow.utils.rllib import get_rllib_pkl
 EXAMPLE_USAGE = """
 example usage:
     python ./visualizer_rllib.py /ray_results/experiment_dir/result_dir 1
-
 Here the arguments are:
 1 - the path to the simulation results
 2 - the number of the checkpoint
 """
+
+def _flatten_action(action):
+    # Concatenate tuple actions
+    if isinstance(action, list) or isinstance(action, tuple):
+        expanded = []
+        for a in action:
+            expanded.append(np.reshape(a, [-1]))
+        action = np.concatenate(expanded, axis=0).flatten()
+    return action
 
 def construct_agent(args):
     result_dir = args.result_dir if args.result_dir[-1] != '/' \
@@ -58,13 +67,20 @@ def construct_agent(args):
     else:
         multiagent = False
 
-    # Run on only one cpu for rendering purposes
-    config['num_workers'] = 0
+    # Set num_workers to be at least 2.
+    if "num_workers" in config:
+        config["num_workers"] = min(2, config["num_workers"])
 
     flow_params = get_flow_params(config)
     sim_params = flow_params['sim']
 
+    # for hacks for old pkl files TODO: remove eventually
+    if not hasattr(sim_params, 'use_ballistic'):
+        sim_params.use_ballistic = False
+
     # Determine agent and checkpoint
+    # TODO(akashvelu): remove this 
+    # print("NEW CONFIGGG: ", config['env_config']['run'])
     config_run = config['env_config']['run'] if 'run' in config['env_config'] \
         else None
     if args.run and config_run:
@@ -76,6 +92,22 @@ def construct_agent(args):
             sys.exit(1)
     if args.run:
         agent_cls = get_agent_class(args.run)
+    elif config['env_config']['run'] == "<class 'flow.controllers.imitation_learning.imitation_trainer.Imitation_PPO_Trainable'>":
+        from flow.controllers.imitation_learning.imitation_trainer import Imitation_PPO_Trainable
+        from flow.controllers.imitation_learning.ppo_model import PPONetwork
+        from ray.rllib.models import ModelCatalog
+        agent_cls = get_agent_class("PPO")
+        ModelCatalog.register_custom_model("imitation_ppo_trainable", Imitation_PPO_Trainable)
+        ModelCatalog.register_custom_model("PPO_loaded_weights", PPONetwork)
+
+    elif config['env_config']['run'] == "<class 'ray.rllib.agents.trainer_template.CCPPOTrainer'>":
+        from flow.algorithms.centralized_PPO import CCTrainer, CentralizedCriticModel
+        from ray.rllib.models import ModelCatalog
+        agent_cls = CCTrainer
+        ModelCatalog.register_custom_model("cc_model", CentralizedCriticModel)
+    elif config['env_config']['run'] == "<class 'ray.rllib.agents.trainer_template.CustomPPOTrainer'>":
+        from flow.algorithms.custom_ppo import CustomPPOTrainer
+        agent_cls = CustomPPOTrainer
     elif config_run:
         if config_run == "CustomPPO":
             from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
@@ -103,15 +135,13 @@ def construct_agent(args):
         sim_params.render = 'drgb'
         sim_params.pxpm = 4
     elif args.render_mode == 'sumo_gui':
-        sim_params.render = True
-        print('NOTE: With render mode {}, an extra instance of the SUMO GUI '
-              'will display before the GUI for visualizing the result. Click '
-              'the green Play arrow to continue.'.format(args.render_mode))
+        sim_params.render = False  # will be set to True below
     elif args.render_mode == 'no_render':
         sim_params.render = False
     if args.save_render:
-        sim_params.render = 'drgb'
-        sim_params.pxpm = 4
+        if args.render_mode != 'sumo_gui':
+            sim_params.render = 'drgb'
+            sim_params.pxpm = 4
         sim_params.save_render = True
 
     # Create and register a gym+rllib env
@@ -159,11 +189,29 @@ def visualizer_rllib(agent, env_name, multiagent, config):
     sim_params = flow_params['sim']
     env_params = flow_params['env']
 
-    if hasattr(agent, "local_evaluator") and \
-            os.environ.get("TEST_FLAG") != 'True':
-        env = agent.local_evaluator.env
-    else:
-        env = gym.make(env_name)
+    if hasattr(agent, "workers") and isinstance(agent.workers, WorkerSet):
+        env = agent.workers.local_worker().env
+        multiagent = isinstance(env, MultiAgentEnv)
+        if agent.workers.local_worker().multiagent:
+            policy_agent_mapping = agent.config["multiagent"][
+                "policy_mapping_fn"]
+
+        policy_map = agent.workers.local_worker().policy_map
+        state_init = {p: m.get_initial_state() for p, m in policy_map.items()}
+        use_lstm = {p: len(s) > 0 for p, s in state_init.items()}
+
+    action_init = {
+        p: _flatten_action(m.action_space.sample())
+        for p, m in policy_map.items()
+    }
+
+
+    # reroute on exit is a training hack, it should be turned off at test time.
+    if hasattr(env, "reroute_on_exit"):
+        env.reroute_on_exit = False
+
+    if args.render_mode == 'sumo_gui':
+        env.sim_params.render = True  # set to True after initializing agent and env
 
     if multiagent:
         rets = {}
@@ -192,38 +240,63 @@ def visualizer_rllib(agent, env_name, multiagent, config):
     else:
         use_lstm = False
 
-    env.restart_simulation(
-        sim_params=sim_params, render=sim_params.render)
+    # if restart_instance, don't restart here because env.reset will restart later
+    if not sim_params.restart_instance:
+        env.restart_simulation(sim_params=sim_params, render=sim_params.render)
 
     # Simulate and collect metrics
     final_outflows = []
     final_inflows = []
+    mpg = []
+    mpj = []
     mean_speed = []
     std_speed = []
     for i in range(args.num_rollouts):
+        mapping_cache = {}  # in case policy_agent_mapping is stochastic
         vel = []
         state = env.reset()
         if multiagent:
             ret = {key: [0] for key in rets.keys()}
         else:
             ret = 0
+        prev_actions = DefaultMapping(
+            lambda agent_id: action_init[mapping_cache[agent_id]])
+        prev_rewards = collections.defaultdict(lambda: 0.)
         for _ in range(env_params.horizon):
             vehicles = env.unwrapped.k.vehicle
-            vel.append(np.mean(vehicles.get_speed(vehicles.get_ids())))
+            speeds = vehicles.get_speed(vehicles.get_ids())
+
+            # only include non-empty speeds
+            if speeds:
+                vel.append(np.mean(speeds))
+
+            action = {}
+
             if multiagent:
-                action = {}
-                for agent_id in state.keys():
+                for agent_id, a_obs in state.items():
+                    policy_id = mapping_cache.setdefault(
+                        agent_id, policy_agent_mapping(agent_id))
                     if use_lstm:
                         action[agent_id], state_init[agent_id], logits = \
                             agent.compute_action(
                             state[agent_id], state=state_init[agent_id],
                             policy_id=policy_map_fn(agent_id))
                     else:
-                        action[agent_id] = agent.compute_action(
-                            state[agent_id], policy_id=policy_map_fn(agent_id))
+                        a_action = agent.compute_action(
+                            a_obs,
+                            prev_action=prev_actions[agent_id],
+                            prev_reward=prev_rewards[agent_id],
+                            policy_id=policy_id)
+                        action[agent_id] = a_action
+                        prev_actions[agent_id] = a_action
             else:
                 action = agent.compute_action(state)
             state, reward, done, _ = env.step(action)
+            if multiagent:
+                for agent_id, r in reward.items():
+                    prev_rewards[agent_id] = r
+            else:
+                prev_rewards[_DUMMY_AGENT_ID] = reward
             if multiagent:
                 for actor, rew in reward.items():
                     ret[policy_map_fn(actor)][0] += rew
@@ -243,11 +316,7 @@ def visualizer_rllib(agent, env_name, multiagent, config):
         final_outflows.append(outflow)
         inflow = vehicles.get_inflow_rate(500)
         final_inflows.append(inflow)
-        if np.all(np.array(final_inflows) > 1e-5):
-            throughput_efficiency = [x / y for x, y in
-                                     zip(final_outflows, final_inflows)]
-        else:
-            throughput_efficiency = [0] * len(final_inflows)
+
         mean_speed.append(np.mean(vel))
         std_speed.append(np.std(vel))
         if multiagent:
@@ -275,10 +344,6 @@ def visualizer_rllib(agent, env_name, multiagent, config):
     print(mean_speed)
     print('Average, std: {}, {}'.format(np.mean(mean_speed), np.std(
         mean_speed)))
-    print("\nSpeed, std (m/s):")
-    print(std_speed)
-    print('Average, std: {}, {}'.format(np.mean(std_speed), np.std(
-        std_speed)))
 
     # Compute arrival rate of vehicles in the last 500 sec of the run
     print("\nOutflows (veh/hr):")
@@ -290,11 +355,6 @@ def visualizer_rllib(agent, env_name, multiagent, config):
     print(final_inflows)
     print('Average, std: {}, {}'.format(np.mean(final_inflows),
                                         np.std(final_inflows)))
-    # Compute throughput efficiency in the last 500 sec of the
-    print("Throughput efficiency (veh/hr):")
-    print(throughput_efficiency)
-    print('Average, std: {}, {}'.format(np.mean(throughput_efficiency),
-                                        np.std(throughput_efficiency)))
 
     # terminate the environment
     env.unwrapped.terminate()
@@ -319,22 +379,17 @@ def visualizer_rllib(agent, env_name, multiagent, config):
         # delete the .xml version of the emission file
         os.remove(emission_path)
 
-    # if we wanted to save the render, here we create the movie
-    if args.save_render:
-        dirs = os.listdir(os.path.expanduser('~')+'/flow_rendering')
-        # Ignore hidden files
-        dirs = [d for d in dirs if d[0] != '.']
-        dirs.sort(key=lambda date: datetime.strptime(date, "%Y-%m-%d-%H%M%S"))
-        recent_dir = dirs[-1]
-        # create the movie
-        movie_dir = os.path.expanduser('~') + '/flow_rendering/' + recent_dir
-        save_dir = os.path.expanduser('~') + '/flow_movies'
-        if not os.path.exists(save_dir):
-            os.mkdir(save_dir)
-        os_cmd = "cd " + movie_dir + " && ffmpeg -i frame_%06d.png"
-        os_cmd += " -pix_fmt yuv420p " + dirs[-1] + ".mp4"
-        os_cmd += "&& cp " + dirs[-1] + ".mp4 " + save_dir + "/"
-        os.system(os_cmd)
+
+class DefaultMapping(collections.defaultdict):
+    """default_factory now takes as an argument the missing key."""
+
+    def __missing__(self, key):
+        self[key] = value = self.default_factory(key)
+        return value
+
+
+def default_policy_agent_mapping(unused_agent_id):
+    return DEFAULT_POLICY_ID
 
 
 def create_parser():
@@ -397,5 +452,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     ray.init(num_cpus=1)
     agent, env_name, multiagent, config = construct_agent(args)
-    for _ in range(10):
+    for _ in range(args.num_rollouts):
         visualizer_rllib(agent, env_name, multiagent, config)

@@ -12,7 +12,7 @@ try:
 except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.env.group_agents_wrapper import _GroupAgentsWrapper
-from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
+from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
 from ray import tune
 from ray.tune import run as run_tune
 from ray.tune.registry import register_env
@@ -77,20 +77,19 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         ),
         routing_controller=(GridRouter, {}),
         depart_time='0.25',
-        num_vehicles=1)
+        num_vehicles=3)
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
-        veh_id='rl_0',
+        veh_id='av',
         acceleration_controller=(RLController, {}),
         car_following_params=SumoCarFollowingParams(
-            speed_mode='right_of_way',
+            speed_mode='aggressive',
         ),
         routing_controller=(GridRouter, {}),
         depart_time='3.5',    #TODO change back to 3.5s
         num_vehicles=1,
         )
-
     if args.randomize_vehicles:
         vehicles.add(
             veh_id="human_1",
@@ -113,7 +112,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             ),
             routing_controller=(GridRouter, {}),
             num_vehicles=1)
-    
+
 
     n_rows = 1
     n_columns = 1
@@ -122,13 +121,13 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     if pedestrians:
         initial_config = InitialConfig(
             spacing='custom',
-            shuffle=True,
+            shuffle=False,
             sidewalks=True, 
             lanes_distribution=float('inf'))
     else:
         initial_config = InitialConfig(
             spacing='custom',
-            shuffle=True)
+            shuffle=False)
 
     flow_params = dict(
         # name of the experiment
@@ -227,7 +226,7 @@ def on_episode_start(info):
     episode.user_data['steps_elapsed'] = 0
     episode.user_data['vehicle_leaving_time'] = []
     episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
-
+    episode.user_data['past_intersection'] = 0
 
 def on_episode_step(info):
     env = info['env'].get_unwrapped()[0]
@@ -253,6 +252,9 @@ def on_episode_step(info):
         episode.user_data['vehicle_leaving_time'] += \
                 [episode.user_data['steps_elapsed']] * num_veh_left
         episode.user_data['num_rl_veh_active'] -= num_veh_left
+    rl_ids = env.k.vehicle.get_rl_ids()
+    if 'av_0' in rl_ids:
+        episode.user_data['past_intersection'] = int(env.past_intersection('av_0'))
 
 
 def on_episode_end(info):
@@ -268,6 +270,7 @@ def on_episode_end(info):
             np.mean(episode.user_data['vehicle_leaving_time'])
     else:
         episode.custom_metrics['avg_rl_veh_arrival'] = 500
+    episode.custom_metrics['past_intersection'] = episode.user_data['past_intersection']
 
 
 def setup_exps_DQN(args, flow_params):
@@ -291,15 +294,22 @@ def setup_exps_DQN(args, flow_params):
     alg_run = 'DQN'
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
-
+    # print(config)
+    # import ipdb; ipdb.set_trace()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['no_done_at_end'] = True
+    # config['no_done_at_end'] = True
     config['lr'] = 1e-4
-    config['gamma'] = 0.97  # discount rate
+    config['n_step'] = 10
+    config['gamma'] = 0.99  # discount rate
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['learning_starts'] = 20000
+    config['prioritized_replay'] = True
+    # increase buffer size
+    config['buffer_size'] = 200000
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
+        config['n_step'] = tune.grid_search([1, 10])
+        config['gamma'] = tune.grid_search([0.999, 0.99, 0.9])  # discount rate
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
@@ -328,6 +338,7 @@ def setup_exps_DQN(args, flow_params):
     config['env_config']['run'] = alg_run
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
+    config['env'] = env_name
 
     # Register as rllib env
     register_env(env_name, create_env)
@@ -354,84 +365,6 @@ def setup_exps_DQN(args, flow_params):
     })
 
     return alg_run, env_name, config
-
-def setup_exps_TD3(args, flow_params):
-    """
-    Experiment setup with TD3 using RLlib.
-
-    Parameters
-    ----------
-    flow_params : dictionary of flow parameters
-
-    Returns
-    -------
-    str
-        name of the training algorithm
-    str
-        name of the gym environment to be trained
-    dict
-        training configuration parameters
-    """
-    alg_run = 'TD3'
-    agent_cls = get_agent_class(alg_run)
-    config = agent_cls._default_config.copy()
-    # config['simple_optimizer'] = True
-    config["num_workers"] = min(args.n_cpus, args.n_rollouts)
-    config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['gamma'] = 0.999  # discount rate
-    config['model'].update({'fcnet_hiddens': [256, 256]})
-    config['lr'] = 1e-5
-    config['sample_batch_size'] = 50
-    if args.grid_search:
-        #config['sample_batch_size'] = tune.grid_search([30, 50, 100])
-        config['lr'] = tune.grid_search([1e-3, 1e-4, 1e-5])
-        #config['gamma'] = tune.grid_search([0.99, 0.999, 0.9999])
-        #config['actor_lr'] = tune.grid_search([1e-5, 1e-4])
-        #config['critic_lr'] = tune.grid_search([1e-5, 1e-4])
-        #config['prioritized_replay'] = tune.grid_search([True, False])
-    config['horizon'] = args.horizon
-    config['no_done_at_end'] = True
-    config['observation_filter'] = 'NoFilter'
-
-    config['callbacks'] = {
-            "on_episode_start":tune.function(on_episode_start),
-            "on_episode_step":tune.function(on_episode_step),
-            "on_episode_end":tune.function(on_episode_end)}
-
-    # save the flow params for replay
-    flow_json = json.dumps(
-        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
-    config['env_config']['flow_params'] = flow_json
-    config['env_config']['run'] = alg_run
-
-    create_env, env_name = make_create_env(params=flow_params, version=0)
-
-    # Register as rllib env
-    register_env(env_name, create_env)
-
-    test_env = create_env()
-    obs_space = test_env.observation_space
-    act_space = test_env.action_space
-
-    def gen_policy():
-        return None, obs_space, act_space, {}
-
-    # Setup PG with a single policy graph for all agents
-    policy_graphs = {'av': gen_policy()}
-
-    def policy_mapping_fn(_):
-        return 'av'
-
-    config.update({
-        'multiagent': {
-            'policies': policy_graphs,
-            'policy_mapping_fn': tune.function(policy_mapping_fn),
-            'policies_to_train': ['av']
-        }
-    })
-
-    return alg_run, env_name, config
-
 
 def setup_exps_PPO(args, flow_params):
     """
@@ -458,14 +391,17 @@ def setup_exps_PPO(args, flow_params):
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
+    # TODO(@ev) fix the termination condition so you don't need this
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
     config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    if args.use_lstm:
+        config['model']['use_lstm'] = True
     if args.grid_search:
-        config['gamma'] = tune.grid_search([0.99, 0.98, 0.97, 0.96])  # discount rate
-        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, -0.02])  # entropy coeff
+        config['gamma'] = tune.grid_search([.995, 0.99, 0.9])  # discount rate
+        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, 0])  # entropy coeff
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
@@ -549,7 +485,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=400,
+    parser.add_argument("--horizon", type=int, default=500,
                         help="Horizon length of a rollout")
 
     # optional input parameters
@@ -576,11 +512,15 @@ if __name__ == '__main__':
                         action="store_true",
                         default=False)
 
+    # Model arguments
+    parser.add_argument("--use_lstm", action="store_true", default=False, help="Use LSTM")
     args = parser.parse_args()
 
     pedestrians = args.pedestrians
     render = args.render
     discrete = args.discrete
+    if args.algo == 'DQN':
+        discrete = True
     flow_params = make_flow_params(args, pedestrians, render, discrete)
 
     upload_dir = args.upload_dir
@@ -590,8 +530,6 @@ if __name__ == '__main__':
 
     if ALGO == 'PPO':
         alg_run, env_name, config = setup_exps_PPO(args, flow_params)
-    elif ALGO == 'TD3':
-        alg_run, env_name, config = setup_exps_TD3(args, flow_params)
     elif ALGO == 'DQN':
         alg_run, env_name, config = setup_exps_DQN(args, flow_params)
 
@@ -624,9 +562,8 @@ if __name__ == '__main__':
     if args.use_s3:
         date = datetime.now(tz=pytz.utc)
         date = date.astimezone(pytz.timezone('US/Pacific')).strftime("%m-%d-%Y")
-        s3_string = upload_dir \
-                    + date + '/' + args.exp_title
-        exp_dict["upload_dir"] = "s3://{}".format(upload_dir)
+        s3_string = os.path.join(os.path.join(upload_dir, date), args.exp_title)
+        exp_dict["upload_dir"] = "s3://{}".format(s3_string)
 
     run_tune(**exp_dict, queue_trials=False, raise_on_failed_trial=False)
 
@@ -656,4 +593,3 @@ if __name__ == '__main__':
                             p1.wait(50)
                         except Exception as e:
                             print('This is the error ', e)
-
