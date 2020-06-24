@@ -335,7 +335,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             
                 if 47 < edge_pos < 50 and self.k.vehicle.get_speed(rl_id) < 0.5:
                     # slow down near the intersection
-                    if rl_id in self.near_intersection_rewarded_set_3 or self.k.vehicle.get_speed(rl_id) > 1.0:
+                    if rl_id in self.near_intersection_rewarded_set_3:
                         pass
                     else:
                         reward = 0.3
