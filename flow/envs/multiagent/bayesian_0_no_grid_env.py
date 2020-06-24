@@ -360,7 +360,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                         accel = self.discrete_actions_to_accels[rl_actions[rl_id]]
                     else:
                         accel = rl_actions[rl_id][0]
-                    reward += min(accel, 0) / 2000.0
+                    reward += min(accel, 0) / 50.0
                 if inside_intersection and self.k.vehicle.get_speed(rl_id) < 1.0:
                     reward -= 0.1
                 rewards[rl_id] = reward
