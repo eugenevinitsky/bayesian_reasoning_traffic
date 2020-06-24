@@ -1,7 +1,29 @@
 """Contains a list of custom velocity controllers."""
 
+# TODO(@evinitsky) move to util
+from flow.utils.rllib import create_agent_from_path
 from flow.controllers.base_controller import BaseController
 import numpy as np
+
+
+class PreTrainedController(BaseController):
+    def __init__(self,
+                 veh_id,
+                 car_following_params,
+                 path,
+                 checkpoint_num):
+        BaseController.__init__(
+            self, veh_id, car_following_params, delay=1.0)
+        self.path = path
+        self.agent = create_agent_from_path(path, checkpoint_num)
+
+    def get_accel(self, env):
+        state = env.get_state()
+        # TODO(@evinitsky) clean up and make more general
+        if len(state) > 0:
+            return self.agent.compute_action(state, policy_id='av')
+        else:
+            return None
 
 
 class FullStop(BaseController):

@@ -15,7 +15,14 @@ from flow.core.params import VehicleParams, PedestrianParams
 from flow.envs import Env
 from flow.networks import Network
 from ray.cloudpickle import cloudpickle
+try:
+    from ray.rllib.agents.agent import get_agent_class
+except ImportError:
+    from ray.rllib.agents.registry import get_agent_class
 import inspect
+from ray.tune.registry import register_env
+from flow.utils.registry import make_create_env
+
 
 
 class FlowParamsEncoder(json.JSONEncoder):
@@ -230,3 +237,39 @@ def get_rllib_pkl(path):
     with open(config_path, 'rb') as f:
         config = cloudpickle.load(f)
     return config
+
+
+def create_agent_from_path(path, checkpoint_num):
+
+    config = get_rllib_config(path)
+
+    # check if we have a multiagent environment but in a
+    # backwards compatible way
+    if config.get('multiagent', {}).get('policies', None):
+        pkl = get_rllib_pkl(path)
+        config['multiagent'] = pkl['multiagent']
+
+    # Run on only one cpu for rendering purposes
+    config['num_workers'] = 0
+
+    # Determine agent and checkpoint
+    config_run = config['env_config']['run'] if 'run' in config['env_config'] \
+        else None
+    agent_cls = get_agent_class(config_run)
+
+    params = get_flow_params(config)
+    # if isinstance(params["env_name"], str):
+    #     print("""Passing of strings for env_name will be deprecated.
+    #     Please pass the Env instance instead.""")
+    #     env_name = params["env_name"] + '-v{}'.format(10)
+    # else:
+    #     env_name = params["env_name"].__name__ + '-v{}'.format(10)
+    # create the agent that will be used to compute the actions
+    create_env, env_name = make_create_env(params=params, version=10)
+    register_env(env_name, create_env)
+    agent = agent_cls(env=env_name, config=config)
+    checkpoint = path + '/checkpoint_' + checkpoint_num
+    checkpoint = checkpoint + '/checkpoint-' + checkpoint_num
+    agent.restore(checkpoint)
+
+    return agent

@@ -16,28 +16,25 @@ from flow.utils.exceptions import FatalFlowError
 
 ADDITIONAL_ENV_PARAMS = {
     # maximum acceleration of autonomous vehicles
-    'max_accel': 4.5,
+    'max_accel': 2.6,
     # maximum deceleration of autonomous vehicles
-    'max_decel': -2.6,
+    'max_decel': 4.5,
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
     # how many objects in our local radius we want to return
     "max_num_objects": 3,
-    # how large of a radius to search vehicles in for a given vehicle in meters
+    # how large of a radius to search in for a given vehicle in meters
     "search_veh_radius": 50,
-    # # how large of a radius to search pedestrians in for a given vehicle in meters
+    # how large of a radius to search for pedestrians in for a given vehicle in meters (create effect of only seeing pedestrian only when relevant)
     "search_ped_radius": 22,
-    # whether or not we have a discrete action space (does discrete allow for decimal points?)
-    "discrete": False,
-    # whether the state should be appended with the priors from the inference
+    # whether or not we have a discrete action space,
+    "discrete": True,
+    # whether to randomize which edge the vehicles are coming from
+    "randomize_vehicles": True,
+    # whether to append the prior into the state
     "inference_in_state": False,
-    # whether the view in front of the vehicle should be gridded into some number of cells
-    # where we check if there's a pedestrian in each one
-    "use_grid": False,
-    # whether to randomize the entering vehicles so that you consistently
-    # enter on a different edge and multiple human vehicles are in the system
-    # TODO(@evinitsky) enable. At the moment ALL the vehicles will always enter the system
-    "randomize_vehicles": False,
+    # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
+    "use_grid": False
 }
 
 HARD_BRAKE_PENALTY = 0.001

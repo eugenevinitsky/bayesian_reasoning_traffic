@@ -136,22 +136,8 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
     def specify_routes(self, net_params):
 
-        car_1_start_edge = "(0.1)--(1.1)"
-        car_2_start_edge = "(2.1)--(1.1)"
-        car_3_start_edge = "(1.0)--(1.1)"
-        car_4_start_edge = "(1.2)--(1.1)"
-
-        car_3_end_edge = "(1.1)--(2.1)"
-
-        end_edges_lst = ["(1.1)--(2.1)",
-                        "(1.1)--(1.2)",
-                        "(1.1)--(0.1)",
-                        "(1.1)--(1.0)"]
-
-        randomize_routes = True
-
         rts = {}
-        if net_params.additional_params.get("randomize_routes", False):
+        if net_params.additional_params["randomize_routes"]:
             start_edges = ['(1.2)--(1.1)',
                         '(0.1)--(1.1)',
                         '(1.0)--(1.1)',
@@ -168,8 +154,21 @@ class Bayesian0Network(TrafficLightGridNetwork):
                     end_index = (i + 1) % 4
                 end = end_edges[end_index]
                 rts[start] = [start, end]
+        else:
+            car_1_start_edge = "(0.1)--(1.1)"
+            car_2_start_edge = "(2.1)--(1.1)"
+            car_3_start_edge = "(1.0)--(1.1)"
+            car_4_start_edge = "(1.2)--(1.1)"
 
-        rts["(0.1)--(1.1)"] = ["(0.1)--(1.1)", car_3_end_edge]
+            end_edges_lst = ["(1.1)--(2.1)",
+                             "(1.1)--(1.2)",
+                             "(1.1)--(0.1)",
+                             "(1.1)--(1.0)"]
+            rts = {car_1_start_edge: [car_1_start_edge, end_edges_lst[0]],
+                   car_2_start_edge: [car_2_start_edge, end_edges_lst[1]],
+                   car_3_start_edge: [car_3_start_edge, end_edges_lst[2]],
+                   car_4_start_edge: [car_4_start_edge, end_edges_lst[3]]}
+
 
         self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.9)
 
