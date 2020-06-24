@@ -1207,5 +1207,3 @@ if __name__ == "__main__":
 #                          "or 'stable-baselines'.")
 
 
-# if __name__ == "__main__":
-#     main(sys.argv[1:])
