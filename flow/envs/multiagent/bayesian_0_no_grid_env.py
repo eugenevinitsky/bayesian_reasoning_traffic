@@ -209,7 +209,7 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 # if we are inside the intersection, go full speed ahead
                 if rl_id in self.got_to_intersection:
-                    continue
+                    return 3.0
                 rl_ids.append(rl_id)
                 accels.append(accel)
 
