@@ -302,15 +302,16 @@ def setup_exps_DQN(args, flow_params):
     config['lr'] = 1e-4
     config['n_step'] = 10
     config['gamma'] = 0.99  # discount rate
-    config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['model'].update({'fcnet_hiddens': [64, 64, 64]})
     config['learning_starts'] = 20000
     config['prioritized_replay'] = True
     # increase buffer size
     config['buffer_size'] = 200000
     if args.grid_search:
+        config['model']['fcnet_activation'] = 'relu'
         config['n_step'] = tune.grid_search([1, 10])
-        config['lr'] = tune.grid_search([1e-3, 1e-2])
-        config['gamma'] = tune.grid_search([0.999, 0.99, 0.9])  # discount rate
+        config['lr'] = tune.grid_search([1e-3, 1e-2, 1e-4])
+        config['gamma'] = tune.grid_search([0.999, 0.99])  # discount rate
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
