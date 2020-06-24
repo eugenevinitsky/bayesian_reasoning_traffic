@@ -294,6 +294,9 @@ class MultiEnv(MultiAgentEnv, Env):
         # ignore if no actions are issued
         if rl_actions is None:
             return None
+        if 'rl_0' in rl_actions:
+            if rl_actions['rl_0'] is None:
+                return None
 
         # clip according to the action space requirements
         if isinstance(self.action_space, Box):
@@ -318,7 +321,15 @@ class MultiEnv(MultiAgentEnv, Env):
         # ignore if no actions are issued
         if rl_actions is None:
             return
+        if 'rl_0' in rl_actions:
+            if rl_actions['rl_0'] is None:
+                return None
 
         # clip according to the action space requirements
-        clipped_actions = self.clip_actions(rl_actions)
+        try:
+            clipped_actions = self.clip_actions(rl_actions)
+        except:
+            import ipdb; ipdb.set_trace()
+            clipped_actions = self.clip_actions(rl_actions)
+
         self._apply_rl_actions(clipped_actions)

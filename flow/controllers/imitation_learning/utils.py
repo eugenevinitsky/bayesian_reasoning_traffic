@@ -224,8 +224,13 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
 
             elif expert_control == "SUMO" and not use_expert:
                 # for eg IDM, the acceleration 'action' is what the car takes on
-                if not env.past_intersection(vehicle_id):
-                    action = controller.get_action(env, allow_junction_control=True)
+                if vehicle_id == 'rl_0':
+                    if vehicle_id in env.inside_intersection and vehicle_id in env.past_intersection_rewarded_set:
+                        action = None
+                    elif env.arrived_intersection(vehicle_id) and not env.past_intersection(vehicle_id):
+                        action = controller.get_action(env, allow_junction_control=True)
+                    else:
+                        action = None
                 else:
                     action = None
 
@@ -266,7 +271,11 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
             observation_dict, reward_dict, done_dict, _ = env.step(None)
         if expert_control == "SUMO" and not use_expert:
             if not env.past_intersection("rl_0"):
-                observation_dict, reward_dict, done_dict, _ = env.step(rl_actions)
+                try:
+                    observation_dict, reward_dict, done_dict, _ = env.step(rl_actions)
+                except:
+                    import ipdb; ipdb.set_trace()
+                    observation_dict, reward_dict, done_dict, _ = env.step(rl_actions)
             else:
                 observation_dict, reward_dict, done_dict, _ = env.step(None)
 

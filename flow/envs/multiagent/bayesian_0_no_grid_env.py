@@ -211,11 +211,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                     accel = actions[0]
 
                 # if we are inside the intersection, go full speed ahead
-                if rl_id in self.inside_intersection:
-                    if self.discrete:
-                        accel = self.discrete_actions_to_accels[-1]
-                    else:
-                        accel = self.action_space.high[0]
+                if rl_id in self.got_to_intersection:
+                    continue
                 rl_ids.append(rl_id)
                 accels.append(accel)
 
@@ -230,7 +227,12 @@ class Bayesian0NoGridEnv(MultiEnv):
     
     def past_intersection(self, veh_id):
         """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
-        on_post_intersection_edge = self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]       
+        try:
+            on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]        
+        except:
+            import ipdb; ipdb.set_trace()
+            on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]        
+
         if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 7: # vehicle arrived at final destination, 8 is a random distance
             return True
         elif self.k.vehicle.get_edge(veh_id) == '':
@@ -240,12 +242,12 @@ class Bayesian0NoGridEnv(MultiEnv):
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
-        # new_loc_states = self.curr_ped_state()
-        # for loc, val in enumerate(new_loc_states):
-        #     prev = self.prev_loc_ped_state[loc]
-        #     curr = val
-        #     self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
-        #     self.prev_loc_ped_state[loc] = curr
+        new_loc_states = self.curr_ped_state()
+        for loc, val in enumerate(new_loc_states):
+            prev = self.prev_loc_ped_state[loc]
+            curr = val
+            self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
+            self.prev_loc_ped_state[loc] = curr
         obs = {}
         num_self_obs = len(self.self_obs_names)
         num_ped_obs = len(self.ped_names)
@@ -256,10 +258,10 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         for rl_id in self.k.vehicle.get_rl_ids():
 
-            if rl_id in self.inside_intersection and rl_id in self.past_intersection_rewarded_set:
+            if self.past_intersection_rewarded_set:
                 continue
                 
-            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+            if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
                 self.rl_set.add(rl_id)
                 assert rl_id in self.arrival_order
 
@@ -273,7 +275,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                         self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-                observation[:num_self_obs + num_ped_obs] = self.get_self_obs(veh_id, visible_pedestrians, visible_lanes)
+                observation[:num_self_obs + num_ped_obs] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
@@ -321,23 +323,27 @@ class Bayesian0NoGridEnv(MultiEnv):
         rewards = {}
         for rl_id in self.k.vehicle.get_rl_ids():   
             # reward rl slightly earlier than when control is given back to SUMO
-            if rl_id in self.inside_intersection: # vehicle arrived at final destination, 5.5 is a random distance
-                if rl_id not in self.past_intersection_rewarded_set:
-                    print('got past the intersection and got the reward')
-                    rewards[rl_id] = 400 / 100
-                    self.past_intersection_rewarded_set.add(rl_id)
+            if rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set:
+                # print('arrived past intersection and got reward')
+                # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
+                # print('state is ', self.get_state())
+                rewards[rl_id] = 0.4
+                self.past_intersection_rewarded_set.add(rl_id)
                 continue
 
-            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+            if self.past_intersection_rewarded_set:
+                continue
+
+            if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
             
-                if 47 < edge_pos < 50:
+                if 47 < edge_pos < 50 and self.k.vehicle.get_speed(rl_id) < 0.5:
                     # slow down near the intersection
-                    if rl_id in self.near_intersection_rewarded_set_3 or self.k.vehicle.get_speed(rl_id) > 1.0:
+                    if rl_id in self.near_intersection_rewarded_set_3:
                         pass
                     else:
-                        reward = 300
+                        reward = 0.3
                         self.near_intersection_rewarded_set_3.add(rl_id)
 
                 # TODO(@evinitsky) pick the right reward
@@ -346,22 +352,20 @@ class Bayesian0NoGridEnv(MultiEnv):
                 inside_intersection = rl_id in self.inside_intersection
 
                 if len(collision_pedestrians) > 0:
-                    reward = -5000
+                    reward = -1.0
                 elif rl_id in collision_vehicles:
-                    reward = -5000
+                    reward = -1.0
 
-                # reward shaping to encourage going forwards
-                reward += self.k.vehicle.get_speed(rl_id)
                 # penalty for jerkiness
                 if rl_id in rl_actions.keys():
                     if self.discrete:
                         accel = self.discrete_actions_to_accels[rl_actions[rl_id]]
                     else:
                         accel = rl_actions[rl_id][0]
-                    reward += min(accel, 0) * 10
+                    reward += min(accel, 0) / 50.0
                 if inside_intersection and self.k.vehicle.get_speed(rl_id) < 1.0:
-                    reward -= 10.0
-                rewards[rl_id] = reward / 100
+                    reward -= 0.1
+                rewards[rl_id] = reward
 
         return rewards
 
@@ -459,13 +463,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                 break
 
         states = self.get_state()
-        done = {key: key in self.k.vehicle.get_arrived_ids() or
-                key in self.past_intersection_rewarded_set
-                for key in states.keys()}
-        if crash:
-            done['__all__'] = True
-        else:
-            done['__all__'] = False
         infos = {key: {} for key in states.keys()}
 
         # compute the reward
@@ -477,6 +474,22 @@ class Bayesian0NoGridEnv(MultiEnv):
         # if states.keys() != reward.keys():
         #     reward = self.compute_reward(rl_actions, fail=crash)
         #     states = self.get_state()
+        done = {key: (key in self.k.vehicle.get_arrived_ids() or
+                     key in self.past_intersection_rewarded_set) and key not in self.done_list
+                for key in states.keys()}
+        # TODO(@ev) figure out why done is not being set
+        if 'av_0' in done and done['av_0']:
+            self.done_list.extend(['av_0'])
+        if crash:
+            done['__all__'] = True
+        else:
+            done['__all__'] = False
+        if done['__all__'] and 'av_0' not in self.done_list:
+            print('you crashed before you got fully inside the intersection')
+            reward = {'av_0': -1.0}
+            states = {'av_0': -np.ones(self.observation_space.shape)}
+            done.update({'av_0': True})
+
         return states, reward, done, infos
 
     def reset(self, new_inflow_rate=None):
@@ -495,10 +508,10 @@ class Bayesian0NoGridEnv(MultiEnv):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
-        # print(self.ped_transition_cnt)
-        # self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
-        # # dict to store the counts for each possible transiion
-        # self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
+        print(self.ped_transition_cnt)
+        self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
+        # dict to store the counts for each possible transiion
+        self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
         
         # Now that we've passed the possibly fake init steps some rl libraries
         # do, we can feel free to actually render things
@@ -512,6 +525,8 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         self.arrival_order = {}
         self.inside_intersection = set()
+        self.got_to_intersection = set()
+        self.done_list = []
 
         # warn about not using restart_instance when using inflows
         if len(self.net_params.inflows.get()) > 0 and \
@@ -753,6 +768,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         yaw = self.k.vehicle.get_yaw(rl_id)
         speed = self.k.vehicle.get_speed(rl_id)
 
+        edge_pos = self.k.vehicle.get_position(rl_id)
         curr_edge = self.k.vehicle.get_edge(rl_id)
         if curr_edge in self.edge_to_int:
             curr_edge = self.edge_to_int[curr_edge]
@@ -761,7 +777,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             curr_edge = -1
             self.inside_intersection.add(rl_id)
-        edge_pos = self.k.vehicle.get_position(rl_id)
+            self.got_to_intersection.add(rl_id)
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
         start, end = self.k.vehicle.get_route(rl_id)
@@ -1003,7 +1019,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def is_cross_walk_visible(self, veh_id, cw):
         pass
 
-    @DeprecationWarning
+    # @DeprecationWarning
     def edge_to_loc(self, lane, ped_id=None):
         """Map a lane id to its corresponding corresponds value. 
 
