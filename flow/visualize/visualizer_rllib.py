@@ -52,12 +52,7 @@ def _flatten_action(action):
         action = np.concatenate(expanded, axis=0).flatten()
     return action
 
-def visualizer_rllib(args):
-    """Visualizer for RLlib experiments.
-    This function takes args (see function create_parser below for
-    more detailed information on what information can be fed to this
-    visualizer), and renders the experiment associated with it.
-    """
+def construct_agent(args):
     result_dir = args.result_dir if args.result_dir[-1] != '/' \
         else args.result_dir[:-1]
 
@@ -77,11 +72,7 @@ def visualizer_rllib(args):
         config["num_workers"] = min(2, config["num_workers"])
 
     flow_params = get_flow_params(config)
-
-    # hack for old pkl files
-    # TODO(ev) remove eventually
     sim_params = flow_params['sim']
-    setattr(sim_params, 'num_clients', 1)
 
     # for hacks for old pkl files TODO: remove eventually
     if not hasattr(sim_params, 'use_ballistic'):
@@ -118,7 +109,11 @@ def visualizer_rllib(args):
         from flow.algorithms.custom_ppo import CustomPPOTrainer
         agent_cls = CustomPPOTrainer
     elif config_run:
-        agent_cls = get_agent_class(config_run)
+        if config_run == "CustomPPO":
+            from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
+            agent_cls = PPOTrainer
+        else:
+            agent_cls = get_agent_class(config_run)
     else:
         print('visualizer_rllib.py: error: could not find flow parameter '
               '\'run\' in params.json, '
@@ -180,8 +175,19 @@ def visualizer_rllib(args):
     checkpoint = result_dir + '/checkpoint_' + args.checkpoint_num
     checkpoint = checkpoint + '/checkpoint-' + args.checkpoint_num
     agent.restore(checkpoint)
-    # TODO(KL) this is wayyy too hard code-y
-    # agent.import_model('/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/b.h5', 'av')
+    return agent, env_name, multiagent, config
+
+
+def visualizer_rllib(agent, env_name, multiagent, config):
+    """Visualizer for RLlib experiments.
+
+    This function takes args (see function create_parser below for
+    more detailed information on what information can be fed to this
+    visualizer), and renders the experiment associated with it.
+    """
+    flow_params = get_flow_params(config)
+    sim_params = flow_params['sim']
+    env_params = flow_params['env']
 
     if hasattr(agent, "workers") and isinstance(agent.workers, WorkerSet):
         env = agent.workers.local_worker().env
@@ -193,16 +199,6 @@ def visualizer_rllib(args):
         policy_map = agent.workers.local_worker().policy_map
         state_init = {p: m.get_initial_state() for p, m in policy_map.items()}
         use_lstm = {p: len(s) > 0 for p, s in state_init.items()}
-    else:
-        env = gym.make(env_name)
-        multiagent = False
-        try:
-            policy_map = {DEFAULT_POLICY_ID: agent.policy}
-        except AttributeError:
-            raise AttributeError(
-                "Agent ({}) does not have a `policy` property! This is needed "
-                "for performing (trained) agent rollouts.".format(agent))
-        use_lstm = {DEFAULT_POLICY_ID: False}
 
     action_init = {
         p: _flatten_action(m.action_space.sample())
@@ -454,5 +450,7 @@ def create_parser():
 if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
-    ray.init(local_mode=True)
-    visualizer_rllib(args)
+    ray.init(num_cpus=1)
+    agent, env_name, multiagent, config = construct_agent(args)
+    for _ in range(args.num_rollouts):
+        visualizer_rllib(agent, env_name, multiagent, config)

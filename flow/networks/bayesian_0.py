@@ -172,7 +172,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
         rts["(0.1)--(1.1)"] = ["(0.1)--(1.1)", car_3_end_edge]
 
         self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.9)
-        # self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.1)
 
         return rts
 
@@ -192,6 +191,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ('(1.2)--(1.1)', '(0.1)--(1.1)')]
 
         rt = np.random.randint(len(routes))
+
         focus_1_3 = False
         if focus_1_3:
             rand = np.random.uniform(1)
