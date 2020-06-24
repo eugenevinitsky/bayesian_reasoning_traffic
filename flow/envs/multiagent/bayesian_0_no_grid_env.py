@@ -211,11 +211,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                     accel = actions[0]
 
                 # if we are inside the intersection, go full speed ahead
-                if rl_id in self.inside_intersection:
-                    if self.discrete:
-                        accel = self.discrete_actions_to_accels[-1]
-                    else:
-                        accel = self.action_space.high[0]
+                if rl_id in self.got_to_intersection:
+                    continue
                 rl_ids.append(rl_id)
                 accels.append(accel)
 
@@ -261,10 +258,10 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         for rl_id in self.k.vehicle.get_rl_ids():
 
-            if rl_id in self.inside_intersection and rl_id in self.past_intersection_rewarded_set:
+            if self.past_intersection_rewarded_set:
                 continue
                 
-            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+            if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
                 self.rl_set.add(rl_id)
                 assert rl_id in self.arrival_order
 
@@ -326,23 +323,27 @@ class Bayesian0NoGridEnv(MultiEnv):
         rewards = {}
         for rl_id in self.k.vehicle.get_rl_ids():   
             # reward rl slightly earlier than when control is given back to SUMO
-            if rl_id in self.inside_intersection: # vehicle arrived at final destination, 5.5 is a random distance
-                if rl_id not in self.past_intersection_rewarded_set:
-                    print('got past the intersection and got the reward')
-                    rewards[rl_id] = 400 / 100
-                    self.past_intersection_rewarded_set.add(rl_id)
+            if rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set:
+                # print('arrived past intersection and got reward')
+                # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
+                # print('state is ', self.get_state())
+                rewards[rl_id] = 0.4
+                self.past_intersection_rewarded_set.add(rl_id)
                 continue
 
-            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+            if self.past_intersection_rewarded_set:
+                continue
+
+            if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
             
-                if 47 < edge_pos < 50:
+                if 47 < edge_pos < 50 and self.k.vehicle.get_speed(rl_id) < 0.5:
                     # slow down near the intersection
-                    if rl_id in self.near_intersection_rewarded_set_3 or self.k.vehicle.get_speed(rl_id) > 1.0:
+                    if rl_id in self.near_intersection_rewarded_set_3:
                         pass
                     else:
-                        reward = 300
+                        reward = 0.3
                         self.near_intersection_rewarded_set_3.add(rl_id)
 
                 # TODO(@evinitsky) pick the right reward
@@ -351,22 +352,20 @@ class Bayesian0NoGridEnv(MultiEnv):
                 inside_intersection = rl_id in self.inside_intersection
 
                 if len(collision_pedestrians) > 0:
-                    reward = -5000
+                    reward = -1.0
                 elif rl_id in collision_vehicles:
-                    reward = -5000
+                    reward = -1.0
 
-                # reward shaping to encourage going forwards
-                reward += self.k.vehicle.get_speed(rl_id)
                 # penalty for jerkiness
                 if rl_id in rl_actions.keys():
                     if self.discrete:
                         accel = self.discrete_actions_to_accels[rl_actions[rl_id]]
                     else:
                         accel = rl_actions[rl_id][0]
-                    reward += min(accel, 0) * 10
+                    reward += min(accel, 0) / 50.0
                 if inside_intersection and self.k.vehicle.get_speed(rl_id) < 1.0:
-                    reward -= 10.0
-                rewards[rl_id] = reward / 100
+                    reward -= 0.1
+                rewards[rl_id] = reward
 
         return rewards
 
@@ -464,13 +463,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                 break
 
         states = self.get_state()
-        done = {key: key in self.k.vehicle.get_arrived_ids() or
-                key in self.past_intersection_rewarded_set
-                for key in states.keys()}
-        if crash:
-            done['__all__'] = True
-        else:
-            done['__all__'] = False
         infos = {key: {} for key in states.keys()}
 
         # compute the reward
@@ -482,6 +474,22 @@ class Bayesian0NoGridEnv(MultiEnv):
         # if states.keys() != reward.keys():
         #     reward = self.compute_reward(rl_actions, fail=crash)
         #     states = self.get_state()
+        done = {key: (key in self.k.vehicle.get_arrived_ids() or
+                     key in self.past_intersection_rewarded_set) and key not in self.done_list
+                for key in states.keys()}
+        # TODO(@ev) figure out why done is not being set
+        if 'av_0' in done and done['av_0']:
+            self.done_list.extend(['av_0'])
+        if crash:
+            done['__all__'] = True
+        else:
+            done['__all__'] = False
+        if done['__all__'] and 'av_0' not in self.done_list:
+            print('you crashed before you got fully inside the intersection')
+            reward = {'av_0': -1.0}
+            states = {'av_0': -np.ones(self.observation_space.shape)}
+            done.update({'av_0': True})
+
         return states, reward, done, infos
 
     def reset(self, new_inflow_rate=None):
@@ -517,6 +525,8 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         self.arrival_order = {}
         self.inside_intersection = set()
+        self.got_to_intersection = set()
+        self.done_list = []
 
         # warn about not using restart_instance when using inflows
         if len(self.net_params.inflows.get()) > 0 and \
@@ -758,6 +768,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         yaw = self.k.vehicle.get_yaw(rl_id)
         speed = self.k.vehicle.get_speed(rl_id)
 
+        edge_pos = self.k.vehicle.get_position(rl_id)
         curr_edge = self.k.vehicle.get_edge(rl_id)
         if curr_edge in self.edge_to_int:
             curr_edge = self.edge_to_int[curr_edge]
@@ -766,7 +777,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             curr_edge = -1
             self.inside_intersection.add(rl_id)
-        edge_pos = self.k.vehicle.get_position(rl_id)
+            self.got_to_intersection.add(rl_id)
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
         start, end = self.k.vehicle.get_route(rl_id)

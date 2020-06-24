@@ -87,7 +87,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             speed_mode='aggressive',
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='3.5',    #TODO change back to 3.5s
+        # depart_time='3.5',    #TODO change back to 3.5s
         num_vehicles=1,
         )
     if args.randomize_vehicles:
@@ -121,7 +121,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     if pedestrians:
         initial_config = InitialConfig(
             spacing='custom',
-            shuffle=False,
+            shuffle=True,
             sidewalks=True, 
             lanes_distribution=float('inf'))
     else:
@@ -302,14 +302,16 @@ def setup_exps_DQN(args, flow_params):
     config['lr'] = 1e-4
     config['n_step'] = 10
     config['gamma'] = 0.99  # discount rate
-    config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['model'].update({'fcnet_hiddens': [64, 64, 64]})
     config['learning_starts'] = 20000
     config['prioritized_replay'] = True
     # increase buffer size
     config['buffer_size'] = 200000
+    config['model']['fcnet_activation'] = 'relu'
     if args.grid_search:
         config['n_step'] = tune.grid_search([1, 10])
-        config['gamma'] = tune.grid_search([0.999, 0.99, 0.9])  # discount rate
+        config['lr'] = tune.grid_search([1e-3, 1e-2, 1e-4])
+        config['gamma'] = tune.grid_search([0.999, 0.99])  # discount rate
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
