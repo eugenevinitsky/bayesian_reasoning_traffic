@@ -37,7 +37,7 @@ MAX_SPEED = 30
 INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 # number of vehicles originating in the left, right, top, and bottom edges
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
-NUM_PEDS = 15
+NUM_PEDS = 2
 
 
 def make_flow_params(args, pedestrians=False, render=False, discrete=False):
@@ -87,7 +87,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             speed_mode='aggressive',
         ),
         routing_controller=(GridRouter, {}),
-        depart_time='3.5',    #TODO change back to 3.5s
+        # depart_time='3.5',    #TODO change back to 3.5s
         num_vehicles=1,
         )
     if args.randomize_vehicles:
@@ -121,7 +121,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     if pedestrians:
         initial_config = InitialConfig(
             spacing='custom',
-            shuffle=False,
+            shuffle=True,
             sidewalks=True, 
             lanes_distribution=float('inf'))
     else:
