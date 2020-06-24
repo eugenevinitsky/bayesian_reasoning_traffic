@@ -80,7 +80,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         ),
         routing_controller=(GridRouter, {}),
         depart_time='0.25',
-        num_vehicles=1)
+        num_vehicles=3)
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
