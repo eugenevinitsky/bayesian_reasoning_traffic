@@ -159,7 +159,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 rts[start] = [start, end]
             if net_params.additional_params["pedestrian_kernel"]:
                 self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.9)
-
         else:
             car_1_start_edge = "(2.1)--(1.1)"
             car_1_end_edge = "(1.1)--(0.1)"
@@ -170,6 +169,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
             rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
                    car_2_start_edge: [car_2_start_edge, car_2_end_edge],
                    car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
+
 
         return rts
 

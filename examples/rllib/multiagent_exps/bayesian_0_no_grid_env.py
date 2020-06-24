@@ -37,7 +37,7 @@ MAX_SPEED = 30
 INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 # number of vehicles originating in the left, right, top, and bottom edges
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
-NUM_PEDS = 15
+NUM_PEDS = 2
 
 
 def make_flow_params(args, pedestrians=False, render=False, discrete=False):
