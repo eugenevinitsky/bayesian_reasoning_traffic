@@ -211,11 +211,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                     accel = actions[0]
 
                 # if we are inside the intersection, go full speed ahead
-                if rl_id in self.inside_intersection:
-                    if self.discrete:
-                        accel = self.discrete_actions_to_accels[-1]
-                    else:
-                        accel = self.action_space.high[0]
+                if rl_id in self.got_to_intersection:
+                    continue
                 rl_ids.append(rl_id)
                 accels.append(accel)
 
@@ -273,7 +270,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                         self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-                observation[:num_self_obs + num_ped_obs] = self.get_self_obs(veh_id, visible_pedestrians, visible_lanes)
+                observation[:num_self_obs + num_ped_obs] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
@@ -321,7 +318,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         rewards = {}
         for rl_id in self.k.vehicle.get_rl_ids():   
             # reward rl slightly earlier than when control is given back to SUMO
-            if rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set:
+            if rl_id in self.inside_intersection or rl_id in self.got_to_intersection and rl_id not in self.past_intersection_rewarded_set:
                 # print('arrived past intersection and got reward')
                 # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
                 # print('state is ', self.get_state())
@@ -336,13 +333,13 @@ class Bayesian0NoGridEnv(MultiEnv):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
             
-                if 47 < edge_pos < 50:
-                    # slow down near the intersection
-                    if rl_id in self.near_intersection_rewarded_set_3 or self.k.vehicle.get_speed(rl_id) > 1.0:
-                        pass
-                    else:
-                        reward = 0.3
-                        self.near_intersection_rewarded_set_3.add(rl_id)
+                # if 47 < edge_pos < 50:
+                #     # slow down near the intersection
+                #     if rl_id in self.near_intersection_rewarded_set_3 or self.k.vehicle.get_speed(rl_id) > 1.0:
+                #         pass
+                #     else:
+                #         reward = 0.3
+                #         self.near_intersection_rewarded_set_3.add(rl_id)
 
                 # TODO(@evinitsky) pick the right reward
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
@@ -523,6 +520,7 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         self.arrival_order = {}
         self.inside_intersection = set()
+        self.got_to_intersection = set()
         self.done_list = []
 
         # warn about not using restart_instance when using inflows
@@ -765,7 +763,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         yaw = self.k.vehicle.get_yaw(rl_id)
         speed = self.k.vehicle.get_speed(rl_id)
 
+        edge_pos = self.k.vehicle.get_position(rl_id)
         curr_edge = self.k.vehicle.get_edge(rl_id)
+        print('curr_edge is ', curr_edge)
         if curr_edge in self.edge_to_int:
             curr_edge = self.edge_to_int[curr_edge]
             if rl_id in self.inside_intersection:
@@ -773,7 +773,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             curr_edge = -1
             self.inside_intersection.add(rl_id)
-        edge_pos = self.k.vehicle.get_position(rl_id)
+            self.got_to_intersection.add(rl_id)
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
         start, end = self.k.vehicle.get_route(rl_id)
