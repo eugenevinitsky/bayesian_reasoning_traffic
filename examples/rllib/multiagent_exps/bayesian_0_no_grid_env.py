@@ -81,7 +81,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
 
     #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
-        veh_id='av',
+        veh_id='rl',
         acceleration_controller=(RLController, {}),
         car_following_params=SumoCarFollowingParams(
             speed_mode='aggressive',
@@ -298,7 +298,7 @@ def setup_exps_DQN(args, flow_params):
     # import ipdb; ipdb.set_trace()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    # config['no_done_at_end'] = True
+    config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['n_step'] = 10
     config['gamma'] = 0.99  # discount rate

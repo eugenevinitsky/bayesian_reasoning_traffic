@@ -224,7 +224,12 @@ class Bayesian0NoGridEnv(MultiEnv):
     
     def past_intersection(self, veh_id):
         """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
-        on_post_intersection_edge = self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]       
+        try:
+            on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]        
+        except:
+            import ipdb; ipdb.set_trace()
+            on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]        
+
         if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 7: # vehicle arrived at final destination, 8 is a random distance
             return True
         elif self.k.vehicle.get_edge(veh_id) == '':
@@ -234,12 +239,12 @@ class Bayesian0NoGridEnv(MultiEnv):
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
-        # new_loc_states = self.curr_ped_state()
-        # for loc, val in enumerate(new_loc_states):
-        #     prev = self.prev_loc_ped_state[loc]
-        #     curr = val
-        #     self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
-        #     self.prev_loc_ped_state[loc] = curr
+        new_loc_states = self.curr_ped_state()
+        for loc, val in enumerate(new_loc_states):
+            prev = self.prev_loc_ped_state[loc]
+            curr = val
+            self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
+            self.prev_loc_ped_state[loc] = curr
         obs = {}
         num_self_obs = len(self.self_obs_names)
         num_ped_obs = len(self.ped_names)
@@ -507,10 +512,10 @@ class Bayesian0NoGridEnv(MultiEnv):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
-        # print(self.ped_transition_cnt)
-        # self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
-        # # dict to store the counts for each possible transiion
-        # self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
+        print(self.ped_transition_cnt)
+        self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
+        # dict to store the counts for each possible transiion
+        self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
         
         # Now that we've passed the possibly fake init steps some rl libraries
         # do, we can feel free to actually render things
@@ -1018,7 +1023,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def is_cross_walk_visible(self, veh_id, cw):
         pass
 
-    @DeprecationWarning
+    # @DeprecationWarning
     def edge_to_loc(self, lane, ped_id=None):
         """Map a lane id to its corresponding corresponds value. 
 

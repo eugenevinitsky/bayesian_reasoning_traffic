@@ -416,9 +416,6 @@ def create_agent(args, flow_params):
     checkpoint = result_dir + '/checkpoint_' + args.checkpoint_num
     checkpoint = checkpoint + '/checkpoint-' + args.checkpoint_num
     agent.restore(checkpoint)
-    # TODO(KL) this is wayyy too hard code-y
-    # agent.import_model(os.path.abspath('../../../../../flow/controllers/imitation_learning/model_files/b.h5'), 'av')
-
 
     return agent, config
 

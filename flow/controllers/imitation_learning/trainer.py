@@ -33,6 +33,7 @@ class Trainer(object):
             def __init__(self):
                 self.horizon = 400
                 self.algo = "PPO"
+                self.randomize_vehicles = True
 
         args = Args()
 

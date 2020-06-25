@@ -39,6 +39,9 @@ def parse_args(args):
         '--algorithm', type=str, default="PPO",
         help='RL algorithm to use. Options are PPO, TD3, MATD3 (MADDPG w/ TD3) right now.'
     )
+    parser.add_argument("--randomize_vehicles", default=True,
+                    help="randomize the number of vehicles in the system and where they come from",
+                    action="store_true")
     parser.add_argument(
         '--num_cpus', type=int, default=1,
         help='How many CPUs to use')
