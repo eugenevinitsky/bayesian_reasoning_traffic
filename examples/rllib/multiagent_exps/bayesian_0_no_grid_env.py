@@ -270,6 +270,7 @@ def on_episode_step(info):
     if 'av_0' in rl_ids:
         episode.user_data['past_intersection'] = int(env.k.vehicle.get_route('av_0')[-1] == env.k.vehicle.get_edge('av_0'))
         # TODO(@evinitsky) remove hardcoding
+    if 'av_0' in env.reward.keys():
         episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.995 ** env.time_counter)
 
 
