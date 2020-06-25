@@ -12,18 +12,18 @@ from flow.core.experiment import Experiment
 from flow.core.params import SimParams
 
 
-# # script for bay0_no_grid flow_params
-# class Args:
-#     def __init__(self):
-#         self.horizon = 400
-#         self.algo = "PPO"
-#         self.load_model=True
-#         self.load_path="flow/controllers/imitation_learning/model_files/bay0_Tue Jun 16 19:47:50 2020.h5"
-
-# args = Args()
 
 def run_experiment(args):
 
+    # script for bay0_no_grid flow_params
+    class Args:
+        def __init__(self):
+            self.horizon = 400
+            self.algo = "PPO"
+            self.load_model=True
+            self.load_path="/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
+            self.randomize_vehicles = True
+    args = Args()
     flow_params = bay_0_make_flow_params(args, pedestrians=True, render=True)
 
     create_env, _ = make_create_env(flow_params)
@@ -43,6 +43,7 @@ def run_experiment(args):
         rl_actions = {}
         for vehicle_id in state.keys():
             obs = state[vehicle_id]
+            import ipdb; ipdb.set_trace()
             action = action_network.get_accel_from_observation(obs)
             rl_actions[vehicle_id] = action
         return rl_actions
