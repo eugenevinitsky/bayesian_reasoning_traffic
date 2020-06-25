@@ -464,7 +464,6 @@ class TraCIVehicle(KernelVehicle):
 
     def get_pedestrian_crash(self, veh_id, pedestrian_kernel):
 
-        veh_x, veh_y = self.get_orientation(veh_id)[:2]
         crashed_pedestrians = []
 
         for ped_id in pedestrian_kernel.get_ids():
@@ -478,7 +477,6 @@ class TraCIVehicle(KernelVehicle):
                 crashed_pedestrians.append(ped_id)
 
         return crashed_pedestrians
-
 
     def get_viewable_objects(self, veh_id, pedestrians=None, lanes=None, radius=50, visualize=False):
         """Get vehicles and pedestrians that are viewable from the observation vehicle.

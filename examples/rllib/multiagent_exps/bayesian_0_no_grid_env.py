@@ -234,6 +234,7 @@ def on_episode_start(info):
     episode.user_data['num_ped_collisions'] = 0
     episode.user_data['num_veh_collisions'] = 0
     episode.user_data['avg_speed'] = []
+    episode.user_data["discounted_reward"] = 0
 
     episode.user_data['steps_elapsed'] = 0
     episode.user_data['vehicle_leaving_time'] = []
@@ -245,12 +246,13 @@ def on_episode_step(info):
     if isinstance(env, _GroupAgentsWrapper):
         env = env.env
     episode = info['episode']
+    collide_ids = env.k.simulation.get_collision_vehicle_ids()
     for v_id in env.k.vehicle.get_rl_ids():
         if len(env.k.vehicle.get_pedestrian_crash(v_id, env.k.pedestrian)) > 0:
             episode.user_data['num_ped_collisions'] += 1
 
-    if env.k.simulation.check_collision():
-        episode.user_data['num_veh_collisions'] += 1
+        if v_id in collide_ids:
+            episode.user_data['num_veh_collisions'] += 1
 
     avg_speed = env.k.vehicle.get_speed(env.k.vehicle.get_rl_ids())
     if len(avg_speed) > 0:
@@ -267,6 +269,8 @@ def on_episode_step(info):
     rl_ids = env.k.vehicle.get_rl_ids()
     if 'av_0' in rl_ids:
         episode.user_data['past_intersection'] = int(env.k.vehicle.get_route('av_0')[-1] == env.k.vehicle.get_edge('av_0'))
+        # TODO(@evinitsky) remove hardcoding
+        episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.995 ** env.time_counter)
 
 
 def on_episode_end(info):
@@ -283,6 +287,7 @@ def on_episode_end(info):
     else:
         episode.custom_metrics['avg_rl_veh_arrival'] = 500
     episode.custom_metrics['past_intersection'] = episode.user_data['past_intersection']
+    episode.custom_metrics["discounted_reward"] = episode.user_data['discounted_reward']
 
 
 def setup_exps_DQN(args, flow_params):
@@ -312,16 +317,16 @@ def setup_exps_DQN(args, flow_params):
     if args.render:
         config["num_workers"] = 0
     config['train_batch_size'] = args.horizon * args.n_rollouts
-    config['no_done_at_end'] = True
+    config['no_done_at_end'] = False
     config['lr'] = 1e-4
     config['n_step'] = 10
-    config['gamma'] = 0.99  # discount rate
+    config['gamma'] = 0.995  # discount rate
     config['model'].update({'fcnet_hiddens': [64, 64, 64]})
     config['learning_starts'] = 20000
     config['prioritized_replay'] = True
     # increase buffer size
     config['buffer_size'] = 200000
-    config['model']['fcnet_activation'] = 'relu'
+    # config['model']['fcnet_activation'] = 'relu'
     if args.grid_search:
         config['n_step'] = tune.grid_search([1, 10])
         config['lr'] = tune.grid_search([1e-3, 1e-2, 1e-4])
@@ -410,7 +415,7 @@ def setup_exps_PPO(args, flow_params):
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
     # TODO(@ev) fix the termination condition so you don't need this
-    config['no_done_at_end'] = True
+    config['no_done_at_end'] = False
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
     # config['entropy_coeff'] = -0.01
