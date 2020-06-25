@@ -3,13 +3,13 @@ import numpy as np
 import gym
 import os
 import argparse
-from flow.utils.registry import make_create_env
 from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params as bay_0_make_flow_params
 from utils import *
 from imitating_network import *
 from utils_tensorflow import *
 from flow.core.experiment import Experiment
 from flow.core.params import SimParams
+from flow.utils.registry import make_create_env
 
 
 
@@ -43,7 +43,7 @@ def run_experiment(args):
         rl_actions = {}
         for vehicle_id in state.keys():
             obs = state[vehicle_id]
-            import ipdb; ipdb.set_trace()
+            # import ipdb; ipdb.set_trace()
             action = action_network.get_accel_from_observation(obs)
             rl_actions[vehicle_id] = action
         return rl_actions
