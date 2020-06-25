@@ -25,7 +25,7 @@ class PreTrainedController(BaseController):
             action = env.discrete_actions_to_accels[np.argmax(q_val)]
             return action
         else:
-            return 3.0
+            return 1.0
 
     def get_discrete_action(self, env):
         state = env.get_state()

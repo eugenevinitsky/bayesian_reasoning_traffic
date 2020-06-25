@@ -82,7 +82,7 @@ def make_flow_params():
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
+            speed_mode="aggressive",
             max_speed=0.0000000000001
         ),
         acceleration_controller=(FullStop, {}),

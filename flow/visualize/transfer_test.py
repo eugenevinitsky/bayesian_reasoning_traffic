@@ -257,6 +257,7 @@ def construct_env(args, flow_params, version_number):
         sim_params.save_render = True
 
     env = create_env()
+    env.sim_params.render = sim_params.render
     return env, env_name
 
 

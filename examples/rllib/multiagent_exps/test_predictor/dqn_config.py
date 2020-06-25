@@ -39,7 +39,7 @@ def get_flow_params(args=None, pedestrians=True, render=True):
         #     end='(1.1)--(1.2)',
         #     depart_pos='40',
         #     )
-        for i in range(20):
+        for i in range(6):
             pedestrian_params.add(
                 ped_id=f'ped_{i}',
                 depart_time='0.00',
