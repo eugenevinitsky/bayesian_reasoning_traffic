@@ -326,7 +326,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
         for rl_id in valid_ids:
             # reward rl slightly earlier than when control is given back to SUMO
-            print('rl_id is and intersection is ', rl_id, self.got_to_intersection)
             if rl_id in self.got_to_intersection and rl_id not in self.past_intersection_rewarded_set:
                 # print('arrived past intersection and got reward')
                 # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
