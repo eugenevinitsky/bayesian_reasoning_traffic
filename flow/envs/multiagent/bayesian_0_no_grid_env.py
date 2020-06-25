@@ -197,8 +197,8 @@ class Bayesian0NoGridEnv(MultiEnv):
             rl_ids = []
             accels = []
             for rl_id, actions in rl_actions.items():
-                if rl_id in self.k.vehicle.get_rl_ids():
-                    self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
+                # if rl_id in self.k.vehicle.get_rl_ids():
+                #     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
 
                 if not self.arrived_intersection(rl_id):
                     continue
@@ -279,7 +279,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
                 for index, veh_id in enumerate(visible_vehicles):
 
-                    before = self.arrived_before(veh_id, rl_id)
+                    before = self.arrival_position(veh_id)
 
                     observed_yaw = self.k.vehicle.get_yaw(veh_id)
                     observed_speed = self.k.vehicle.get_speed(veh_id)
@@ -330,7 +330,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 # good job on getting to goal and going fast. We keep these rewards tiny to not overwhelm the
                 # pedestrian penalty
                 rewards[rl_id] = (0.4 / 500.0)
-                speed = self.k.vehicle.get_speed(rl_id) / 1000.0
+                speed = self.k.vehicle.get_speed(rl_id) / 300.0
                 # after a crash, the speed can be a huge negative or positive float
                 if speed > 0 and speed < 100.0:
                     rewards[rl_id] += speed
@@ -807,6 +807,13 @@ class Bayesian0NoGridEnv(MultiEnv):
             return 1
         else:
             return 0
+
+    def arrival_position(self, veh_1):
+        """Return arrival position if vehicle has arrived. Else, return -1"""
+        if veh_1 not in self.arrival_order:
+            return -1
+        else:
+            return self.arrival_order[veh_1]
 
     def curr_ped_state(self):
         """Return a list containing the ground truth state of pedestrians wrt the four locations. 

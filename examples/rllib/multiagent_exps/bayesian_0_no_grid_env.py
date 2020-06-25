@@ -445,7 +445,7 @@ def setup_exps_PPO(args, flow_params):
     flow_json = json.dumps(
         flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
     config['env_config']['flow_params'] = flow_json
-    config['env_config']['run'] = "CustomPPO"
+    config['env_config']['run'] = "PPO"
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
     config['env'] = env_name
