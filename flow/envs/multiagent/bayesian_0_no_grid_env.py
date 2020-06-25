@@ -197,10 +197,11 @@ class Bayesian0NoGridEnv(MultiEnv):
             rl_ids = []
             accels = []
             for rl_id, actions in rl_actions.items():
-                if not self.arrived_intersection(rl_id):
-                    continue
                 if rl_id in self.k.vehicle.get_rl_ids():
                     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
+
+                if not self.arrived_intersection(rl_id):
+                    continue
                 
                 if self.discrete:
                     accel = self.discrete_actions_to_accels[actions]
@@ -209,7 +210,7 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 # if we are inside the intersection, go full speed ahead
                 if rl_id in self.got_to_intersection:
-                    return 3.0
+                    accel =  3.0
                 rl_ids.append(rl_id)
                 accels.append(accel)
 
@@ -501,7 +502,8 @@ class Bayesian0NoGridEnv(MultiEnv):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
-        print(self.ped_transition_cnt)
+        # print(self.ped_transition_cnt)
+        self.time_counter = 0
         self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
         # dict to store the counts for each possible transiion
         self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}

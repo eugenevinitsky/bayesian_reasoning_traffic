@@ -266,7 +266,7 @@ def on_episode_step(info):
         episode.user_data['num_rl_veh_active'] -= num_veh_left
     rl_ids = env.k.vehicle.get_rl_ids()
     if 'av_0' in rl_ids:
-        episode.user_data['past_intersection'] = int(env.past_intersection('av_0'))
+        episode.user_data['past_intersection'] = int('av_0' in env.got_to_intersection)
 
 
 def on_episode_end(info):
@@ -309,6 +309,8 @@ def setup_exps_DQN(args, flow_params):
     # print(config)
     # import ipdb; ipdb.set_trace()
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
+    if args.render:
+        config["num_workers"] = 0
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
@@ -411,7 +413,7 @@ def setup_exps_PPO(args, flow_params):
     config['no_done_at_end'] = True
     config['lr'] = 1e-4
     config['gamma'] = 0.97  # discount rate
-    config['entropy_coeff'] = -0.01
+    # config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.use_lstm:
         config['model']['use_lstm'] = True
