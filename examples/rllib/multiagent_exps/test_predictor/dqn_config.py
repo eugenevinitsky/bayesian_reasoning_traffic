@@ -28,7 +28,7 @@ INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 
 
-def get_flow_params(args=None, pedestrians=True, render=True):
+def get_flow_params(args=None, pedestrians=True, render=False):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
@@ -69,7 +69,7 @@ def get_flow_params(args=None, pedestrians=True, render=True):
         acceleration_controller=(PreTrainedController,
                                  {"path": os.path.expanduser("~/ray_results/final_policy_rss/DQN_0_0_2020-06-24_14-19-463mwnbpq0"),
                                   "checkpoint_num": str(400)}),
-        num_vehicles=3)
+        num_vehicles=1)
 
     n_rows = 1
     n_columns = 1

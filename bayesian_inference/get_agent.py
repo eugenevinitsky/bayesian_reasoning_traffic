@@ -7,8 +7,10 @@ try:
 except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 
-from examples.rllib.multiagent_exps.test_predictor.pedestrian_policy_1 import create_agent
-from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params as bay_0_make_flow_params
+from flow.controllers.imitation_learning.utils import *
+from flow.controllers.imitation_learning.imitating_network import *
+from flow.controllers.imitation_learning.utils_tensorflow import *
+from flow.utils.registry import make_create_env
 
 EXAMPLE_USAGE = """
 example usage:

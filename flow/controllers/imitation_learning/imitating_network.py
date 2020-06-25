@@ -1,14 +1,11 @@
-import numpy as np
-from time import time
 import tensorflow as tf
-import tensorflow_probability as tfp
 
 from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.controllers.imitation_learning.keras_utils import *
 from flow.controllers.imitation_learning.keras_utils import negative_log_likelihood_loss
 
 from flow.controllers.base_controller import BaseController
-from replay_buffer import ReplayBuffer
+from flow.controllers.imitation_learning.replay_buffer import ReplayBuffer
 from tensorflow.python.keras.callbacks import TensorBoard
 
 
