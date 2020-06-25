@@ -1167,7 +1167,6 @@ class TraCIVehicle(KernelVehicle):
 
     def update_vehicle_colors(self):
         """See parent class.
-
         The colors of all vehicles are updated as follows:
         - red: autonomous (rl) vehicles
         - white: unobserved human-driven vehicles
@@ -1175,8 +1174,11 @@ class TraCIVehicle(KernelVehicle):
         """
         for veh_id in self.get_rl_ids():
             try:
-                # color rl vehicles red
-                self.set_color(veh_id=veh_id, color=RED)
+                # If vehicle is already being colored via argument to vehicles.add(), don't re-color it.
+                if 'color' not in \
+                        self.type_parameters[self.get_type(veh_id)]:
+                    # color rl vehicles red
+                    self.set_color(veh_id=veh_id, color=RED)
             except (FatalTraCIError, TraCIException) as e:
                 print('Error when updating rl vehicle colors:', e)
 
@@ -1184,7 +1186,21 @@ class TraCIVehicle(KernelVehicle):
         for veh_id in self.get_human_ids():
             try:
                 color = CYAN if veh_id in self.get_observed_ids() else WHITE
-                self.set_color(veh_id=veh_id, color=color)
+                # If vehicle is already being colored via argument to vehicles.add(), don't re-color it.
+                if 'color' not in \
+                        self.type_parameters[self.get_type(veh_id)]:
+                    self.set_color(veh_id=veh_id, color=color)
+            except (FatalTraCIError, TraCIException) as e:
+                print('Error when updating human vehicle colors:', e)
+
+        for veh_id in self.get_ids():
+            try:
+                if 'av' in veh_id:
+                    color = RED
+                    # If vehicle is already being colored via argument to vehicles.add(), don't re-color it.
+                    if 'color' not in \
+                            self.type_parameters[self.get_type(veh_id)]:
+                        self.set_color(veh_id=veh_id, color=color)
             except (FatalTraCIError, TraCIException) as e:
                 print('Error when updating human vehicle colors:', e)
 

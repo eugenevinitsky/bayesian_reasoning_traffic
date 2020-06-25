@@ -75,6 +75,7 @@ def make_env():
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="aggressive",
         ),
+        color='red',
         num_vehicles=1)
 
     vehicles.add(
