@@ -37,7 +37,7 @@ MAX_SPEED = 30
 INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 # number of vehicles originating in the left, right, top, and bottom edges
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
-NUM_PEDS = 2
+NUM_PEDS = 6
 
 
 def make_flow_params(args, pedestrians=False, render=False, discrete=False):
@@ -67,32 +67,20 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     # support traffic light compliance
     vehicles = VehicleParams()
 
-    vehicles.add(
-        veh_id="human_0",
-        acceleration_controller=(SimCarFollowingController, {}),
-        car_following_params=SumoCarFollowingParams(
-            min_gap=2.5,
-            decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
-        ),
-        routing_controller=(GridRouter, {}),
-        depart_time='0.25',
-        num_vehicles=1)
-
-    #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
-    vehicles.add(
-        veh_id='rl',
-        acceleration_controller=(RLController, {}),
-        car_following_params=SumoCarFollowingParams(
-            speed_mode='aggressive',
-        ),
-        routing_controller=(GridRouter, {}),
-        # depart_time='3.5',    #TODO change back to 3.5s
-        num_vehicles=1,
+    if args.only_rl:
+        vehicles.add(
+            veh_id='rl',
+            acceleration_controller=(RLController, {}),
+            car_following_params=SumoCarFollowingParams(
+                speed_mode='aggressive',
+            ),
+            routing_controller=(GridRouter, {}),
+            # depart_time='3.5',    #TODO change back to 3.5s
+            num_vehicles=4,
         )
-    if args.randomize_vehicles:
+    else:
         vehicles.add(
-            veh_id="human_1",
+            veh_id="human_0",
             acceleration_controller=(SimCarFollowingController, {}),
             car_following_params=SumoCarFollowingParams(
                 min_gap=2.5,
@@ -100,18 +88,42 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 speed_mode="right_of_way",
             ),
             routing_controller=(GridRouter, {}),
+            depart_time='0.25',
             num_vehicles=1)
 
+        #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
         vehicles.add(
-            veh_id="human_2",
-            acceleration_controller=(SimCarFollowingController, {}),
+            veh_id='rl',
+            acceleration_controller=(RLController, {}),
             car_following_params=SumoCarFollowingParams(
-                min_gap=2.5,
-                decel=7.5,  # avoid collisions at emergency stops
-                speed_mode="right_of_way",
+                speed_mode='aggressive',
             ),
             routing_controller=(GridRouter, {}),
-            num_vehicles=1)
+            # depart_time='3.5',    #TODO change back to 3.5s
+            num_vehicles=1,
+            )
+        if args.randomize_vehicles:
+            vehicles.add(
+                veh_id="human_1",
+                acceleration_controller=(SimCarFollowingController, {}),
+                car_following_params=SumoCarFollowingParams(
+                    min_gap=2.5,
+                    decel=7.5,  # avoid collisions at emergency stops
+                    speed_mode="right_of_way",
+                ),
+                routing_controller=(GridRouter, {}),
+                num_vehicles=1)
+
+            vehicles.add(
+                veh_id="human_2",
+                acceleration_controller=(SimCarFollowingController, {}),
+                car_following_params=SumoCarFollowingParams(
+                    min_gap=2.5,
+                    decel=7.5,  # avoid collisions at emergency stops
+                    speed_mode="right_of_way",
+                ),
+                routing_controller=(GridRouter, {}),
+                num_vehicles=1)
 
 
     n_rows = 1
@@ -504,6 +516,9 @@ if __name__ == '__main__':
                         action="store_true")
     parser.add_argument("--randomize_vehicles", default=True,
                         help="randomize the number of vehicles in the system and where they come from",
+                        action="store_true")
+    parser.add_argument("--only_rl", default=False,
+                        help="only use AVs in the system",
                         action="store_true")
     parser.add_argument("--render",
                         help="render SUMO simulation",

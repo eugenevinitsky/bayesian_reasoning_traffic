@@ -28,16 +28,25 @@ INNER_LENGTH = 50  # length of inner edges in the traffic light grid network
 N_LEFT, N_RIGHT, N_TOP, N_BOTTOM = 0, 1, 1, 1
 
 
-def get_flow_params(args=None, pedestrians=True, render=False):
+def get_flow_params(args=None, pedestrians=True, render=True):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-        pedestrian_params.add(
-            ped_id='ped_0',
-            depart_time='0.00',
-            start='(1.0)--(1.1)',
-            end='(1.1)--(1.2)',
-            depart_pos='40')
+        # pedestrian_params.add(
+        #     ped_id='ped_0',
+        #     depart_time='0.00',
+        #     start='(1.0)--(1.1)',
+        #     end='(1.1)--(1.2)',
+        #     depart_pos='40',
+        #     )
+        for i in range(20):
+            pedestrian_params.add(
+                ped_id=f'ped_{i}',
+                depart_time='0.00',
+                start='(1.2)--(1.1)',
+                end='(1.1)--(1.0)',
+                depart_pos=f'{44 + 0.5 * i}',
+                arrival_pos='5')
 
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -53,6 +62,7 @@ def get_flow_params(args=None, pedestrians=True, render=False):
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="aggressive",
         ),
+        color='white',
         acceleration_controller=(PreTrainedController,
                                  {"path": os.path.expanduser("~/ray_results/final_policy_rss/DQN_0_0_2020-06-24_14-19-463mwnbpq0"),
                                   "checkpoint_num": str(400)}),
@@ -66,6 +76,7 @@ def get_flow_params(args=None, pedestrians=True, render=False):
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="aggressive",
         ),
+        color='red',
         acceleration_controller=(PreTrainedController,
                                  {"path": os.path.expanduser("~/ray_results/final_policy_rss/DQN_0_0_2020-06-24_14-19-463mwnbpq0"),
                                   "checkpoint_num": str(400)}),

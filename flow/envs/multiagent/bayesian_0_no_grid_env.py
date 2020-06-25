@@ -208,7 +208,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     accel = actions[0]
 
                 # if we are inside the intersection, go full speed ahead
-                if rl_id in self.past_intersection_rewarded_set:
+                if rl_id in self.got_to_intersection:
                     return 3.0
                 rl_ids.append(rl_id)
                 accels.append(accel)
@@ -257,8 +257,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         # avs are trained via DQN, rl is the L2 car
         valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
         for rl_id in valid_ids:
-            if rl_id in self.past_intersection_rewarded_set:
-                continue
                 
             if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
                 self.rl_set.add(rl_id)
@@ -326,15 +324,11 @@ class Bayesian0NoGridEnv(MultiEnv):
         valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
         for rl_id in valid_ids:
             # reward rl slightly earlier than when control is given back to SUMO
-            if rl_id in self.got_to_intersection and rl_id not in self.past_intersection_rewarded_set:
-                # print('arrived past intersection and got reward')
-                # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
-                # print('state is ', self.get_state())
-                rewards[rl_id] = 0.4
-                self.past_intersection_rewarded_set.add(rl_id)
-                continue
+            if rl_id in self.got_to_intersection:
 
-            if self.past_intersection_rewarded_set:
+                # good job on getting to goal and going fast. We keep these rewards tiny to not overwhelm the
+                # pedestrian penalty
+                rewards[rl_id] = (0.4 / 500.0) + self.k.vehicle.get_speed(rl_id) / 1000.0
                 continue
 
             if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
@@ -342,12 +336,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 edge_pos = self.k.vehicle.get_position(rl_id)
             
                 if 47 < edge_pos < 50 and self.k.vehicle.get_speed(rl_id) < 0.5:
-                    # slow down near the intersection
-                    if rl_id in self.near_intersection_rewarded_set_3:
-                        pass
-                    else:
-                        reward = 0.3
-                        self.near_intersection_rewarded_set_3.add(rl_id)
+                    # this reward needs to be a good deal less than the "get to goal reward". You can't just sit here
+                    # and maximize your reward
+                    reward = 0.4 / 2000.0
 
                 # TODO(@evinitsky) pick the right reward
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
@@ -477,21 +468,20 @@ class Bayesian0NoGridEnv(MultiEnv):
         # if states.keys() != reward.keys():
         #     reward = self.compute_reward(rl_actions, fail=crash)
         #     states = self.get_state()
-        done = {key: (key in self.k.vehicle.get_arrived_ids() or
-                     key in self.past_intersection_rewarded_set) and key not in self.done_list
+        done = {key: key in self.k.vehicle.get_arrived_ids()
                 for key in states.keys()}
-        # TODO(@ev) figure out why done is not being set
-        if 'av_0' in done and done['av_0']:
-            self.done_list.extend(['av_0'])
+        # # TODO(@ev) figure out why done is not being set
+        # if 'av_0' in done and done['av_0']:
+        #     self.done_list.extend(['av_0'])
         if crash:
             done['__all__'] = True
         else:
             done['__all__'] = False
-        if done['__all__'] and 'av_0' not in self.done_list:
-            print('you crashed before you got fully inside the intersection')
-            reward = {'av_0': -1.0}
-            states = {'av_0': -np.ones(self.observation_space.shape)}
-            done.update({'av_0': True})
+        # if done['__all__'] and 'av_0' not in self.done_list:
+        #     print('you crashed before you got fully inside the intersection')
+        #     reward = {'av_0': -1.0}
+        #     states = {'av_0': -np.ones(self.observation_space.shape)}
+        #     done.update({'av_0': True})
 
         return states, reward, done, infos
 

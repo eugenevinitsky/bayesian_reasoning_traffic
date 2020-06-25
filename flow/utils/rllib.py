@@ -23,6 +23,7 @@ except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 import inspect
 from ray.tune.registry import register_env
+from flow.envs import Env
 
 
 class FlowParamsEncoder(json.JSONEncoder):
