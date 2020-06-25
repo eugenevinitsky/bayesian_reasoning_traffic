@@ -65,7 +65,7 @@ def make_flow_params():
         veh_id='rl',
         acceleration_controller=(RLController, {}),
         car_following_params=SumoCarFollowingParams(
-            speed_mode="right_of_way",
+            speed_mode="aggressive",
         ),
         routing_controller=(GridRouter, {}),
         num_vehicles=1)

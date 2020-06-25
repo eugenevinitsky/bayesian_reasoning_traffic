@@ -69,7 +69,7 @@ def construct_agent(args):
 
     # Set num_workers to be at least 2.
     if "num_workers" in config:
-        config["num_workers"] = min(2, config["num_workers"])
+        config["num_workers"] = 0
 
     flow_params = get_flow_params(config)
     sim_params = flow_params['sim']
@@ -110,8 +110,7 @@ def construct_agent(args):
         agent_cls = CustomPPOTrainer
     elif config_run:
         if config_run == "CustomPPO":
-            from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
-            agent_cls = PPOTrainer
+            agent_cls = get_agent_class("PPO")
         else:
             agent_cls = get_agent_class(config_run)
     else:

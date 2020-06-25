@@ -24,6 +24,7 @@ except ImportError:
 import inspect
 
 from ray.tune.registry import register_env
+from flow.envs import Env
 
 
 class FlowParamsEncoder(json.JSONEncoder):
