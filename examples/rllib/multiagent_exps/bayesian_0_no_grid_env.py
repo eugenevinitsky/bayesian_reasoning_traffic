@@ -69,7 +69,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
 
     if args.only_rl:
         vehicles.add(
-            veh_id='rl',
+            veh_id='av',
             acceleration_controller=(RLController, {}),
             car_following_params=SumoCarFollowingParams(
                 speed_mode='aggressive',
@@ -93,7 +93,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
 
         #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
         vehicles.add(
-            veh_id='rl',
+            veh_id='av',
             acceleration_controller=(RLController, {}),
             car_following_params=SumoCarFollowingParams(
                 speed_mode='aggressive',
@@ -266,7 +266,7 @@ def on_episode_step(info):
         episode.user_data['num_rl_veh_active'] -= num_veh_left
     rl_ids = env.k.vehicle.get_rl_ids()
     if 'av_0' in rl_ids:
-        episode.user_data['past_intersection'] = int('av_0' in env.got_to_intersection)
+        episode.user_data['past_intersection'] = int(env.k.vehicle.get_route('av_0')[-1] == env.k.vehicle.get_edge('av_0'))
 
 
 def on_episode_end(info):

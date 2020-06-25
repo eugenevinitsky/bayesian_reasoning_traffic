@@ -329,7 +329,11 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 # good job on getting to goal and going fast. We keep these rewards tiny to not overwhelm the
                 # pedestrian penalty
-                rewards[rl_id] = (0.4 / 500.0) + self.k.vehicle.get_speed(rl_id) / 1000.0
+                rewards[rl_id] = (0.4 / 500.0)
+                speed = self.k.vehicle.get_speed(rl_id) / 1000.0
+                # after a crash, the speed can be a huge negative or positive float
+                if speed > 0 and speed < 100.0:
+                    rewards[rl_id] += speed
                 continue
 
             if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
