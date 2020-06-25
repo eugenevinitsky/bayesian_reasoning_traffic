@@ -16,28 +16,25 @@ from flow.utils.exceptions import FatalFlowError
 
 ADDITIONAL_ENV_PARAMS = {
     # maximum acceleration of autonomous vehicles
-    'max_accel': 4.5,
+    'max_accel': 2.6,
     # maximum deceleration of autonomous vehicles
-    'max_decel': -2.6,
+    'max_decel': 4.5,
     # desired velocity for all vehicles in the network, in m/s
     "target_velocity": 25,
     # how many objects in our local radius we want to return
     "max_num_objects": 3,
-    # how large of a radius to search vehicles in for a given vehicle in meters
+    # how large of a radius to search in for a given vehicle in meters
     "search_veh_radius": 50,
-    # # how large of a radius to search pedestrians in for a given vehicle in meters
+    # how large of a radius to search for pedestrians in for a given vehicle in meters (create effect of only seeing pedestrian only when relevant)
     "search_ped_radius": 22,
-    # whether or not we have a discrete action space (does discrete allow for decimal points?)
-    "discrete": False,
-    # whether the state should be appended with the priors from the inference
+    # whether or not we have a discrete action space,
+    "discrete": True,
+    # whether to randomize which edge the vehicles are coming from
+    "randomize_vehicles": True,
+    # whether to append the prior into the state
     "inference_in_state": False,
-    # whether the view in front of the vehicle should be gridded into some number of cells
-    # where we check if there's a pedestrian in each one
-    "use_grid": False,
-    # whether to randomize the entering vehicles so that you consistently
-    # enter on a different edge and multiple human vehicles are in the system
-    # TODO(@evinitsky) enable. At the moment ALL the vehicles will always enter the system
-    "randomize_vehicles": False,
+    # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
+    "use_grid": False
 }
 
 HARD_BRAKE_PENALTY = 0.001
@@ -211,8 +208,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                     accel = actions[0]
 
                 # if we are inside the intersection, go full speed ahead
-                if rl_id in self.got_to_intersection:
-                    continue
+                if rl_id in self.past_intersection_rewarded_set:
+                    return 3.0
                 rl_ids.append(rl_id)
                 accels.append(accel)
 
@@ -256,9 +253,11 @@ class Bayesian0NoGridEnv(MultiEnv):
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
-        for rl_id in self.k.vehicle.get_rl_ids():
-
-            if self.past_intersection_rewarded_set:
+        veh_ids = self.k.vehicle.get_ids()
+        # avs are trained via DQN, rl is the L2 car
+        valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
+        for rl_id in valid_ids:
+            if rl_id in self.past_intersection_rewarded_set:
                 continue
                 
             if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
@@ -317,13 +316,17 @@ class Bayesian0NoGridEnv(MultiEnv):
     def compute_reward(self, rl_actions, **kwargs):
         """See class definition."""
         # in the warmup steps
-        if rl_actions is None:
-            return {}
+        # if rl_actions is None:
+        #     return {}
 
         rewards = {}
-        for rl_id in self.k.vehicle.get_rl_ids():   
+        veh_ids = self.k.vehicle.get_ids()
+
+        # avs are trained via DQN, rl is the L2 car
+        valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
+        for rl_id in valid_ids:
             # reward rl slightly earlier than when control is given back to SUMO
-            if rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set:
+            if rl_id in self.got_to_intersection and rl_id not in self.past_intersection_rewarded_set:
                 # print('arrived past intersection and got reward')
                 # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
                 # print('state is ', self.get_state())
@@ -357,7 +360,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     reward = -1.0
 
                 # penalty for jerkiness
-                if rl_id in rl_actions.keys():
+                if rl_actions and rl_id in rl_actions.keys():
                     if self.discrete:
                         accel = self.discrete_actions_to_accels[rl_actions[rl_id]]
                     else:

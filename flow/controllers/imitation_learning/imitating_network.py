@@ -1,14 +1,11 @@
-import numpy as np
-from time import time
 import tensorflow as tf
-import tensorflow_probability as tfp
 
 from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.controllers.imitation_learning.keras_utils import *
 from flow.controllers.imitation_learning.keras_utils import negative_log_likelihood_loss
 
 from flow.controllers.base_controller import BaseController
-from replay_buffer import ReplayBuffer
+from flow.controllers.imitation_learning.replay_buffer import ReplayBuffer
 from tensorflow.python.keras.callbacks import TensorBoard
 
 
@@ -165,10 +162,15 @@ class ImitatingNetwork():
         # "batch size" is 1, so just get single acceleration/acceleration vector
         network_output = self.model.predict(observation)
         if self.stochastic:
-            mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
-            var = np.exp(2 * log_std)
-            action = np.random.multivariate_normal(mean[0], var)
-            return action
+            try:
+
+                mean, log_std = network_output[:, :self.action_dim], network_output[:, self.action_dim:]
+                var = np.exp(2 * log_std)
+                action = np.random.multivariate_normal(mean[0], var)
+                print(var)
+                return action
+            except:
+                import ipdb; ipdb.set_trace()
         else:
             return network_output
 

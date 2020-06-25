@@ -386,9 +386,11 @@ def setup_exps_PPO(args, flow_params):
         training configuration parameters
     """
 
-    from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
-    alg_run = PPOTrainer
-    config = PPO_DEFAULT_CONFIG.copy()
+    # from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
+    alg_run = "PPO"
+    # config = PPO_DEFAULT_CONFIG.copy()
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
 
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
