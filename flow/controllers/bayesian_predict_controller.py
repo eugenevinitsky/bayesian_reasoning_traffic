@@ -9,14 +9,7 @@ class BayesianPredictController(BaseController):
 
         self.look_ahead_len = look_ahead_len
 
-    def get_accel(self, env):
-
-        if not isinstance(env.query_env.k.vehicle.get_acc_controller('av_0'), BayesianManualController):
-            env.query_env.k.vehicle.kernel_api.vehicle.setSpeedMode('av_0', 0)
-            env.query_env.k.vehicle.set_acc_controller('av_0', (BayesianManualController, {}))
-            env.query_env.k.vehicle.set_controlled('av_0')
-
-        # Set query_env state to the same as env
+    def sync_envs(self, env):
         for veh_id in env.k.vehicle.get_ids():
             x, y = env.k.vehicle.get_xy(veh_id)
             edge_id = env.k.vehicle.get_edge(veh_id)
@@ -35,9 +28,57 @@ class BayesianPredictController(BaseController):
             edge = env.k.pedestrian.get_edge(ped_id)
             env.query_env.k.pedestrian.set_xy(
                     ped_id, edge, x, y)
+
+        env.query_env.step(None)
+
+    def get_accel(self, env, ped_prob=1):
+
+        if not isinstance(env.query_env.k.vehicle.get_acc_controller('av_0'), BayesianManualController):
+            env.query_env.k.vehicle.kernel_api.vehicle.setSpeedMode('av_0', 0)
+            env.query_env.k.vehicle.set_acc_controller('av_0', (BayesianManualController, {}))
+            env.query_env.k.vehicle.set_controlled('av_0')
+
+        # Set query_env state to the same as env
+        self.sync_envs(env)
+
+        # Remove pedestrians from query_env
+        ped_states = {}
+        for ped_id in env.query_env.k.pedestrian.get_ids():
+            ped_state = {}
+            ped_state['edge_id'] = env.k.pedestrian.get_edge(ped_id)
+            ped_state['position'] = env.k.pedestrian.get_lane_position(ped_id)
+            ped_state['stage'] = env.k.pedestrian.kernel_api.person.getStage(ped_id)
+            ped_states[ped_id] = ped_state
+            env.query_env.k.pedestrian.remove(ped_id)
+
+        # Look ahead with no pedestrians
+        _, _, action_scores_no_ped = self.look_ahead(env, self.look_ahead_len)
+
+        # Add pedestrians back in to query_env and sync
+        for ped_id in ped_states:
+            env.query_env.k.kernel_api.person.add(
+                    ped_id,
+                    ped_states[ped_id]['edge_id'],
+                    ped_states[ped_id]['position'])
+            env.query_env.k.kernel_api.person.appendStage(ped_id,
+                    ped_states[ped_id]['stage'])
+        env.query_env.step(None)
+        self.sync_envs(env)
+
         # Perform recursive look ahead
-        action, _ = self.look_ahead(env, self.look_ahead_len)
-        return action
+        _, _, action_scores_ped = self.look_ahead(env, self.look_ahead_len)
+
+        # Compute weighted average for scores to determine best action
+        best_action = 0
+        best_score = 0
+        for a in action_scores_ped:
+            score = (ped_prob * action_scores_ped[a]) + \
+                    ((1 - ped_prob) * action_scores_no_ped[a])
+            if score >= best_score:
+                best_score = score
+                best_action = a
+
+        return best_action
 
     def store_info(self, env):
         # save current state information
@@ -58,7 +99,7 @@ class BayesianPredictController(BaseController):
     # TODO(@ev) return sum of rewards, not reward at leaf
     def look_ahead(self, env, steps):
         '''
-        return (best accel, score of best accel)
+        return (best accel, score of best accel, dict accel:score)
         '''
 
         # Set score that vehicle tries to maximize
@@ -67,7 +108,7 @@ class BayesianPredictController(BaseController):
         near_exit = self.check_near_exit(env.query_env)
         # base case or collision (negative score)
         if steps == 0 or score < 0 or near_exit:
-            return 0, score
+            return 0, score, {}
 
         # Different accelerations to iterate over
         accels = [-4.5, 0, 2.6] # TODO:add as a param
@@ -75,6 +116,7 @@ class BayesianPredictController(BaseController):
         # save current state information
         states, ped_states = self.store_info(env.query_env)
 
+        action_scores = {}
         best_action = 0
         best_score = 0
 
@@ -84,9 +126,10 @@ class BayesianPredictController(BaseController):
             # Forward step
             env.query_env.k.vehicle.get_acc_controller('av_0').set_accel(a)
             env.query_env.step(None)
-            _, score = self.look_ahead(env, steps - 1)
+            _, score, _ = self.look_ahead(env, steps - 1)
 
             # Update if best accel so far
+            action_scores[a] = score
             if score >= best_score:
                 best_score = score
                 best_action = a
@@ -106,16 +149,7 @@ class BayesianPredictController(BaseController):
             # Take a step to reset vehicle positions and speed
             env.query_env.step(None)
 
-        for ped_id in env.k.pedestrian.get_ids():
-            x, y = env.k.pedestrian.get_xy(ped_id)
-            edge_id = env.k.pedestrian.get_edge(ped_id)
-            print([x, y, edge_id])
-        for ped_id in env.query_env.k.pedestrian.get_ids():
-            x, y = env.query_env.k.pedestrian.get_xy(ped_id)
-            edge_id = env.query_env.k.pedestrian.get_edge(ped_id)
-            print([x, y, edge_id])
-
-        return best_action, best_score
+        return best_action, best_score, action_scores
 
     def compute_reward(self, env):
         """See class definition."""

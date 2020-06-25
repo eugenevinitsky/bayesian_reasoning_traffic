@@ -115,7 +115,7 @@ class TraCIPedestrian(KernelPedestrian):
         """See parent class."""
         if ped_id in self.kernel_api.person.getIDList():
             self.kernel_api.person.unsubscribe(ped_id)
-            self.kernel_api.person.remove(ped_id)
+            self.kernel_api.person.removeStages(ped_id)
 
         if ped_id in self.__ids:
             self.__ids.remove(ped_id)
@@ -167,7 +167,7 @@ class TraCIPedestrian(KernelPedestrian):
         """See parent class."""
         if isinstance(ped_id, (list, np.ndarray)):
             return [self.get_lane_position(pedID, error) for pedID in ped_id]
-        return self.kernel_api._person.getLanePosition(ped_id)
+        return self.kernel_api.person.getLanePosition(ped_id)
 
     def is_pedestrian(self, obj_id):
         """See parent class"""
