@@ -419,7 +419,7 @@ def setup_exps_PPO(args, flow_params):
         config['model']['use_lstm'] = True
     if args.grid_search:
         config['gamma'] = tune.grid_search([.995, 0.99, 0.9])  # discount rate
-        config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, 0])  # entropy coeff
+        # config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, 0])  # entropy coeff
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
