@@ -20,7 +20,18 @@ class PreTrainedController(BaseController):
     def get_accel(self, env):
         state = env.get_state()
         if len(state) > 0 and self.veh_id in state.keys():
-            action = env.discrete_actions_to_accels[self.agent.compute_action(state[self.veh_id], policy_id='av')]
+            _, _, logits = self.agent.compute_action(state[self.veh_id], policy_id='av', full_fetch=True)
+            q_val = logits['q_values']
+            action = env.discrete_actions_to_accels[np.argmax(q_val)]
+            print('action is ', action)
+            return action
+        else:
+            return None
+
+    def get_discrete_action(self, env):
+        state = env.get_state()
+        if len(state) > 0 and self.veh_id in state.keys():
+            action = self.agent.compute_action(state[self.veh_id], policy_id='av')
             print('action is ', action)
             return action
         else:
