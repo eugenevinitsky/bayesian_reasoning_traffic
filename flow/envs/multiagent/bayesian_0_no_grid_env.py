@@ -208,7 +208,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     accel = actions[0]
 
                 # if we are inside the intersection, go full speed ahead
-                if rl_id in self.got_to_intersection:
+                if rl_id in self.past_intersection_rewarded_set:
                     return 3.0
                 rl_ids.append(rl_id)
                 accels.append(accel)
@@ -248,9 +248,11 @@ class Bayesian0NoGridEnv(MultiEnv):
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
-        for rl_id in self.k.vehicle.get_rl_ids():
-
-            if self.past_intersection_rewarded_set:
+        veh_ids = self.k.vehicle.get_ids()
+        # avs are trained via DQN, rl is the L2 car
+        valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
+        for rl_id in valid_ids:
+            if rl_id in self.past_intersection_rewarded_set:
                 continue
                 
             if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
@@ -309,13 +311,18 @@ class Bayesian0NoGridEnv(MultiEnv):
     def compute_reward(self, rl_actions, **kwargs):
         """See class definition."""
         # in the warmup steps
-        if rl_actions is None:
-            return {}
+        # if rl_actions is None:
+        #     return {}
 
         rewards = {}
-        for rl_id in self.k.vehicle.get_rl_ids():   
+        veh_ids = self.k.vehicle.get_ids()
+
+        # avs are trained via DQN, rl is the L2 car
+        valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
+        for rl_id in valid_ids:
             # reward rl slightly earlier than when control is given back to SUMO
-            if rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set:
+            print('rl_id is and intersection is ', rl_id, self.got_to_intersection)
+            if rl_id in self.got_to_intersection and rl_id not in self.past_intersection_rewarded_set:
                 # print('arrived past intersection and got reward')
                 # print('enter condition', rl_id in self.inside_intersection and rl_id not in self.past_intersection_rewarded_set)
                 # print('state is ', self.get_state())
@@ -349,7 +356,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     reward = -1.0
 
                 # penalty for jerkiness
-                if rl_id in rl_actions.keys():
+                if rl_actions and rl_id in rl_actions.keys():
                     if self.discrete:
                         accel = self.discrete_actions_to_accels[rl_actions[rl_id]]
                     else:

@@ -19,9 +19,10 @@ class PreTrainedController(BaseController):
 
     def get_accel(self, env):
         state = env.get_state()
-        # TODO(@evinitsky) clean up and make more general
-        if len(state) > 0:
-            return self.agent.compute_action(state, policy_id='av')
+        if len(state) > 0 and self.veh_id in state.keys():
+            action = env.discrete_actions_to_accels[self.agent.compute_action(state[self.veh_id], policy_id='av')]
+            print('action is ', action)
+            return action
         else:
             return None
 

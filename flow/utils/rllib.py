@@ -5,6 +5,7 @@ This includes: environment generation, serialization, and visualization.
 """
 import json
 from copy import deepcopy
+import gym
 import os
 
 import flow.envs
@@ -12,7 +13,8 @@ from flow.core.params import SumoLaneChangeParams, SumoCarFollowingParams, \
     SumoParams, InitialConfig, EnvParams, NetParams, InFlows
 from flow.core.params import TrafficLightParams
 from flow.core.params import VehicleParams, PedestrianParams
-from flow.envs import Env
+from flow.utils.registry import make_create_env
+# from flow.envs import Env
 from flow.networks import Network
 from ray.cloudpickle import cloudpickle
 try:
@@ -21,8 +23,6 @@ except ImportError:
     from ray.rllib.agents.registry import get_agent_class
 import inspect
 from ray.tune.registry import register_env
-from flow.utils.registry import make_create_env
-
 
 
 class FlowParamsEncoder(json.JSONEncoder):
