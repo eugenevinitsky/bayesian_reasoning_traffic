@@ -327,10 +327,12 @@ def setup_exps_DQN(args, flow_params):
     config['prioritized_replay'] = True
     # increase buffer size
     config['buffer_size'] = 200000
+    config["train_batch_size"] = 320
     # config['model']['fcnet_activation'] = 'relu'
     if args.grid_search:
         config['n_step'] = tune.grid_search([1, 10])
-        config['lr'] = tune.grid_search([1e-3, 1e-2, 1e-4])
+        # config['lr'] = tune.grid_search([1e-3, 1e-2, 1e-4])
+        config["train_batch_size"] = tune.grid_search([32, 320])
         config['gamma'] = tune.grid_search([0.999, 0.99])  # discount rate
 
     config['horizon'] = args.horizon

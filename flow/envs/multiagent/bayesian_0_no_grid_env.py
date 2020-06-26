@@ -211,6 +211,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 # if we are past the intersection, go full speed ahead
                 if self.past_intersection(rl_id):
                     # accel = 1.0
+                    self.k.vehicle.set_speed_mode(rl_id, 'right_of_way')
                     continue
                 rl_ids.append(rl_id)
                 accels.append(accel)
