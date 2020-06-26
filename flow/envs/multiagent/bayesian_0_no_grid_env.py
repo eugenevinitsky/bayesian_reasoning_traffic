@@ -8,9 +8,9 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-# from bayesian_inference.bayesian_inference_PPO import create_black_box
-# from bayesian_inference.get_agent import get_agent
-# from bayesian_inference.inference import get_updated_priors
+from bayesian_inference.get_inferer import get_inferrer
+from bayesian_inference.inference import get_filtered_posteriors
+
 
 # TODO(KL) means KL's reminder for KL
 
@@ -162,8 +162,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
         self.inference_in_state = env_params.additional_params.get("inference_in_state", False)
         # TODO(@evinitsky) the inference code is not merged yet
-        # if self.inference_in_state:
-        #     self.agent = get_agent("PPO")
+        if self.inference_in_state:
+            path_to_inferrer = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
+            self.agent = get_inferrer(path=path_to_inferrer, inferrer_type="imitation")
         self.max_num_objects = env_params.additional_params.get("max_num_objects", 3)
 
     @property
@@ -302,7 +303,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                             if self.arrived_intersection(veh_id):
                                 acceleration = self.k.vehicle.get_acceleration(veh_id)
                                 visible_veh_non_ped_obs = self.get_non_ped_obs(veh_id)
-                                updated_ped_probs, self.priors[veh_id] = get_updated_priors(acceleration,
+                                updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(acceleration,
                                                                                             visible_veh_non_ped_obs,
                                                                                             self.priors.get(veh_id, {}),
                                                                                             self.agent)
@@ -832,18 +833,18 @@ class Bayesian0NoGridEnv(MultiEnv):
         return locs
 
     def get_non_ped_obs(self, veh_id):
-        """Return all the obs for vehicle veh_id aside from the updated probabilities and 
+        """Return all the obs for vehicle veh_id aside from the updated probabilities for 
         the four crosswalk pedestrian params
         
         Returns
         -------
         non_ped_obs : list
-            self_obs_names + veh_obs_names x (max_num_objects - 1)
+            self_obs_names + [None, None, None, None] + veh_obs_names x (max_num_objects - 1)
         """
         max_objects = self.env_params.additional_params["max_num_objects"]
         num_self_no_ped_obs = len(self.self_obs_names)
         num_other_no_ped_obs = len(self.veh_obs_names)
-        non_ped_obs = np.zeros(num_self_no_ped_obs + num_other_no_ped_obs * max_objects)
+        non_ped_obs = np.zeros(num_self_no_ped_obs + NUM_PED_LOCATIONS + num_other_no_ped_obs * max_objects)
 
         visible_vehicles, visible_pedestrians = self.find_visible_objects(veh_id, self.search_radius)
 

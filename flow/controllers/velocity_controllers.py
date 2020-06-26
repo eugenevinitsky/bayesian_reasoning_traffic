@@ -1,7 +1,7 @@
 """Contains a list of custom velocity controllers."""
 
 # TODO(@evinitsky) move to util
-from flow.utils.rllib import create_agent_from_path
+# from flow.utils.rllib import create_agent_from_path
 from flow.controllers.base_controller import BaseController
 import numpy as np
 
