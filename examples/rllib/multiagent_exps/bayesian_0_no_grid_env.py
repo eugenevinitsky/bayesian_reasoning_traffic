@@ -584,6 +584,8 @@ if __name__ == '__main__':
         'stop': {
             'training_iteration': args.n_iterations
         },
+        # TODO(@evinitsky) disable
+        'restore': "/Users/eugenevinitsky/ray_results/final_policy_rss3_DQN_bigbatch/DQN_0_0_2020-06-25_21-05-33jge0aj0_/checkpoint_400/checkpoint-400",
         'config': config,
         "num_samples": 1,
     }

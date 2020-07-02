@@ -198,7 +198,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             accels = []
             for rl_id, actions in rl_actions.items():
                 # if rl_id in self.k.vehicle.get_rl_ids():
-                #     self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
+                self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
 
                 if not self.arrived_intersection(rl_id):
                     continue
@@ -276,6 +276,8 @@ class Bayesian0NoGridEnv(MultiEnv):
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
                 observation[:num_self_obs + num_ped_obs] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
+                self.ped_variables = observation[num_self_obs: num_self_obs + num_ped_obs]
+
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after

@@ -45,7 +45,7 @@ def get_flow_params(args=None, pedestrians=True, render=True):
                 depart_time='0.00',
                 start='(1.2)--(1.1)',
                 end='(1.1)--(1.0)',
-                depart_pos=f'{44 + 0.5 * i}',
+                depart_pos=f'{43 + 0.5 * i}',
                 arrival_pos='5')
 
     # we place a sufficient number of vehicles to ensure they confirm with the
@@ -60,13 +60,13 @@ def get_flow_params(args=None, pedestrians=True, render=True):
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="aggressive",
+            speed_mode="right_of_way",
         ),
         color='white',
-        acceleration_controller=(PreTrainedController,
-                                 {"path": os.path.expanduser("~/ray_results/final_policy_rss/DQN_0_0_2020-06-24_14-19-463mwnbpq0"),
-                                  "checkpoint_num": str(400)}),
-        num_vehicles=2)
+        # acceleration_controller=(PreTrainedController,
+        #                          {"path": os.path.expanduser("~/ray_results/final_policy_rss/DQN_0_0_2020-06-24_14-19-463mwnbpq0"),
+        #                           "checkpoint_num": str(400)}),
+        num_vehicles=3)
 
     vehicles.add(
         veh_id="rl",
@@ -78,7 +78,7 @@ def get_flow_params(args=None, pedestrians=True, render=True):
         ),
         color='red',
         acceleration_controller=(PreTrainedController,
-                                 {"path": os.path.expanduser("~/ray_results/final_policy_rss/DQN_0_0_2020-06-24_14-19-463mwnbpq0"),
+                                 {"path": os.path.expanduser("/Users/eugenevinitsky/ray_results/final_policy_rss3_DQN_bigbatch/DQN_0_0_2020-06-25_21-05-33jge0aj0_"),
                                   "checkpoint_num": str(400)}),
         num_vehicles=1)
 
@@ -147,7 +147,7 @@ def get_flow_params(args=None, pedestrians=True, render=True):
         # or reset (see flow.core.params.InitialConfig)
         initial=initial_config,
         network_init=Bayesian0Network(
-            name="bayesian_1",
+            name="bayesian_0",
             vehicles=vehicles,
             net_params=net_params,
             pedestrians=pedestrian_params,
