@@ -1,17 +1,19 @@
 """Sets up and runs the basic bayesian example. This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
-from flow.controllers import GridRouter
+import argparse
+import os
+import ray
+
+from flow.controllers import GridRouter, RuleBasedIntersectionController
 from flow.core.experiment import Experiment
 from flow.core.bayesian_0_experiment import Bayesian0Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, SumoLaneChangeParams
 from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
-from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
-from flow.envs.multiagent.data_collection.bayesian_0_data_collection_env import Bayesian0DataCollectionEnv, ADDITIONAL_ENV_PARAMS
+from flow.envs.multiagent.bayesian_0_no_grid_env import Bayesian0NoGridEnv, ADDITIONAL_ENV_PARAMS
 from flow.networks import Bayesian0Network
 from flow.core.params import PedestrianParams
-import argparse
 
 
 def gen_edges(col_num, row_num):
@@ -113,7 +115,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
     num_cars_top = 1
     num_cars_bot = 0
     tot_cars = (num_cars_left + num_cars_right) * n_columns \
-        + (num_cars_top + num_cars_bot) * n_rows              # Why's this * n_rows and not n_cols?
+               + (num_cars_top + num_cars_bot) * n_rows  # Why's this * n_rows and not n_cols?
 
     grid_array = {
         "inner_length": inner_length,
@@ -125,7 +127,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         "cars_bot": num_cars_bot
     }
 
-    sim_params = SumoParams(sim_step=0.1, render=True)
+    sim_params = SumoParams(sim_step=0.1, render=True, restart_instance=True)
 
     if render is not None:
         sim_params.render = render
@@ -135,35 +137,37 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         lc_pushy=0.8,
         lc_speed_gain=4.0,
         model="LC2013",
-        lane_change_mode="strategic",   # TODO: check-is there a better way to change lanes?
+        lane_change_mode="strategic",  # TODO: check-is there a better way to change lanes?
         lc_keep_right=0.8
     )
 
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-        pedestrian_params.add(
-             ped_id='ped_0',
-             depart_time='0.00',
-             start='(1.2)--(1.1)',
-             end='(1.1)--(1.0)',
-             depart_pos='43')
+        for i in range(20):
+            pedestrian_params.add(
+                ped_id='ped_{}'.format(i),
+                depart_time='0.00',
+                start='(1.2)--(1.1)',
+                end='(1.1)--(1.0)',
+                depart_pos=str(43 + 0.5 * i))
 
     vehicles = VehicleParams()
 
     vehicles.add(
-        veh_id="human_0",
+        veh_id="av",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
+            speed_mode="aggressive",
         ),
+        acceleration_controller=(RuleBasedIntersectionController, {}),
         lane_change_params=lane_change_params,
-        num_vehicles=num_cars_left)
+        num_vehicles=3)
 
     # For now, just have the one human car and one pedestrian
-    #
+
     # vehicles.add(
     #     veh_id="obstacle",
     #     routing_controller=(GridRouter, {}),
@@ -175,7 +179,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
     #     ),
     #     lane_change_params=lane_change_params,
     #     num_vehicles=num_cars_top)
-    #
+
     # vehicles.add(
     #     veh_id="rl",
     #     routing_controller=(GridRouter, {}),
@@ -194,7 +198,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         "speed_limit": 35,
         "horizontal_lanes": 1,
         "vertical_lanes": 1,
-        "randomize_routes": False
+        "randomize_routes": True
     }
 
     initial_config, net_params = get_non_flow_params(
@@ -209,13 +213,9 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         pedestrians=pedestrian_params,
         initial_config=initial_config)
 
-    
-    if not collect_data:
-        env = AccelEnv(env_params, sim_params, network)
-        return Experiment(env)
-    else:
-        env = Bayesian0DataCollectionEnv(env_params, sim_params, network)
-        return Bayesian0Experiment(env)
+    env = Bayesian0NoGridEnv(env_params, sim_params, network)
+    return Experiment(env)
+
 
 if __name__ == "__main__":
     # check for pedestrians
@@ -239,4 +239,5 @@ if __name__ == "__main__":
     # import the experiment variable
     exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
-    exp.run(1, 150)
+    ray.init()
+    exp.run(1, 600, multiagent=True)

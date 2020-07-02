@@ -170,7 +170,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
                    car_2_start_edge: [car_2_start_edge, car_2_end_edge],
                    car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
 
-
         return rts
 
     # def specify_routes(self, net_params):
@@ -340,14 +339,14 @@ class Bayesian0Network(TrafficLightGridNetwork):
             car_4_start_edge = start_edges[start_indices[3]]
 
 
-            car_1_start_pos = max(np.random.normal(20, 30), 0)
-            car_2_start_pos = max(np.random.normal(20, 30), 0)
-            car_3_start_pos = max(np.random.normal(20, 30), 0)
-            car_4_start_pos = max(np.random.normal(20, 30), 0)
+            car_1_start_pos = max(np.random.normal(30, 10), 0)
+            car_2_start_pos = max(np.random.normal(30, 10), 0)
+            car_3_start_pos = max(np.random.normal(30, 10), 0)
+            car_4_start_pos = max(np.random.normal(30, 10), 0)
 
 
             start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos),
-            (car_3_start_edge, car_3_start_pos), (car_4_start_edge, car_4_start_pos)]
+                        (car_3_start_edge, car_3_start_pos), (car_4_start_edge, car_4_start_pos)]
             # In SUMO, lanes are zero-indexed starting from the right-most lane
             start_lanes = [0, 0, 0, 0]
 
@@ -361,7 +360,8 @@ class Bayesian0Network(TrafficLightGridNetwork):
             car_4_start_edge = "(0.1)--(1.1)"
             car_4_start_pos = 0
 
-            start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos)]
+            start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos),
+                         (car_4_start_edge, car_4_start_pos)]
             start_lanes = [0, 0, 0, 0]
 
         return start_pos, start_lanes

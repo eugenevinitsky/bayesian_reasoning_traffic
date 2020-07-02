@@ -5,9 +5,9 @@ import os
 import argparse
 from flow.utils.registry import make_create_env
 from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params as bay_0_make_flow_params
-from utils import *
-from imitating_network import *
-from utils_tensorflow import *
+from flow.controllers.imitation_learning.utils import *
+from flow.controllers.imitation_learning.imitating_network import *
+from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.core.experiment import Experiment
 from flow.core.params import SimParams
 
@@ -21,8 +21,9 @@ def run_experiment(args):
             self.horizon = 400
             self.algo = "PPO"
             self.load_model=True
-            self.load_path="/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
+            self.load_path=os.path.abspath("model_files/c.h5")
             self.randomize_vehicles = True
+            self.only_rl = False
     args = Args()
     flow_params = bay_0_make_flow_params(args, pedestrians=True, render=True)
 
@@ -43,8 +44,8 @@ def run_experiment(args):
         rl_actions = {}
         for vehicle_id in state.keys():
             obs = state[vehicle_id]
-            import ipdb; ipdb.set_trace()
             action = action_network.get_accel_from_observation(obs)
+            # TODO(@evinitsky) should this be exp of that
             rl_actions[vehicle_id] = action
         return rl_actions
 

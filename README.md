@@ -39,6 +39,8 @@ follow the Brew instructions to install it via Brew.
 - The relevant environments that define step, reset, etc. are in flow/envs/multiagent/bayesian_0_no_grid_env.py
 - To replay a policy, look at flow/visualize/visualizer_rllib.py
 - For an example that uses future state prediction run examples/sumo/bayesian_1_predict.py
+- The rule based controller is called RuleBasedController
+- The pretrained controller which you can use by giving a path to a policy is called PreTrainedController.
 
 # Citing Flow
 
