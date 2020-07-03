@@ -12,7 +12,7 @@ from flow.controllers.imitation_learning.imitating_network import *
 from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.utils.registry import make_create_env
 
-import examples.rllib.multiagent_exps.bayesian_0_no_grid_env
+from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params
 
 EXAMPLE_USAGE = """
 example usage:
@@ -30,7 +30,7 @@ class Args:
         
 args = Args()
 
-bay_0_flow_params = examples.rllib.multiagent_exps.bayesian_0_no_grid_env.make_flow_params(args, pedestrians=True)
+bay_0_flow_params = make_flow_params(args, pedestrians=True)
 imitation_path = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
 
 def get_inferrer(flow_params=bay_0_flow_params, path=imitation_path, inferrer_type="imitation_network"):

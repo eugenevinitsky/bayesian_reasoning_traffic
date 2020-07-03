@@ -76,7 +76,7 @@ def get_filtered_posteriors(action, dummy_obs, priors, agent, filter_matrix, pol
 
     
     # p(o_1 = 1) = 0.887, p(o_2 = 1) = 0.443
-    if priors = {}:
+    if priors == {}:
         priors = {comb : [1 / len(flag_set)] for comb in single_ped_combs_str}
     # p(o_0, o_1, o_2, o_3)
 
