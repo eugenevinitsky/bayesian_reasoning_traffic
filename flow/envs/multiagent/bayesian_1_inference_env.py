@@ -9,8 +9,8 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-from bayesian_inference.get_inferer import get_inferrer
-from bayesian_inference.inference import get_filtered_posteriors
+from bayesian_inference.get_agent import get_inference_network
+from bayesian_inference.inference import get_updated_priors
 
 # TODO(KL) means KL's reminder for KL
 
