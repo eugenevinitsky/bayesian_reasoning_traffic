@@ -103,7 +103,7 @@ class Bayesian1Network(TrafficLightGridNetwork):
                  pedestrians=None):
         """Initialize an n*m traffic light grid network."""
         super().__init__(name, vehicles, net_params, initial_config,
-                         traffic_lights, pedestrians, use_traffic_lights=False, nodes_radius=None)
+                         traffic_lights, pedestrians, use_traffic_lights=False)
         self.nodes = self._nodes
 
     @property
@@ -404,8 +404,8 @@ class Bayesian4Network(Bayesian1Network):
         car_1_start_edge = start_edges[start_indices[0]]
         car_2_start_edge = start_edges[start_indices[1]]
 
-        car_1_start_pos = 50
-        car_2_start_pos = 50
+        car_1_start_pos = 48
+        car_2_start_pos = 49
 
         start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos)]
         # In SUMO, lanes are zero-indexed starting from the right-most lane

@@ -1,7 +1,7 @@
 """Contains a list of custom velocity controllers."""
 
 # TODO(@evinitsky) move to util
-from flow.utils.rllib import create_agent_from_path
+# from flow.utils.rllib import create_agent_from_path
 from flow.controllers.base_controller import BaseController
 import numpy as np
 
@@ -23,10 +23,9 @@ class PreTrainedController(BaseController):
             _, _, logits = self.agent.compute_action(state[self.veh_id], policy_id='av', full_fetch=True)
             q_val = logits['q_values']
             action = env.discrete_actions_to_accels[np.argmax(q_val)]
-            print('action is ', action)
             return action
         else:
-            return None
+            return 1.0
 
     def get_discrete_action(self, env):
         state = env.get_state()
@@ -36,6 +35,51 @@ class PreTrainedController(BaseController):
             return action
         else:
             return None
+
+    def get_action(self, env, allow_junction_control=False):
+        """Convert the get_accel() acceleration into an action.
+
+        If no acceleration is specified, the action returns a None as well,
+        signifying that sumo should control the accelerations for the current
+        time step.
+
+        This method also augments the controller with the desired level of
+        stochastic noise, and utlizes the "instantaneous" or "safe_velocity"
+        failsafes if requested.
+
+        Parameters
+        ----------
+        env : flow.envs.Env
+            state of the environment at the current time step
+
+        Returns
+        -------
+        float
+            the modified form of the acceleration
+        """
+        # this is to avoid abrupt decelerations when a vehicle has just entered
+        # a network and it's data is still not subscribed
+        if len(env.k.vehicle.get_edge(self.veh_id)) == 0:
+            return None
+
+        accel = self.get_accel(env)
+
+        # if no acceleration is specified, let sumo take over for the current
+        # time step
+        if accel is None:
+            return None
+
+        # add noise to the accelerations, if requested
+        if self.accel_noise > 0:
+            accel += np.random.normal(0, self.accel_noise)
+
+        # run the failsafes, if requested
+        if self.fail_safe == 'instantaneous':
+            accel = self.get_safe_action_instantaneous(env, accel)
+        elif self.fail_safe == 'safe_velocity':
+            accel = self.get_safe_velocity_action(env, accel)
+
+        return accel
 
 
 class FullStop(BaseController):

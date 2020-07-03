@@ -23,6 +23,8 @@ def run_experiment(args):
             self.load_model=True
             self.load_path="/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
             self.randomize_vehicles = True
+            self.inference_in_state = False
+
     args = Args()
     flow_params = bay_0_make_flow_params(args, pedestrians=True, render=True)
 
