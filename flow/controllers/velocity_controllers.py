@@ -102,10 +102,22 @@ class RuleBasedIntersectionController(BaseController):
         BaseController.__init__(
             self, veh_id, car_following_params, noise=noise)
 
+        self.edge_to_num = {
+            "(1.2)--(1.1)" : 0,
+            "(1.1)--(1.2)" : 0,
+            "(2.1)--(1.1)" : 1,
+            "(1.1)--(2.1)" : 1,
+            "(1.0)--(1.1)" : 2,
+            "(1.1)--(1.0)" : 2,
+            "(0.1)--(1.1)" : 3,
+            "(1.1)--(0.1)" : 3
+        }
+
     def get_accel(self, env):
         """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
         state = env.get_state()
         ped_pos = [7, 8, 9, 10]
+        turn_num_idx = 2
 
         # we are not yet at the intersection and we are on the first edge
         desired_pos = 49
@@ -132,8 +144,9 @@ class RuleBasedIntersectionController(BaseController):
         elif env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[-1]:
             return None
 
-        if np.any(state[self.veh_id][ped_pos]):
-            import ipdb; ipdb.set_trace()
+        start, end = env.k.vehicle.get_route(self.veh_id)
+        start, end = self.edge_to_num[start], self.edge_to_num[end]
+        if state[self.veh_id][ped_pos][start] or state[self.veh_id][ped_pos][end]:
             return -3.0
 
         arrival_order = [env.arrival_order[veh_id] for veh_id in env.inside_intersection]
