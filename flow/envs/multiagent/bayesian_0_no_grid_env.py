@@ -789,8 +789,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         if self.k.vehicle.get_edge(rl_id) in self.in_edges:
             edge_pos = 50 - edge_pos
         start, end = self.k.vehicle.get_route(rl_id)
-        start = self.edge_to_num[start]
-        end = self.edge_to_num[end]
+        start = self.edge_to_int[start]
+        end = self.edge_to_int[end]
         turn_num = (end - start) % 8
         if turn_num == 1:
             turn_num = 0 # turn right
