@@ -69,7 +69,7 @@ worker_nodes:
     # Additional options in the boto docs.
 
 setup_commands:
-    - cd bayesian_reasoning_traffic && git fetch && git checkout origin/ev/inference_testing
+    - cd bayesian_reasoning_traffic && git fetch && git checkout origin/master
     - pip install gym==0.17.1
     - pip install torch==1.4.0
     - pip install tensorflow_probability

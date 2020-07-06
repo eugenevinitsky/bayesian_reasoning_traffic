@@ -228,7 +228,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def past_intersection(self, veh_id):
         """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
         try:
-            on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]        
+            on_post_intersection_edge = len(self.k.vehicle.get_route(veh_id)) == 0 or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]
         except:
             import ipdb; ipdb.set_trace()
             on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]        
@@ -488,8 +488,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             done['__all__'] = False
 
-        veh_ids = self.k.vehicle.get_ids()
-        valid_ids = [veh_id for veh_id in veh_ids if ('av' in veh_id or 'rl' in veh_id) and veh_id in self.k.vehicle.get_arrived_ids()]
+        valid_ids = [veh_id for veh_id in self.k.vehicle.get_arrived_ids() if ('av' in veh_id or 'rl' in veh_id)]
         for rl_id in valid_ids:
             done[rl_id] = True
             reward[rl_id] = 1.0
