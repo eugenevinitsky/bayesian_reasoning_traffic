@@ -74,7 +74,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             veh_id='av',
             acceleration_controller=(RLController, {}),
             car_following_params=SumoCarFollowingParams(
-                speed_mode='aggressive',
+                speed_mode='right_of_way',
             ),
             routing_controller=(GridRouter, {}),
             # depart_time='3.5',    #TODO change back to 3.5s
@@ -271,10 +271,9 @@ def on_episode_step(info):
                 [episode.user_data['steps_elapsed']] * num_veh_left
         episode.user_data['num_rl_veh_active'] -= num_veh_left
     rl_ids = env.k.vehicle.get_rl_ids()
-    if 'av_0' in rl_ids:
-        episode.user_data['past_intersection'] = int(env.k.vehicle.get_route('av_0')[-1] == env.k.vehicle.get_edge('av_0'))
-        # TODO(@evinitsky) remove hardcoding
-    if 'av_0' in env.reward.keys() and not episode.user_data['av_past_intersection']:
+    arrived_ids = env.k.vehicle.get_arrived_ids()
+    # TODO(@evinitsky) remove hardcoding
+    if 'av_0' in env.reward.keys() and 'av_0' in rl_ids or 'av_0' in arrived_ids:
         episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.995 ** env.time_counter)
         episode.user_data['av_past_intersection'] = True
 
@@ -341,7 +340,7 @@ def setup_exps_DQN(args, flow_params):
         config['gamma'] = tune.grid_search([0.999, 0.99])  # discount rate
 
     config['horizon'] = args.horizon
-    config['observation_filter'] = 'NoFilter'
+    config['observation_filter'] = 'MeanStdFilter'
 
     # define callbacks for tensorboard
 

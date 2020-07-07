@@ -8,6 +8,7 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
+
 # from bayesian_inference.bayesian_inference_PPO import create_black_box
 # from bayesian_inference.get_agent import get_agent
 # from bayesian_inference.inference import get_updated_priors
@@ -41,6 +42,7 @@ HARD_BRAKE_PENALTY = 0.001
 NUM_PED_LOCATIONS = 4
 JUNCTION_ID = '(1.1)'
 DISCRETE_VALS = 10
+
 
 class Bayesian0NoGridEnv(MultiEnv):
     """Testing whether an agent can learn to navigate successfully crossing the env described
@@ -79,7 +81,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         A rollout is terminated if the time horizon is reached or if two
         vehicles collide into one another.
     """
-    # TODO(KL) Not sure how to feed in params to the _init_: the envs object is created in registry.py (??)  Hard 
+
+    # TODO(KL) Not sure how to feed in params to the _init_: the envs object is created in registry.py (??)  Hard
     def __init__(self, env_params, sim_params, network, simulator='traci', ):
         # for p in ADDITIONAL_ENV_PARAMS.keys():
         #     if p not in env_params.additional_params:
@@ -93,10 +96,10 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.use_grid = env_params.additional_params.get("use_grid", False)
         if self.use_grid:
             self.num_grid_cells = 6
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "veh_x", "veh_y",]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3", "ped_in_4", "ped_in_5"]
         else:
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "veh_x", "veh_y",]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
         # self.search_ped_radius = self.env_params.additional_params["search_ped_radius"]
@@ -110,50 +113,49 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.arrival_order = {}
         # set to store vehicles currently inside the intersection
         self.inside_intersection = set()
-        
+
         # dict to store the ground truth state of pedestrians at the four locations
         self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
         # dict to store the counts for each possible transiion
-        self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
-
+        self.ped_transition_cnt = {loc: {'00': 1, '01': 1, '10': 1, '11': 1} for loc in range(NUM_PED_LOCATIONS)}
 
         self.near_intersection_rewarded_set_1 = set()
         self.near_intersection_rewarded_set_2 = set()
         self.near_intersection_rewarded_set_3 = set()
 
         self.edge_to_num = {
-                "(1.2)--(1.1)" : 0,
-                "(1.1)--(1.2)" : 1,
-                "(2.1)--(1.1)" : 2,
-                "(1.1)--(2.1)" : 3,
-                "(1.0)--(1.1)" : 4,
-                "(1.1)--(1.0)" : 5,
-                "(0.1)--(1.1)" : 6,
-                "(1.1)--(0.1)" : 7
+            "(1.2)--(1.1)": 0,
+            "(1.1)--(1.2)": 1,
+            "(2.1)--(1.1)": 2,
+            "(1.1)--(2.1)": 3,
+            "(1.0)--(1.1)": 4,
+            "(1.1)--(1.0)": 5,
+            "(0.1)--(1.1)": 6,
+            "(1.1)--(0.1)": 7
         }
 
-
         self.edge_to_int = {
-                "(1.1)--(2.1)" : 0,
-                "(2.1)--(1.1)" : 1,
-                "(1.1)--(1.2)" : 2,
-                "(1.2)--(1.1)" : 3,
-                "(1.1)--(0.1)" : 4,
-                "(0.1)--(1.1)" : 5,
-                "(1.1)--(1.0)" : 6,
-                "(1.0)--(1.1)" : 7
+            "(1.1)--(2.1)": 0,
+            "(2.1)--(1.1)": 1,
+            "(1.1)--(1.2)": 2,
+            "(1.2)--(1.1)": 3,
+            "(1.1)--(0.1)": 4,
+            "(0.1)--(1.1)": 5,
+            "(1.1)--(1.0)": 6,
+            "(1.0)--(1.1)": 7
         }
 
         self.num_to_edge = {
-            num : edge for edge, num in self.edge_to_num.items()
+            num: edge for edge, num in self.edge_to_num.items()
         }
 
         self.in_edges = ["(2.1)--(1.1)",
-                        "(1.2)--(1.1)",
-                        "(0.1)--(1.1)",
-                        "(1.0)--(1.1)"]
+                         "(1.2)--(1.1)",
+                         "(0.1)--(1.1)",
+                         "(1.0)--(1.1)"]
 
-        max_accel, max_decel = self.env_params.additional_params['max_decel'], -np.abs(self.env_params.additional_params['max_decel'])
+        max_accel, max_decel = self.env_params.additional_params['max_decel'], -np.abs(
+            self.env_params.additional_params['max_decel'])
         step_size = (max_accel - max_decel) / (DISCRETE_VALS + 1)
         self.discrete_actions_to_accels = [round(max_decel + i * step_size, 2) for i in range(DISCRETE_VALS)]
 
@@ -198,11 +200,12 @@ class Bayesian0NoGridEnv(MultiEnv):
             accels = []
             for rl_id, actions in rl_actions.items():
                 # if rl_id in self.k.vehicle.get_rl_ids():
-                self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
 
                 if not self.arrived_intersection(rl_id):
                     continue
-                
+
+                self.k.vehicle.set_speed_mode(rl_id, 'aggressive')
+
                 if self.discrete:
                     accel = self.discrete_actions_to_accels[actions]
                 else:
@@ -220,19 +223,24 @@ class Bayesian0NoGridEnv(MultiEnv):
     def arrived_intersection(self, veh_id):
         """Return True if vehicle is at or past the intersection and false if not."""
         intersection_length = self.net_params.additional_params['grid_array']['inner_length']
-        dist_to_intersection = intersection_length - self.k.vehicle.get_position(veh_id) 
-        return not (self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
-                dist_to_intersection > 20)
-    
-    def past_intersection(self, veh_id):
-        """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not""" #TODO(KL)
-        try:
-            on_post_intersection_edge = len(self.k.vehicle.get_route(veh_id)) == 0 or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]
-        except:
-            import ipdb; ipdb.set_trace()
-            on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[-1]        
+        dist_to_intersection = intersection_length - self.k.vehicle.get_position(veh_id)
+        return not (len(self.k.vehicle.get_route(veh_id)) == 0 or \
+                    self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0] and \
+                    dist_to_intersection > 5)
 
-        if on_post_intersection_edge and self.k.vehicle.get_position(veh_id) > 7: # vehicle arrived at final destination, 8 is a random distance
+    def past_intersection(self, veh_id):
+        """Return True if vehicle is at least 20m past the intersection (we had control back to SUMO at this point) & false if not"""  # TODO(KL)
+        try:
+            on_post_intersection_edge = len(self.k.vehicle.get_route(veh_id)) == 0 or self.k.vehicle.get_edge(veh_id) == \
+                                        self.k.vehicle.get_route(veh_id)[-1]
+        except:
+            import ipdb;
+            ipdb.set_trace()
+            on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == \
+                                        self.k.vehicle.get_route(veh_id)[-1]
+
+        if on_post_intersection_edge and self.k.vehicle.get_position(
+                veh_id) > 7:  # vehicle arrived at final destination, 8 is a random distance
             return True
         elif self.k.vehicle.get_edge(veh_id) == '':
             return True
@@ -260,19 +268,20 @@ class Bayesian0NoGridEnv(MultiEnv):
         # avs are trained via DQN, rl is the L2 car. We have all these conditions so we can use pre-trained controllers later.
         valid_ids = [veh_id for veh_id in veh_ids if ('av' in veh_id or 'rl' in veh_id or veh_id in rl_ids)]
         for rl_id in valid_ids:
-                
+
             if self.arrived_intersection(rl_id):
                 self.rl_set.add(rl_id)
                 assert rl_id in self.arrival_order
 
-                observation = np.zeros(self.observation_space.shape[0])   #TODO(KL) Check if this makes sense
+                observation = np.zeros(self.observation_space.shape[0])  # TODO(KL) Check if this makes sense
 
-                visible_vehicles, visible_pedestrians, visible_lanes = self.find_visible_objects(rl_id, self.search_veh_radius)
+                visible_vehicles, visible_pedestrians, visible_lanes = self.find_visible_objects(rl_id,
+                                                                                                 self.search_veh_radius)
 
                 # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
                 visible_vehicles = sorted(visible_vehicles, key=lambda v: \
-                        (self.k.vehicle.get_relative_angle(rl_id, \
-                        self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
+                    (self.k.vehicle.get_relative_angle(rl_id, \
+                                                       self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
                 observation[:num_self_obs + num_ped_obs] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
@@ -295,8 +304,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                     if index < self.max_num_objects:
                         observation[(index * num_veh_obs) + num_self_obs + num_ped_obs:
                                     num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
-                                [observed_yaw / 360, observed_speed / 20, 
-                                        rel_x / 50, rel_y / 50, before / 5]
+                            [observed_yaw, observed_speed,
+                             rel_x, rel_y, before]
                         if self.inference_in_state:
                             # only perform inference if the visible veh has arrived
                             if self.arrived_intersection(veh_id):
@@ -335,8 +344,9 @@ class Bayesian0NoGridEnv(MultiEnv):
             #     rewards[rl_id] = 0.4 / 500.0
             #     continue
 
-            if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
+            if self.arrived_intersection(rl_id):  # and not self.past_intersection(rl_id):
                 reward = 0
+                self.reward[rl_id] = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
                 #
                 # if 47 < edge_pos < 50 and self.k.vehicle.get_speed(rl_id) < 1.0:
@@ -522,9 +532,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.reward = {}
         self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
         # dict to store the counts for each possible transiion
-        self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
+        self.ped_transition_cnt = {loc: {'00': 1, '01': 1, '10': 1, '11': 1} for loc in range(NUM_PED_LOCATIONS)}
         self.observed_rl_ids = set()
-        
+
         # Now that we've passed the possibly fake init steps some rl libraries
         # do, we can feel free to actually render things
         if self.should_render:
@@ -736,11 +746,11 @@ class Bayesian0NoGridEnv(MultiEnv):
             b) intersection ped walkways: these contain a 'c'
         """
         visible_vehicles, visible_pedestrians, visible_lanes = self.k.vehicle.get_viewable_objects(
-                veh_id,
-                self.k.pedestrian,
-                self.k.network.kernel_api.lane,
-                radius)
-        
+            veh_id,
+            self.k.pedestrian,
+            self.k.network.kernel_api.lane,
+            radius)
+
         return visible_vehicles, visible_pedestrians, visible_lanes
 
     def get_action_mask(self, valid_agent):
@@ -797,14 +807,14 @@ class Bayesian0NoGridEnv(MultiEnv):
         end = self.edge_to_int[end]
         turn_num = (end - start) % 8
         if turn_num == 1:
-            turn_num = 0 # turn right
+            turn_num = 0  # turn right
         elif turn_num == 3:
-            turn_num = 1 # go straight
+            turn_num = 1  # go straight
         else:
-            turn_num = 2 # turn left
+            turn_num = 2  # turn left
         # subtract by one since we're not including the pedestrian here
-        observation = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50,
-                       veh_x / 300.0, veh_y / 300.0]
+        observation = [yaw, speed, turn_num, curr_edge, end, edge_pos,
+                       veh_x, veh_y]
         if self.use_grid:
             ped_param = self.get_grid_ped_params(visible_peds, rl_id)
         else:
@@ -908,7 +918,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         # if ground_truth:
         #     locs = self.curr_ped_state()
 
-
         # else:
         #     locs = [-1] * NUM_PED_LOCATIONS
         #     lane_visible_arr = [[0,0] for _ in range(NUM_PED_LOCATIONS)]
@@ -982,10 +991,10 @@ class Bayesian0NoGridEnv(MultiEnv):
         """
         ped_kernel = self.k.pedestrian
         # check :(1.1)_w2, (1.0)--(1.1), :(1.1)_c2
-        cw_edges = self.get_cross_walk_edge_names(cw) 
+        cw_edges = self.get_cross_walk_edge_names(cw)
         ped_edge = ped_kernel.get_edge(ped_id)
 
-        if ped_edge in cw_edges: 
+        if ped_edge in cw_edges:
             if "c" in ped_edge or "w" in ped_edge:
                 return True
             elif "-" in ped_edge:
@@ -1032,7 +1041,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             edge_1 = self.num_to_edge[2 * i]
             edge_2 = self.num_to_edge[(2 * i - 1) % 8]
             cw_names.extend([w, edge_1, edge_2])
-        
+
         return cw_names
 
     def is_cross_walk_visible(self, veh_id, cw):
@@ -1065,7 +1074,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             # c corresponds to something inside an intersection area in SUMO
             if 'c' in lane:
-                lane = lane.split("_")[1]    
+                lane = lane.split("_")[1]
                 return int(lane[1])
             # w corresponds to something else inside an intersection area in SUMO
             if 'w' in lane:
@@ -1082,18 +1091,19 @@ class Bayesian0NoGridEnv(MultiEnv):
                     pt_a, pt_b = pts[0], pts[1]
                     cross_walk_center = ((pt_a[0] + pt_b[0]) / 2, (pt_a[1] + pt_b[1]) / 2)
                     walkway_length = lane_kernel.getLength(lane + '_0')
-                    lane = lane.split("_")[1]    
-                    if self.in_circle_radius(cross_walk_center, walkway_length * 1.3, self.k.pedestrian.get_position(ped_id)):
+                    lane = lane.split("_")[1]
+                    if self.in_circle_radius(cross_walk_center, walkway_length * 1.3,
+                                             self.k.pedestrian.get_position(ped_id)):
                         return (int(lane[1]) - 1) % 4
                     else:
                         return None
                 else:
-                    lane = lane.split("_")[1]    
+                    lane = lane.split("_")[1]
                     return (int(lane[1]) - 1) % 4
-    
+
     def in_circle_radius(self, center, radius, pt):
         """Return True if pt is within the circle specified by the center point and the radius"""
-        dist_to_center = np.sqrt((center[0] - pt[0])**2 + (center[1] - pt[1])**2)
+        dist_to_center = np.sqrt((center[0] - pt[0]) ** 2 + (center[1] - pt[1]) ** 2)
         return dist_to_center <= radius
 
     def get_grid_ped_params(self, visible_pedestrians, rl_id):
@@ -1125,9 +1135,3 @@ class Bayesian0NoGridEnv(MultiEnv):
             else:
                 raise RuntimeError("Relative Angle is Invalid")
         return ped_param
-
-
-            
-
-
-
