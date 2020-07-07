@@ -165,7 +165,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         ),
         acceleration_controller=(PreTrainedController,
                                  {"path": os.path.expanduser("/Users/eugenevinitsky/Desktop/Research/Data/bayesian_traffic/07-06-2020/l0_training_PPO_20rollout_allRL_r2/l0_training_PPO_20rollout_allRL_r2/PPO_1_gamma=0.99_1_gamma=0.99_2020-07-06_22-35-47iweym1ab"),
-                                  "checkpoint_num": str(100)}),
+                                  "checkpoint_num": str(200)}),
         lane_change_params=lane_change_params,
         color='red',
         num_vehicles=3)

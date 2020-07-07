@@ -153,7 +153,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                         "(0.1)--(1.1)",
                         "(1.0)--(1.1)"]
 
-        max_accel, max_decel = self.env_params.additional_params['max_decel'], -self.env_params.additional_params['max_decel']
+        max_accel, max_decel = self.env_params.additional_params['max_decel'], -np.abs(self.env_params.additional_params['max_decel'])
         step_size = (max_accel - max_decel) / (DISCRETE_VALS + 1)
         self.discrete_actions_to_accels = [round(max_decel + i * step_size, 2) for i in range(DISCRETE_VALS)]
 
@@ -247,7 +247,6 @@ class Bayesian0NoGridEnv(MultiEnv):
             curr = val
             self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
             self.prev_loc_ped_state[loc] = curr
-        self.observed_rl_ids.update(self.k.vehicle.get_rl_ids())
         obs = {}
         num_self_obs = len(self.self_obs_names)
         num_ped_obs = len(self.ped_names)
@@ -258,11 +257,11 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         veh_ids = self.k.vehicle.get_ids()
         rl_ids = self.k.vehicle.get_rl_ids()
-        # avs are trained via DQN, rl is the L2 car
+        # avs are trained via DQN, rl is the L2 car. We have all these conditions so we can use pre-trained controllers later.
         valid_ids = [veh_id for veh_id in veh_ids if ('av' in veh_id or 'rl' in veh_id or veh_id in rl_ids)]
         for rl_id in valid_ids:
                 
-            if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
+            if self.arrived_intersection(rl_id):
                 self.rl_set.add(rl_id)
                 assert rl_id in self.arrival_order
 
@@ -298,9 +297,6 @@ class Bayesian0NoGridEnv(MultiEnv):
                                     num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
                                 [observed_yaw / 360, observed_speed / 20, 
                                         rel_x / 50, rel_y / 50, before / 5]
-                        # TODO(@evinitsky) update so that this actually works
-                        # print('vehicle obs is ', [observed_yaw / 360, observed_speed / 20,
-                        #                 rel_x / 50, rel_y / 50, before / 5])
                         if self.inference_in_state:
                             # only perform inference if the visible veh has arrived
                             if self.arrived_intersection(veh_id):
@@ -452,6 +448,9 @@ class Bayesian0NoGridEnv(MultiEnv):
             # store new observations in the vehicles and traffic lights class
             self.k.update(reset=False)
 
+            # track observed IDs
+            self.observed_rl_ids.update(self.k.vehicle.get_rl_ids())
+
             # update the colors of vehicles
             if self.sim_params.render:
                 self.k.vehicle.update_vehicle_colors()
@@ -486,12 +485,14 @@ class Bayesian0NoGridEnv(MultiEnv):
         # # TODO(@ev) figure out why done is not being set
         # if 'av_0' in done and done['av_0']:
         #     self.done_list.extend(['av_0'])
-        if crash:
+        no_avs_left = len([veh_id for veh_id in self.k.vehicle.get_ids() if ('av' in veh_id or 'rl' in veh_id)]) == 0
+        if crash or no_avs_left:
             done['__all__'] = True
         else:
             done['__all__'] = False
 
-        valid_ids = [veh_id for veh_id in self.k.vehicle.get_arrived_ids() if ('av' in veh_id or 'rl' in veh_id)]
+        valid_ids = [veh_id for veh_id in self.k.vehicle.get_arrived_ids() if ('av' in veh_id or 'rl' in veh_id
+                                                                               or veh_id in self.observed_rl_ids)]
         for rl_id in valid_ids:
             done[rl_id] = True
             reward[rl_id] = 1.0
@@ -807,7 +808,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         if self.use_grid:
             ped_param = self.get_grid_ped_params(visible_peds, rl_id)
         else:
-            ped_param = self.four_way_ped_params(visible_peds, visible_lanes)
+            ped_param = self.four_way_ped_params(visible_peds, visible_lanes, ground_truth=False)
         observation.extend(ped_param)
         return observation
 
@@ -842,7 +843,7 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         return locs
 
-    def four_way_ped_params(self, visible_pedestrians, visible_lanes, ground_truth=True, veh_id="1"):
+    def four_way_ped_params(self, visible_pedestrians, visible_lanes, ground_truth=True):
         """For a given RL agent's visible pedestrians and visible lanes, return a 
         length 4 ternary indicator array for the 'source' car's pedestrian visibility state vector.
         If using ground truth, return a length 4 binary indicator array of whether there are pedestrians

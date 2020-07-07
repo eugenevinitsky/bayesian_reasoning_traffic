@@ -1,5 +1,5 @@
 """Contains the bayesian scenario 1 class."""
-
+from collections import defaultdict
 from flow.networks.traffic_light_grid import TrafficLightGridNetwork
 from flow.core.params import InitialConfig
 from flow.core.params import TrafficLightParams
@@ -139,7 +139,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
         if net_params == None:
             net_params = self.net_params
 
-        rts = {}
+        rts = defaultdict(list)
 
         if net_params.additional_params.get("randomize_routes", False):
             start_edges = ['(1.2)--(1.1)',
@@ -151,12 +151,13 @@ class Bayesian0Network(TrafficLightGridNetwork):
                     '(1.1)--(1.0)',
                     '(1.1)--(2.1)']
             for i in range(len(start_edges)):
-                start = start_edges[i]
-                end_index = np.random.randint(0, 4)
-                if end_index == i: # no u-turn routes
-                    end_index = (i + 1) % 4
-                end = end_edges[end_index]
-                rts[start] = [start, end]
+                for j in range(len(end_edges)):
+                    start = start_edges[i]
+                    # end_index = np.random.randint(0, 4)
+                    if j == i: # no u-turn routes
+                        continue
+                    end = end_edges[j]
+                    rts[start].append(([start, end], 1.0 / 3))
             if net_params.additional_params["pedestrian_kernel"]:
                 self.randomize_pedestrian_routes(net_params.additional_params["pedestrian_kernel"], 0.9)
         else:
@@ -333,22 +334,13 @@ class Bayesian0Network(TrafficLightGridNetwork):
             start_indices = [0, 1, 2, 3]
             np.random.shuffle(start_indices)
 
-            car_1_start_edge = start_edges[start_indices[0]]
-            car_2_start_edge = start_edges[start_indices[1]]
-            car_3_start_edge = start_edges[start_indices[2]]
-            car_4_start_edge = start_edges[start_indices[3]]
-
-
-            car_1_start_pos = max(np.random.normal(30, 10), 0)
-            car_2_start_pos = max(np.random.normal(30, 10), 0)
-            car_3_start_pos = max(np.random.normal(30, 10), 0)
-            car_4_start_pos = max(np.random.normal(30, 10), 0)
-
-
-            start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos),
-                        (car_3_start_edge, car_3_start_pos), (car_4_start_edge, car_4_start_pos)]
+            start_pos = []
+            for i in range(net_params.additional_params.get("num_cars", 4)):
+                car_start_edge = start_edges[start_indices[np.random.randint(4)]]
+                car_start_pos = max(np.random.normal(30, 10), 0)
+                start_pos.append((car_start_edge, car_start_pos))
             # In SUMO, lanes are zero-indexed starting from the right-most lane
-            start_lanes = [0, 0, 0, 0]
+            start_lanes = [0] * net_params.additional_params.get("num_cars", 4)
 
         else:
             car_1_start_edge = "(2.1)--(1.1)"

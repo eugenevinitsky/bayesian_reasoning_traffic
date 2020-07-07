@@ -59,7 +59,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             depart_time='0.00',
             start='(1.2)--(1.1)',
             end='(1.1)--(1.0)',
-            depart_pos=f'{44 + 0.5*i}',
+            depart_pos=f'{46 + 0.5*i}',
             arrival_pos='5')
         
     # we place a sufficient number of vehicles to ensure they confirm with the
@@ -78,7 +78,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             ),
             routing_controller=(GridRouter, {}),
             # depart_time='3.5',    #TODO change back to 3.5s
-            num_vehicles=4,
+            num_vehicles=args.num_vehicles,
         )
     elif args.inflows:
         vehicles.add(
@@ -89,7 +89,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             ),
             routing_controller=(GridRouter, {}),
             # depart_time='3.5',    #TODO change back to 3.5s
-            num_vehicles=1,
+            num_vehicles=args.num_vehicles,
         )
         outer_edges = ['(1.2)--(1.1)',
                     '(0.1)--(1.1)',
@@ -99,21 +99,10 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             inflow.add(
                 veh_type='av',
                 edge=outer_edges[i],
-                vehs_per_hour=400,
+                vehs_per_hour=200,
                 departLane='free',
                 departSpeed=10)
     else:
-        vehicles.add(
-            veh_id="human_0",
-            acceleration_controller=(SimCarFollowingController, {}),
-            car_following_params=SumoCarFollowingParams(
-                min_gap=2.5,
-                decel=7.5,  # avoid collisions at emergency stops
-                speed_mode="right_of_way",
-            ),
-            routing_controller=(GridRouter, {}),
-            depart_time='0.25',
-            num_vehicles=1)
 
         #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
         vehicles.add(
@@ -128,7 +117,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             )
         if args.randomize_vehicles:
             vehicles.add(
-                veh_id="human_1",
+                veh_id="human",
                 acceleration_controller=(SimCarFollowingController, {}),
                 car_following_params=SumoCarFollowingParams(
                     min_gap=2.5,
@@ -136,19 +125,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                     speed_mode="right_of_way",
                 ),
                 routing_controller=(GridRouter, {}),
-                num_vehicles=1)
-
-            vehicles.add(
-                veh_id="human_2",
-                acceleration_controller=(SimCarFollowingController, {}),
-                car_following_params=SumoCarFollowingParams(
-                    min_gap=2.5,
-                    decel=7.5,  # avoid collisions at emergency stops
-                    speed_mode="right_of_way",
-                ),
-                routing_controller=(GridRouter, {}),
-                num_vehicles=1)
-
+                num_vehicles=args.num_vehicles - 1)
 
     n_rows = 1
     n_columns = 1
@@ -231,7 +208,8 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 "vertical_lanes": 1,
                 "randomize_routes": True,
                 # "vehicle_kernel": vehicles,
-                # "pedestrian_kernel": pedestrian_params,
+                "pedestrian_kernel": pedestrian_params,
+                "num_cars": args.num_vehicles
             },
         ),
 
@@ -554,6 +532,8 @@ if __name__ == '__main__':
     parser.add_argument("--randomize_vehicles", default=True,
                         help="randomize the number of vehicles in the system and where they come from",
                         action="store_true")
+    parser.add_argument("--num_vehicles", type=int, default=4,
+                        help="total number of vehicles in the system")
     parser.add_argument("--only_rl", default=False,
                         help="only use AVs in the system",
                         action="store_true")
