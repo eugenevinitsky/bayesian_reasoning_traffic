@@ -12,7 +12,7 @@ from flow.controllers.imitation_learning.imitating_network import *
 from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.utils.registry import make_create_env
 
-from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params
+# from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params
 
 EXAMPLE_USAGE = """
 example usage:
@@ -30,10 +30,10 @@ class Args:
         
 args = Args()
 
-bay_0_flow_params = make_flow_params(args, pedestrians=True)
+# bay_0_flow_params = make_flow_params(args, pedestrians=True)
 imitation_path = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
 
-def get_inferrer(flow_params=bay_0_flow_params, path=imitation_path, inferrer_type="imitation_network"):
+def get_inferrer(env, path=imitation_path, inferrer_type="imitation_network"):
     """Load and return imitation policy at path
 
     Parameters
@@ -61,8 +61,8 @@ def get_inferrer(flow_params=bay_0_flow_params, path=imitation_path, inferrer_ty
     # args = Args()
 
     # might be necessary to add a load_model flag somewhere 
-    create_env, _ = make_create_env(flow_params)
-    env = create_env()
+    # create_env, _ = make_create_env(flow_params)
+    # env = create_env()
     obs_dim = env.observation_space.shape[0]
     action_dim = (1,)[0]
 

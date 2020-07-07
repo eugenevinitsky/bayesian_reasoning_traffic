@@ -223,8 +223,8 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
                 expert_action_dict[vehicle_id] = expert_action
 
             elif expert_control == "SUMO" and not use_expert:
-                # for eg IDM, the acceleration 'action' is what the car takes on
-                if vehicle_id == 'rl_0':
+                # for eg IDM, the acceleration 'action' is what the car takes on - no hard coding please TODO(KL)
+                if vehicle_id == 'av_0':
                     if vehicle_id in env.inside_intersection and vehicle_id in env.past_intersection_rewarded_set:
                         action = None
                     elif env.arrived_intersection(vehicle_id) and not env.past_intersection(vehicle_id):
@@ -270,7 +270,7 @@ def sample_trajectory_multiagent(env, controllers, action_network, max_trajector
         if expert_control == "SUMO" and use_expert:
             observation_dict, reward_dict, done_dict, _ = env.step(None)
         if expert_control == "SUMO" and not use_expert:
-            if not env.past_intersection("rl_0"):
+            if not env.past_intersection("av_0"):
                 try:
                     observation_dict, reward_dict, done_dict, _ = env.step(rl_actions)
                 except:

@@ -34,6 +34,9 @@ class Trainer(object):
                 self.horizon = 400
                 self.algo = "PPO"
                 self.randomize_vehicles = True
+                # TODO(ev/nliu) what's this variable
+                self.only_rl = False
+                self.inference_in_state = False
 
         args = Args()
 
@@ -76,7 +79,8 @@ class Trainer(object):
         self.action_network = ImitatingNetwork(self.env, self.sess, self.params['action_dim'], self.params['obs_dim'], 
                                                 self.params['fcnet_hiddens'], self.params['replay_buffer_size'], 
                                                 stochastic=self.params['stochastic'], variance_regularizer=self.params['variance_regularizer'], 
-                                                load_model=self.params['load_imitation_model'], load_path=self.params['load_imitation_path'])
+                                                load_model=self.params['load_imitation_model'], load_path=self.params['load_imitation_path'],
+                                                tensorboard_path=self.params['tensorboard_path'])
         # controllers setup
         v_des = self.params['v_des'] # for FollowerStopper
         car_following_params = SumoCarFollowingParams()
