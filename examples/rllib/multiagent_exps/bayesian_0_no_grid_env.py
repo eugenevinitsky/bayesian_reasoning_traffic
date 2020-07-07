@@ -19,7 +19,7 @@ from ray.tune.registry import register_env
 
 from flow.envs.multiagent import Bayesian0NoGridEnv
 from flow.networks import Bayesian0Network
-from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
+from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, InFlows
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.core.params import PedestrianParams
 
@@ -67,6 +67,8 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     # support traffic light compliance
     vehicles = VehicleParams()
 
+    inflow = InFlows()
+
     if args.only_rl:
         vehicles.add(
             veh_id='av',
@@ -78,6 +80,28 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             # depart_time='3.5',    #TODO change back to 3.5s
             num_vehicles=4,
         )
+    elif args.inflows:
+        vehicles.add(
+            veh_id='av',
+            acceleration_controller=(RLController, {}),
+            car_following_params=SumoCarFollowingParams(
+                speed_mode='aggressive',
+            ),
+            routing_controller=(GridRouter, {}),
+            # depart_time='3.5',    #TODO change back to 3.5s
+            num_vehicles=1,
+        )
+        outer_edges = ['(1.2)--(1.1)',
+                    '(0.1)--(1.1)',
+                    '(1.0)--(1.1)',
+                    '(2.1)--(1.1)']
+        for i in range(len(outer_edges)):
+            inflow.add(
+                veh_type='av',
+                edge=outer_edges[i],
+                vehs_per_hour=400,
+                departLane='free',
+                departSpeed=10)
     else:
         vehicles.add(
             veh_id="human_0",
@@ -96,7 +120,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             veh_id='av',
             acceleration_controller=(RLController, {}),
             car_following_params=SumoCarFollowingParams(
-                speed_mode='aggressive',
+                speed_mode='right_of_way',
             ),
             routing_controller=(GridRouter, {}),
             # depart_time='3.5',    #TODO change back to 3.5s
@@ -134,7 +158,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         initial_config = InitialConfig(
             spacing='custom',
             shuffle=True,
-            sidewalks=True, 
+            sidewalks=True,
             lanes_distribution=float('inf'))
     else:
         initial_config = InitialConfig(
@@ -191,6 +215,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         # network-related parameters (see flow.core.params.NetParams and the
         # network's documentation or ADDITIONAL_NET_PARAMS component)
         net=NetParams(
+            inflows=inflow,
             additional_params={
                 "speed_limit": V_ENTER + 5,  # inherited from grid0 benchmark
                 "grid_array": {
@@ -240,6 +265,7 @@ def on_episode_start(info):
     episode.user_data['vehicle_leaving_time'] = []
     episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
     episode.user_data['past_intersection'] = 0
+    episode.user_data['av_past_intersection'] = False
 
 def on_episode_step(info):
     env = info['env'].get_unwrapped()[0]
@@ -270,8 +296,9 @@ def on_episode_step(info):
     if 'av_0' in rl_ids:
         episode.user_data['past_intersection'] = int(env.k.vehicle.get_route('av_0')[-1] == env.k.vehicle.get_edge('av_0'))
         # TODO(@evinitsky) remove hardcoding
-    if 'av_0' in env.reward.keys():
+    if 'av_0' in env.reward.keys() and not episode.user_data['av_past_intersection']:
         episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.995 ** env.time_counter)
+        episode.user_data['av_past_intersection'] = True
 
 
 def on_episode_end(info):
@@ -529,6 +556,9 @@ if __name__ == '__main__':
                         action="store_true")
     parser.add_argument("--only_rl", default=False,
                         help="only use AVs in the system",
+                        action="store_true")
+    parser.add_argument("--inflows", default=False,
+                        help="flow in RL vehicles",
                         action="store_true")
     parser.add_argument("--render",
                         help="render SUMO simulation",

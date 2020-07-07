@@ -208,9 +208,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                 else:
                     accel = actions[0]
 
-                # if we are past the intersection, go full speed ahead
+                # if we are past the intersection, go full speed ahead but don't crash
                 if self.past_intersection(rl_id):
-                    # accel = 1.0
                     self.k.vehicle.set_speed_mode(rl_id, 'right_of_way')
                     continue
                 rl_ids.append(rl_id)
@@ -248,6 +247,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             curr = val
             self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
             self.prev_loc_ped_state[loc] = curr
+        self.observed_rl_ids.update(self.k.vehicle.get_rl_ids())
         obs = {}
         num_self_obs = len(self.self_obs_names)
         num_ped_obs = len(self.ped_names)
@@ -257,8 +257,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
         veh_ids = self.k.vehicle.get_ids()
+        rl_ids = self.k.vehicle.get_rl_ids()
         # avs are trained via DQN, rl is the L2 car
-        valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
+        valid_ids = [veh_id for veh_id in veh_ids if ('av' in veh_id or 'rl' in veh_id or veh_id in rl_ids)]
         for rl_id in valid_ids:
                 
             if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
@@ -326,7 +327,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         veh_ids = self.k.vehicle.get_ids()
 
         # avs are trained via DQN, rl is the L2 car
-        valid_ids = [veh_id for veh_id in veh_ids if 'av' in veh_id or 'rl' in veh_id]
+        rl_ids = self.k.vehicle.get_rl_ids()
+        # avs are trained via DQN, rl is the L2 car
+        valid_ids = [veh_id for veh_id in veh_ids if ('av' in veh_id or 'rl' in veh_id or veh_id in rl_ids)]
         for rl_id in valid_ids:
             # reward rl slightly earlier than when control is given back to SUMO
             # if self.past_intersection(rl_id):
@@ -519,6 +522,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
         # dict to store the counts for each possible transiion
         self.ped_transition_cnt = {loc: {'00':1, '01':1, '10':1, '11':1} for loc in range(NUM_PED_LOCATIONS)}
+        self.observed_rl_ids = set()
         
         # Now that we've passed the possibly fake init steps some rl libraries
         # do, we can feel free to actually render things

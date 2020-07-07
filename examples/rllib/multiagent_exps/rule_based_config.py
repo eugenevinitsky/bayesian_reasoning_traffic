@@ -48,63 +48,16 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     # support traffic light compliance
     vehicles = VehicleParams()
 
-    if args.only_rl:
-        vehicles.add(
-            veh_id='av',
-            acceleration_controller=(RLController, {}),
-            car_following_params=SumoCarFollowingParams(
-                speed_mode='aggressive',
-            ),
-            routing_controller=(GridRouter, {}),
-            # depart_time='3.5',    #TODO change back to 3.5s
-            num_vehicles=4,
-        )
-    else:
-        vehicles.add(
-            veh_id="human_0",
-            acceleration_controller=(SimCarFollowingController, {}),
-            car_following_params=SumoCarFollowingParams(
-                min_gap=2.5,
-                decel=7.5,  # avoid collisions at emergency stops
-                speed_mode="right_of_way",
-            ),
-            routing_controller=(GridRouter, {}),
-            depart_time='0.25',
-            num_vehicles=1)
-
-        # TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
-        vehicles.add(
-            veh_id='av',
-            acceleration_controller=(RLController, {}),
-            car_following_params=SumoCarFollowingParams(
-                speed_mode='aggressive',
-            ),
-            routing_controller=(GridRouter, {}),
-            # depart_time='3.5',    #TODO change back to 3.5s
-            num_vehicles=1,
-        )
-        if args.randomize_vehicles:
-            vehicles.add(
-                veh_id="human_1",
-                acceleration_controller=(SimCarFollowingController, {}),
-                car_following_params=SumoCarFollowingParams(
-                    min_gap=2.5,
-                    decel=7.5,  # avoid collisions at emergency stops
-                    speed_mode="right_of_way",
-                ),
-                routing_controller=(GridRouter, {}),
-                num_vehicles=1)
-
-            vehicles.add(
-                veh_id="human_2",
-                acceleration_controller=(SimCarFollowingController, {}),
-                car_following_params=SumoCarFollowingParams(
-                    min_gap=2.5,
-                    decel=7.5,  # avoid collisions at emergency stops
-                    speed_mode="right_of_way",
-                ),
-                routing_controller=(GridRouter, {}),
-                num_vehicles=1)
+    vehicles.add(
+        veh_id="av",
+        routing_controller=(GridRouter, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="aggressive",
+        ),
+        acceleration_controller=(RuleBasedIntersectionController, {}),
+        num_vehicles=3)
 
     n_rows = 1
     n_columns = 1

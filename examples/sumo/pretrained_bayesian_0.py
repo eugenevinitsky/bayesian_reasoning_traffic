@@ -144,12 +144,14 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-        pedestrian_params.add(
-            ped_id='ped_0',
-            depart_time='0.00',
-            start='(1.2)--(1.1)',
-            end='(1.1)--(1.0)',
-            depart_pos='43')
+        for i in range(6):
+            pedestrian_params.add(
+                ped_id=f'ped_{i}',
+                depart_time='0.00',
+                start='(1.2)--(1.1)',
+                end='(1.1)--(1.0)',
+                depart_pos=f'{48 + 0.5 * i}',
+                arrival_pos='5')
 
     vehicles = VehicleParams()
 
@@ -159,12 +161,13 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
+            speed_mode="aggressive",
         ),
         acceleration_controller=(PreTrainedController,
-                                 {"path": os.path.expanduser("~/ray_results/test/DQN_0_0_2020-06-24_01-55-23azw35dox"),
-                                  "checkpoint_num": str(400)}),
+                                 {"path": os.path.expanduser("/Users/eugenevinitsky/Desktop/Research/Data/bayesian_traffic/07-06-2020/l0_training_PPO_20rollout_allRL_r2/l0_training_PPO_20rollout_allRL_r2/PPO_1_gamma=0.99_1_gamma=0.99_2020-07-06_22-35-47iweym1ab"),
+                                  "checkpoint_num": str(100)}),
         lane_change_params=lane_change_params,
+        color='red',
         num_vehicles=3)
 
     # For now, just have the one human car and one pedestrian
@@ -176,10 +179,9 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
     #         min_gap=2.5,
     #         decel=7.5,  # avoid collisions at emergency stops
     #         speed_mode="right_of_way",
-    #         max_speed=0.000001
     #     ),
     #     lane_change_params=lane_change_params,
-    #     num_vehicles=num_cars_top)
+    #     num_vehicles=3)
 
     # vehicles.add(
     #     veh_id="rl",
@@ -241,4 +243,4 @@ if __name__ == "__main__":
     exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
     ray.init()
-    exp.run(1, 150, multiagent=True)
+    exp.run(5, 500, multiagent=True)

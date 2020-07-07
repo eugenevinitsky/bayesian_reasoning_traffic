@@ -31,7 +31,6 @@ class PreTrainedController(BaseController):
         state = env.get_state()
         if len(state) > 0 and self.veh_id in state.keys():
             action = self.agent.compute_action(state[self.veh_id], policy_id='av')
-            print('action is ', action)
             return action
         else:
             return None
