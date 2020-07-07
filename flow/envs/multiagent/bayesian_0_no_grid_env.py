@@ -8,10 +8,9 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
+from bayesian_inference.get_inferer import get_inferrer
+from bayesian_inference.inference import get_filtered_posteriors
 
-# from bayesian_inference.bayesian_inference_PPO import create_black_box
-# from bayesian_inference.get_agent import get_agent
-# from bayesian_inference.inference import get_updated_priors
 
 # TODO(KL) means KL's reminder for KL
 
@@ -101,6 +100,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
+
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
         # self.search_ped_radius = self.env_params.additional_params["search_ped_radius"]
         # variable to encourage vehicle to move in curriculum training
@@ -163,8 +163,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
         self.inference_in_state = env_params.additional_params.get("inference_in_state", False)
         # TODO(@evinitsky) the inference code is not merged yet
-        # if self.inference_in_state:
-        #     self.agent = get_agent("PPO")
+        if self.inference_in_state:
+            path_to_inferrer = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
+            self.agent = get_inferrer(path=path_to_inferrer, inferrer_type="imitation")
         self.max_num_objects = env_params.additional_params.get("max_num_objects", 3)
 
     @property
@@ -311,7 +312,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                             if self.arrived_intersection(veh_id):
                                 acceleration = self.k.vehicle.get_acceleration(veh_id)
                                 visible_veh_non_ped_obs = self.get_non_ped_obs(veh_id)
-                                updated_ped_probs, self.priors[veh_id] = get_updated_priors(acceleration,
+                                updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(acceleration,
                                                                                             visible_veh_non_ped_obs,
                                                                                             self.priors.get(veh_id, {}),
                                                                                             self.agent)
@@ -853,8 +854,53 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         return locs
 
-    def four_way_ped_params(self, visible_pedestrians, visible_lanes, ground_truth=True):
-        """For a given RL agent's visible pedestrians and visible lanes, return a 
+    def get_non_ped_obs(self, veh_id):
+        """Return all the obs for vehicle veh_id aside from the updated probabilities for 
+        the four crosswalk pedestrian params
+        
+        Returns
+        -------
+        non_ped_obs : list
+            self_obs_names + [None, None, None, None] + veh_obs_names x (max_num_objects - 1)
+        """
+        max_objects = self.env_params.additional_params["max_num_objects"]
+        num_self_no_ped_obs = len(self.self_obs_names)
+        num_other_no_ped_obs = len(self.veh_obs_names)
+        non_ped_obs = np.zeros(num_self_no_ped_obs + NUM_PED_LOCATIONS + num_other_no_ped_obs * max_objects)
+
+        visible_vehicles, visible_pedestrians = self.find_visible_objects(veh_id, self.search_radius)
+
+        # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
+        visible_vehicles = sorted(visible_vehicles, key=lambda v: \
+                (self.k.vehicle.get_relative_angle(veh_id, \
+                self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
+
+        # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
+        non_ped_obs[:num_self_no_ped_obs] = self.get_self_obs(veh_id, visible_pedestrians)[:num_self_no_ped_obs]
+        veh_x, veh_y = self.k.vehicle.get_orientation(veh_id)[:2]
+
+        # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
+        for idx, obs_veh_id in enumerate(visible_vehicles):
+            
+            before = self.arrival_position(veh_id)
+
+            observed_yaw = self.k.vehicle.get_yaw(obs_veh_id)
+            observed_speed = self.k.vehicle.get_speed(obs_veh_id)
+            observed_x, observed_y = self.k.vehicle.get_orientation(obs_veh_id)[:2]
+            rel_x = observed_x - veh_x
+            rel_y = observed_y - veh_y
+
+            # Consider the first 3 visible vehicles
+            # TODO(@evinitsky) magic numbers
+            if idx <= 2:
+                non_ped_obs[(idx * num_other_no_ped_obs) + num_self_no_ped_obs: \
+                            num_other_no_ped_obs * (idx + 1) + num_self_no_ped_obs] = \
+                            [observed_yaw, observed_speed, rel_x, rel_y, before]
+
+        return non_ped_obs
+
+    def four_way_ped_params(self, visible_pedestrians, visible_lanes, ground_truth=True, veh_id="1"):
+        """For a given RL agent's visible pedestrians and visible lanes, return a
         length 4 ternary indicator array for the 'source' car's pedestrian visibility state vector.
         If using ground truth, return a length 4 binary indicator array of whether there are pedestrians
         on each of the crosswalks, regardless of the actual source vehicle.

@@ -10,6 +10,7 @@ from flow.controllers.imitation_learning.imitating_network import *
 from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.core.experiment import Experiment
 from flow.core.params import SimParams
+from flow.utils.registry import make_create_env
 
 
 
@@ -24,6 +25,8 @@ def run_experiment(args):
             self.load_path=os.path.abspath("model_files/rule_based.h5")
             self.randomize_vehicles = True
             self.only_rl = False
+            self.inference_in_state = False
+
     args = Args()
     flow_params = bay_0_make_flow_params(args, pedestrians=True, render=True)
 
@@ -44,6 +47,7 @@ def run_experiment(args):
         rl_actions = {}
         for vehicle_id in state.keys():
             obs = state[vehicle_id]
+
             action = action_network.get_accel_from_observation(obs)
             # TODO(@evinitsky) should this be exp of that
             rl_actions[vehicle_id] = action

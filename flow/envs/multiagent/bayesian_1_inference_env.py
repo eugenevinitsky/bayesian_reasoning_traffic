@@ -9,7 +9,7 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-from bayesian_inference.get_agent import get_agent
+from bayesian_inference.get_agent import get_inference_network
 from bayesian_inference.inference import get_updated_priors
 
 # TODO(KL) means KL's reminder for KL
@@ -97,7 +97,7 @@ class Bayesian1InferenceEnv(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
 
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
-        self.agent = get_agent("PPO")
+        self.agent = get_inferrer("PPO")
         self.num_self_no_ped_obs = 4
         self.num_grid_cells = 6
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] + self.prob_ped_in_grid_names(self.num_grid_cells)

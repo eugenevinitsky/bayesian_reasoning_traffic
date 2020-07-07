@@ -12,6 +12,8 @@ from flow.controllers.imitation_learning.imitating_network import *
 from flow.controllers.imitation_learning.utils_tensorflow import *
 from flow.utils.registry import make_create_env
 
+# from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params
+
 EXAMPLE_USAGE = """
 example usage:
     python ./visualizer_rllib.py /ray_results/experiment_dir/result_dir 1
@@ -19,7 +21,19 @@ Here the arguments are:
 1 - the path to the simulation results
 2 - the number of the checkpoint
 """
-def get_inference_network(path, flow_params):
+class Args:
+    def __init__(self):
+        self.horizon = 400
+        self.algo = "PPO"
+        self.load_model=True
+        self.randomize_vehicles = True
+        
+args = Args()
+
+# bay_0_flow_params = make_flow_params(args, pedestrians=True)
+imitation_path = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
+
+def get_inferrer(env, path=imitation_path, inferrer_type="imitation_network"):
     """Load and return imitation policy at path
 
     Parameters
@@ -47,8 +61,8 @@ def get_inference_network(path, flow_params):
     # args = Args()
 
     # might be necessary to add a load_model flag somewhere 
-    create_env, _ = make_create_env(flow_params)
-    env = create_env()
+    # create_env, _ = make_create_env(flow_params)
+    # env = create_env()
     obs_dim = env.observation_space.shape[0]
     action_dim = (1,)[0]
 

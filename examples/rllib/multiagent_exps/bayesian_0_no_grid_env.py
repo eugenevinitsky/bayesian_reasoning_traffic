@@ -184,7 +184,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 # whether to randomize which edge the vehicles are coming from
                 "randomize_vehicles": args.randomize_vehicles,
                 # whether to append the prior into the state
-                "inference_in_state": False,
+                "inference_in_state": args.inference_in_state,
                 # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
                 "use_grid": False
             },
@@ -547,6 +547,10 @@ if __name__ == '__main__':
                         action="store_true")
     parser.add_argument("--run_transfer_tests",
                         help="run the tests of generalization at the end of training",
+                        action="store_true",
+                        default=False)
+    parser.add_argument("--inference_in_state",
+                        help="determine if we append inference probabilities to an agent's state",
                         action="store_true",
                         default=False)
 
