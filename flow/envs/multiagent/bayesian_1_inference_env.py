@@ -9,8 +9,9 @@ from flow.envs.multiagent.base import MultiEnv
 from traci.exceptions import FatalTraCIError
 from traci.exceptions import TraCIException
 from flow.utils.exceptions import FatalFlowError
-from bayesian_inference.get_agent import get_inference_network
-from bayesian_inference.inference import get_updated_priors
+from bayesian_inference.get_inferer import get_inferrer
+from bayesian_inference.inference import get_filtered_posteriors
+from examples.rllib.multiagent_exps.bayesian_0_no_grid_env import make_flow_params
 
 # TODO(KL) means KL's reminder for KL
 
@@ -97,7 +98,12 @@ class Bayesian1InferenceEnv(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
 
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
-        self.agent = get_inferrer("PPO")
+        bay_0_flow_params = make_flow_params(args, pedestrians=True)
+        create_env, _ = make_create_env(flow_params)
+        env = create_env()
+        self.env = env
+        self.agent = get_inferrer(env)
+        
         self.num_self_no_ped_obs = 4
         self.num_grid_cells = 6
         self.observation_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"] + self.prob_ped_in_grid_names(self.num_grid_cells)
@@ -140,6 +146,7 @@ class Bayesian1InferenceEnv(MultiEnv):
                         "(1.2)--(1.1)",
                         "(0.1)--(1.1)",
                         "(1.0)--(1.1)"]
+
 
     @property
     def observation_space(self):
