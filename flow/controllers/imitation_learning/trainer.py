@@ -5,7 +5,7 @@ import numpy as np
 import gym
 import os
 import tensorflow as tf
-from utils import *
+from flow.controllers.imitation_learning.utils import *
 from flow.utils.registry import make_create_env
 from flow.controllers.imitation_learning.imitating_controller import ImitatingController
 from flow.controllers.imitation_learning.imitating_network import ImitatingNetwork
@@ -31,12 +31,16 @@ class Trainer(object):
         """
         class Args:
             def __init__(self):
+                # TODO(klin) BAD HACK
                 self.horizon = 400
                 self.algo = "PPO"
                 self.randomize_vehicles = True
                 # TODO(ev/nliu) what's this variable
+                # this is a back hack for
                 self.only_rl = False
                 self.inference_in_state = False
+                self.num_vehicles = 4
+                self.inflows = False
 
         args = Args()
 

@@ -57,7 +57,18 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             speed_mode="aggressive",
         ),
         acceleration_controller=(RuleBasedIntersectionController, {}),
-        num_vehicles=3)
+        num_vehicles=1)
+
+    vehicles.add(
+        veh_id="rl_non_collecting",
+        routing_controller=(GridRouter, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="aggressive",
+        ),
+        acceleration_controller=(RuleBasedIntersectionController, {}),
+        num_vehicles=2)
 
     n_rows = 1
     n_columns = 1
@@ -139,7 +150,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 "vertical_lanes": 1,
                 "randomize_routes": True,
                 # "vehicle_kernel": vehicles,
-                # "pedestrian_kernel": pedestrian_params,
+                "pedestrian_kernel": pedestrian_params,
             },
         ),
 

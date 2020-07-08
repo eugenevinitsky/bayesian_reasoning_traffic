@@ -80,28 +80,28 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             # depart_time='3.5',    #TODO change back to 3.5s
             num_vehicles=args.num_vehicles,
         )
-    elif args.inflows:
-        vehicles.add(
-            veh_id='av',
-            acceleration_controller=(RLController, {}),
-            car_following_params=SumoCarFollowingParams(
-                speed_mode='aggressive',
-            ),
-            routing_controller=(GridRouter, {}),
-            # depart_time='3.5',    #TODO change back to 3.5s
-            num_vehicles=args.num_vehicles,
-        )
-        outer_edges = ['(1.2)--(1.1)',
-                    '(0.1)--(1.1)',
-                    '(1.0)--(1.1)',
-                    '(2.1)--(1.1)']
-        for i in range(len(outer_edges)):
-            inflow.add(
-                veh_type='av',
-                edge=outer_edges[i],
-                vehs_per_hour=200,
-                departLane='free',
-                departSpeed=10)
+    # elif args.inflows:
+    #     vehicles.add(
+    #         veh_id='av',
+    #         acceleration_controller=(RLController, {}),
+    #         car_following_params=SumoCarFollowingParams(
+    #             speed_mode='aggressive',
+    #         ),
+    #         routing_controller=(GridRouter, {}),
+    #         # depart_time='3.5',    #TODO change back to 3.5s
+    #         num_vehicles=args.num_vehicles,
+    #     )
+    #     outer_edges = ['(1.2)--(1.1)',
+    #                 '(0.1)--(1.1)',
+    #                 '(1.0)--(1.1)',
+    #                 '(2.1)--(1.1)']
+    #     for i in range(len(outer_edges)):
+    #         inflow.add(
+    #             veh_type='av',
+    #             edge=outer_edges[i],
+    #             vehs_per_hour=200,
+    #             departLane='free',
+    #             departSpeed=10)
     else:
 
         #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
@@ -209,7 +209,9 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 "randomize_routes": True,
                 # "vehicle_kernel": vehicles,
                 "pedestrian_kernel": pedestrian_params,
-                "num_cars": args.num_vehicles
+                "num_cars": args.num_vehicles,
+                # the vehicles can be on any edge and take any route
+                "full_randomization": True
             },
         ),
 
@@ -291,7 +293,7 @@ def on_episode_end(info):
             np.mean(episode.user_data['vehicle_leaving_time'])
     else:
         episode.custom_metrics['avg_rl_veh_arrival'] = 500
-    episode.custom_metrics['past_intersection'] = episode.user_data['past_intersection']
+    episode.custom_metrics['past_intersection'] = episode.user_data['av_past_intersection']
     episode.custom_metrics["discounted_reward"] = episode.user_data['discounted_reward']
 
 

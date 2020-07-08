@@ -93,7 +93,7 @@ def main():
     parser.add_argument('--PPO_save_path', type=str, default='', help='Filepath to h5 file in which PPO model with copied weights should be saved')
 
     # misc params
-    parser.add_argument('--tensorboard_path', type=str, default='./tensorboard/', help='Path to which tensorboard events should be written.')
+    parser.add_argument('--tensorboard_path', type=str, default='~/tensorboard/', help='Path to which tensorboard events should be written.')
 
     args = parser.parse_args()
 
