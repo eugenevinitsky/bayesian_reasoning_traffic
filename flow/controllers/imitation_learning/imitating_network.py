@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 
 from flow.controllers.imitation_learning.utils_tensorflow import *
@@ -63,7 +64,7 @@ class ImitatingNetwork():
             self.compile_network()
 
         self.replay_buffer = ReplayBuffer(replay_buffer_size)
-        self.writer = tf.summary.FileWriter(tensorboard_path, tf.get_default_graph())
+        self.writer = tf.summary.FileWriter(os.path.abspath(os.path.expanduser(tensorboard_path)), tf.get_default_graph())
 
     def build_network(self):
         """

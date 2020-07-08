@@ -413,6 +413,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         info : dict
             contains other diagnostic information from the previous action
         """
+        # used to track rewards
+        self.reward = {}
         for _ in range(self.env_params.sims_per_step):
             self.time_counter += 1
             self.step_counter += 1
