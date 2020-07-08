@@ -337,7 +337,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 if speed > 0 and speed < 100.0:
                     rewards[rl_id] += speed
                 continue
-
+ 
             if self.arrived_intersection(rl_id): #and not self.past_intersection(rl_id):
                 reward = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
