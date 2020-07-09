@@ -186,7 +186,9 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 # whether to append the prior into the state
                 "inference_in_state": args.inference_in_state,
                 # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
-                "use_grid": False
+                "use_grid": False,
+                # how much to penalize a collision
+                "ped_collision_penalty": -np.abs(args.ped_collision_penalty)
             },
         ),
         # network-related parameters (see flow.core.params.NetParams and the
@@ -555,6 +557,10 @@ if __name__ == '__main__':
                         help="determine if we append inference probabilities to an agent's state",
                         action="store_true",
                         default=False)
+    parser.add_argument("--ped_collision_penalty",
+                        help="how much to penalize a collision",
+                        type=int,
+                        default=-10)
 
     # Model arguments
     parser.add_argument("--use_lstm", action="store_true", default=False, help="Use LSTM")

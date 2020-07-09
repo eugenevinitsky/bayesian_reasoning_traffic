@@ -361,7 +361,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 inside_intersection = rl_id in self.inside_intersection
 
                 if len(collision_pedestrians) > 0:
-                    reward = -10.0
+                    reward = -self.env_params.additional_params["ped_collision_penalty"]
                 elif rl_id in collision_vehicles:
                     reward = -10.0
 
