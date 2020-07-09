@@ -95,10 +95,10 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.use_grid = env_params.additional_params.get("use_grid", False)
         if self.use_grid:
             self.num_grid_cells = 6
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3", "ped_in_4", "ped_in_5"]
         else:
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
 
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
@@ -305,8 +305,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                     if index < self.max_num_objects:
                         observation[(index * num_veh_obs) + num_self_obs + num_ped_obs:
                                     num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
-                            [observed_yaw, observed_speed,
-                             rel_x, rel_y, before]
+                            [observed_yaw / 360, observed_speed / 20,
+                             rel_x / 50, rel_y / 50, before / 5]
                         if self.inference_in_state:
                             # only perform inference if the visible veh has arrived
                             if self.arrived_intersection(veh_id):
@@ -816,8 +816,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             turn_num = 2  # turn left
         # subtract by one since we're not including the pedestrian here
-        observation = [yaw, speed, turn_num, curr_edge, end, edge_pos,
-                       veh_x, veh_y]
+        observation = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50,
+                       veh_x / 300.0, veh_y / 300.0]
         if self.use_grid:
             ped_param = self.get_grid_ped_params(visible_peds, rl_id)
         else:

@@ -73,7 +73,7 @@ setup_commands:
     - pip install gym==0.17.1
     - pip install torch==1.4.0
     - pip install tensorflow_probability
-    - pip install tensorflow==2.1.0
+    - pip install tensorflow==2.2.0
     - pip install ray==0.8.5
     - pip install tensorboardX
     - pip install dm-tree

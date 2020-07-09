@@ -342,7 +342,7 @@ def setup_exps_DQN(args, flow_params):
         config['gamma'] = tune.grid_search([0.999, 0.99])  # discount rate
 
     config['horizon'] = args.horizon
-    config['observation_filter'] = 'MeanStdFilter'
+    config['observation_filter'] = 'NoFilter'
 
     # define callbacks for tensorboard
 

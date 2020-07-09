@@ -115,7 +115,7 @@ class RuleBasedIntersectionController(BaseController):
     def get_accel(self, env):
         """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
         state = env.get_state()
-        ped_pos = [8, 9, 10, 11]
+        ped_pos = [7, 8, 9, 10]
         turn_num_idx = 2
 
         # we are not yet at the intersection and we are on the first edge
