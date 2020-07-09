@@ -163,7 +163,6 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         ),
 
         # environment related parameters (see flow.core.params.EnvParams)
-        
         env=EnvParams(
             horizon=args.horizon,
             additional_params={
@@ -188,7 +187,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
                 "use_grid": False,
                 # how much to penalize a collision
-                "ped_collision_penalty": -np.abs(args.ped_collision_penalty)
+                "ped_collision_penalty": -abs(args.ped_collision_penalty)
             },
         ),
         # network-related parameters (see flow.core.params.NetParams and the
@@ -560,7 +559,7 @@ if __name__ == '__main__':
     parser.add_argument("--ped_collision_penalty",
                         help="how much to penalize a collision",
                         type=int,
-                        default=-10)
+                        default=10)
 
     # Model arguments
     parser.add_argument("--use_lstm", action="store_true", default=False, help="Use LSTM")

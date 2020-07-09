@@ -95,10 +95,10 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.use_grid = env_params.additional_params.get("use_grid", False)
         if self.use_grid:
             self.num_grid_cells = 6
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "veh_x", "veh_y", ]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3", "ped_in_4", "ped_in_5"]
         else:
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "edge_pos", "veh_x", "veh_y", ]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
 
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
@@ -358,10 +358,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 # TODO(@evinitsky) pick the right reward
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
-                inside_intersection = rl_id in self.inside_intersection
 
                 if len(collision_pedestrians) > 0:
-                    reward = -self.env_params.additional_params["ped_collision_penalty"]
+                    reward = self.env_params.additional_params.get("ped_collision_penalty", -10)
                 elif rl_id in collision_vehicles:
                     reward = -10.0
 
@@ -504,9 +503,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             done['__all__'] = False
 
-        valid_ids = [veh_id for veh_id in self.k.vehicle.get_arrived_ids() if ('av' in veh_id or 'rl' in veh_id
+        done_ids = [veh_id for veh_id in self.k.vehicle.get_arrived_ids() if ('av' in veh_id or 'rl' in veh_id
                                                                                or veh_id in self.observed_rl_ids)]
-        for rl_id in valid_ids:
+        for rl_id in done_ids:
             done[rl_id] = True
             reward[rl_id] = 1.0
             self.reward[rl_id] = 1.0
@@ -816,7 +815,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         else:
             turn_num = 2  # turn left
         # subtract by one since we're not including the pedestrian here
-        observation = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, edge_pos / 50,
+        observation = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, end / 8, edge_pos / 50,
                        veh_x / 300.0, veh_y / 300.0]
         if self.use_grid:
             ped_param = self.get_grid_ped_params(visible_peds, rl_id)
