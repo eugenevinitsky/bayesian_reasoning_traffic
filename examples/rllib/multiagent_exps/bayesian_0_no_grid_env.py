@@ -160,6 +160,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
             restart_instance=True,
             sim_step=0.2,
             render=render,
+            print_warnings=False
         ),
 
         # environment related parameters (see flow.core.params.EnvParams)
@@ -237,26 +238,36 @@ def on_episode_start(info):
     if isinstance(env, _GroupAgentsWrapper):
         env = env.env
     episode = info['episode']
-    episode.user_data['num_ped_collisions'] = 0
     episode.user_data['num_veh_collisions'] = 0
     episode.user_data['avg_speed'] = []
     episode.user_data["discounted_reward"] = 0
+    episode.user_data["time_counter"] = 0
 
     episode.user_data['steps_elapsed'] = 0
     episode.user_data['vehicle_leaving_time'] = []
     episode.user_data['num_rl_veh_active'] = len(env.k.vehicle.get_rl_ids())
     episode.user_data['past_intersection'] = 0
     episode.user_data['av_past_intersection'] = False
+    episode.user_data['ped_side_collisions'] = 0
+    episode.user_data['ped_front_collisions'] = 0
 
 def on_episode_step(info):
     env = info['env'].get_unwrapped()[0]
     if isinstance(env, _GroupAgentsWrapper):
         env = env.env
     episode = info['episode']
+    episode.user_data["time_counter"] += 1
     collide_ids = env.k.simulation.get_collision_vehicle_ids()
     for v_id in env.k.vehicle.get_rl_ids():
         if len(env.k.vehicle.get_pedestrian_crash(v_id, env.k.pedestrian)) > 0:
-            episode.user_data['num_ped_collisions'] += 1
+            visible_vehicles, visible_pedestrians, visible_lanes = env.find_visible_objects(v_id,
+                                                                                             env.search_veh_radius)
+            ped_grid = env.four_way_ped_params(visible_pedestrians, visible_lanes, ground_truth=False)
+            # we didn't see the ped but it collided with us
+            if np.sum(ped_grid) == 0:
+                episode.user_data['ped_side_collisions'] += 1
+            else:
+                episode.user_data['ped_front_collisions'] += 1
 
         if v_id in collide_ids:
             episode.user_data['num_veh_collisions'] += 1
@@ -274,28 +285,32 @@ def on_episode_step(info):
                 [episode.user_data['steps_elapsed']] * num_veh_left
         episode.user_data['num_rl_veh_active'] -= num_veh_left
     rl_ids = env.k.vehicle.get_rl_ids()
-    arrived_ids = env.k.vehicle.get_arrived_ids()
     # TODO(@evinitsky) remove hardcoding
-    if 'av_0' in env.reward.keys() and 'av_0' in rl_ids or 'av_0' in arrived_ids:
+
+    episode.user_data['av_past_intersection'] = env.past_intersection('av_0')
+
+    if 'av_0' in env.reward.keys() and 'av_0' in rl_ids and \
+            ('av_0' not in env.done_ids or not episode.user_data['av_past_intersection']):
         episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.995 ** env.time_counter)
-        episode.user_data['av_past_intersection'] = True
 
 
 def on_episode_end(info):
     episode = info['episode']
-    episode.custom_metrics['num_ped_collisions'] = episode.user_data['num_ped_collisions']
-    episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
-    episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
+    if episode.user_data["time_counter"] > 0:
+        episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
+        episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
 
-    if episode.user_data['num_ped_collisions'] + episode.user_data['num_ped_collisions'] == 0:
-        episode.user_data['vehicle_leaving_time'] += \
-                [episode.user_data['steps_elapsed']] * episode.user_data['num_rl_veh_active']
-        episode.custom_metrics['avg_rl_veh_arrival'] = \
-            np.mean(episode.user_data['vehicle_leaving_time'])
-    else:
-        episode.custom_metrics['avg_rl_veh_arrival'] = 500
-    episode.custom_metrics['past_intersection'] = episode.user_data['av_past_intersection']
-    episode.custom_metrics["discounted_reward"] = episode.user_data['discounted_reward']
+        if episode.user_data['ped_front_collisions'] + episode.user_data['ped_side_collisions'] == 0:
+            episode.user_data['vehicle_leaving_time'] += \
+                    [episode.user_data['steps_elapsed']] * episode.user_data['num_rl_veh_active']
+            episode.custom_metrics['avg_rl_veh_arrival'] = \
+                np.mean(episode.user_data['vehicle_leaving_time'])
+        else:
+            episode.custom_metrics['avg_rl_veh_arrival'] = 500
+        episode.custom_metrics['past_intersection'] = episode.user_data['av_past_intersection']
+        episode.custom_metrics["discounted_reward"] = episode.user_data['discounted_reward']
+        episode.custom_metrics['ped_side_collisions'] = episode.user_data['ped_side_collisions']
+        episode.custom_metrics['ped_front_collisions'] = episode.user_data['ped_front_collisions']
 
 
 def setup_exps_DQN(args, flow_params):
@@ -424,10 +439,9 @@ def setup_exps_PPO(args, flow_params):
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     config['train_batch_size'] = args.horizon * args.n_rollouts
     config['simple_optimizer'] = False
-    # TODO(@ev) fix the termination condition so you don't need this
     config['no_done_at_end'] = False
     config['lr'] = 1e-4
-    config['gamma'] = 0.97  # discount rate
+    config['gamma'] = 0.995  # discount rate
     # config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
     if args.use_lstm:
@@ -600,7 +614,7 @@ if __name__ == '__main__':
         # 'env': env_name,
         'checkpoint_freq': CHECKPOINT_FREQ,
         'trial_name_creator': trial_str_creator,
-        "max_failures": 1,
+        "max_failures": 0,
         'stop': {
             'training_iteration': args.n_iterations
         },
