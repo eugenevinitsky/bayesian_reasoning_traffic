@@ -482,7 +482,14 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.k.vehicle.update_vehicle_colors()
 
             # crash encodes whether the simulator experienced a collision
+            # we only want to call crash if an RL car collides though
             crash = self.k.simulation.check_collision()
+            if crash:
+                crash = False
+                collide_ids = self.k.simulation.get_collision_vehicle_ids()
+                for veh_id in self.k.vehicle.get_rl_ids():
+                    if veh_id in collide_ids:
+                        crash = True
 
             # update crash if there's an pedestrian-vehicle collision
             if self.k.pedestrian:
@@ -526,8 +533,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         ids_to_check += [veh_id for veh_id in self.k.vehicle.get_arrived_ids()]
         done_ids = [veh_id for veh_id in ids_to_check if ((('av' in veh_id or 'rl' in veh_id
                                                                               or veh_id in self.observed_rl_ids) and
-                                                                      veh_id in arrived_ids or
-                                                                      veh_id in collide_ids) and
+                                                                      (veh_id in arrived_ids or
+                                                                      veh_id in collide_ids)) and
                                                                       veh_id not in self.done_ids)]
         done_ids = [done_id for done_id in done_ids if 'human' not in done_id]
 
