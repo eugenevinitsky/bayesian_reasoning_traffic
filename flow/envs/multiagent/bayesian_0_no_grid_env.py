@@ -1,5 +1,5 @@
 """Environment testing scenario one of the bayesian envs."""
-from copy import deepcopy
+from copy import deepcopy, copy
 import math
 import numpy as np
 from gym.spaces import Box, Discrete
@@ -190,8 +190,8 @@ class Bayesian0NoGridEnv(MultiEnv):
             return Discrete(DISCRETE_VALS + 1)
         else:
             return Box(
-                low=-np.abs(self.env_params.additional_params['max_decel']),
-                high=self.env_params.additional_params['max_accel'],
+                low=-1,
+                high=1,
                 shape=(1,),  # (4,),
                 dtype=np.float32)
 
@@ -216,7 +216,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 if self.discrete:
                     accel = self.discrete_actions_to_accels[actions]
                 else:
-                    accel = actions[0]
+                    max_decel = -np.abs(self.env_params.additional_params["max_decel"])
+                    max_accel = self.env_params.additional_params["max_accel"]
+                    accel = max_decel + (max_accel - max_decel) * (actions[0] + 1) / 2
 
                 # if we are past the intersection, go full speed ahead but don't crash
                 # if self.past_intersection(rl_id):
@@ -286,15 +288,15 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.rl_set.add(rl_id)
                 assert rl_id in self.arrival_order
 
-                observation = np.zeros(self.observation_space.shape[0])  # TODO(KL) Check if this makes sense
+                observation = -np.ones(self.observation_space.shape[0])
 
                 visible_vehicles, visible_pedestrians, visible_lanes = self.find_visible_objects(rl_id,
                                                                                                  self.search_veh_radius)
 
                 # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
-                visible_vehicles = sorted(visible_vehicles, key=lambda v: \
-                    (self.k.vehicle.get_relative_angle(rl_id, \
-                                                       self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
+                # visible_vehicles = sorted(visible_vehicles, key=lambda v: \
+                #     (self.k.vehicle.get_relative_angle(rl_id, \
+                #                                        self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
                 observation[:num_self_obs + num_ped_obs] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
@@ -303,6 +305,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
+                # print('number of visible vehicles is ', len(visible_vehicles))
                 for index, veh_id in enumerate(visible_vehicles):
 
                     before = self.arrival_position(veh_id)
@@ -518,11 +521,14 @@ class Bayesian0NoGridEnv(MultiEnv):
         # done_ids = [veh_id for veh_id in self.k.vehicle.get_arrived_ids() if ('av' in veh_id or 'rl' in veh_id
         #                                                                        or veh_id in self.observed_rl_ids)]
         collide_ids = self.k.simulation.get_collision_vehicle_ids()
-        done_ids = [veh_id for veh_id in self.k.vehicle.get_ids() if (('av' in veh_id or 'rl' in veh_id
+        arrived_ids = self.k.vehicle.get_arrived_ids()
+        ids_to_check = copy(self.k.vehicle.get_ids())
+        ids_to_check += [veh_id for veh_id in self.k.vehicle.get_arrived_ids()]
+        done_ids = [veh_id for veh_id in ids_to_check if ((('av' in veh_id or 'rl' in veh_id
                                                                               or veh_id in self.observed_rl_ids) and
-                                                                      self.past_intersection(veh_id) and
-                                                                      veh_id not in self.done_ids or
-                                                                      veh_id in collide_ids)]
+                                                                      veh_id in arrived_ids or
+                                                                      veh_id in collide_ids) and
+                                                                      veh_id not in self.done_ids)]
         done_ids = [done_id for done_id in done_ids if 'human' not in done_id]
 
         for rl_id in done_ids:
@@ -531,6 +537,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.reward[rl_id] = self.env_params.additional_params["ped_collision_penalty"]
                 reward[rl_id] = self.env_params.additional_params["ped_collision_penalty"]
             else:
+                self.exit_time[rl_id] = self.time_counter * self.sim_step
                 self.reward[rl_id] = 1.0
                 reward[rl_id] = 1.0
 
@@ -558,6 +565,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         # print(self.ped_transition_cnt)
         self.time_counter = 0
         self.reward = {}
+        self.exit_time = {}
         self.done_ids = set()
         self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
         # dict to store the counts for each possible transiion

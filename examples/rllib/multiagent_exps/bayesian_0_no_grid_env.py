@@ -52,15 +52,18 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
     dict
         flow_params object
     """
-    pedestrian_params = PedestrianParams()
-    for i in range(NUM_PEDS):
-        pedestrian_params.add(
-            ped_id=f'ped_{i}',
-            depart_time='0.00',
-            start='(1.2)--(1.1)',
-            end='(1.1)--(1.0)',
-            depart_pos=f'{46 + 0.5*i}',
-            arrival_pos='5')
+    if pedestrians:
+        pedestrian_params = PedestrianParams()
+        for i in range(NUM_PEDS):
+            pedestrian_params.add(
+                ped_id=f'ped_{i}',
+                depart_time='0.00',
+                start='(1.2)--(1.1)',
+                end='(1.1)--(1.0)',
+                depart_pos=f'{46 + 0.5*i}',
+                arrival_pos='5')
+    else:
+        pedestrian_params = None
         
     # we place a sufficient number of vehicles to ensure they confirm with the
     # total number specified above. We also use a "right_of_way" speed mode to
@@ -293,6 +296,9 @@ def on_episode_step(info):
             ('av_0' not in env.done_ids or not episode.user_data['av_past_intersection']):
         episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.995 ** env.time_counter)
 
+    if 'av_0' in env.exit_time.keys():
+        episode.user_data["exit_time"] = env.exit_time['av_0']
+
 
 def on_episode_end(info):
     episode = info['episode']
@@ -300,7 +306,8 @@ def on_episode_end(info):
         episode.custom_metrics['num_veh_collisions'] = episode.user_data['num_veh_collisions']
         episode.custom_metrics['avg_speed'] = np.mean(episode.user_data['avg_speed'])
 
-        if episode.user_data['ped_front_collisions'] + episode.user_data['ped_side_collisions'] == 0:
+        if episode.user_data['ped_front_collisions'] + episode.user_data['ped_side_collisions'] \
+                + episode.user_data['num_veh_collisions'] == 0:
             episode.user_data['vehicle_leaving_time'] += \
                     [episode.user_data['steps_elapsed']] * episode.user_data['num_rl_veh_active']
             episode.custom_metrics['avg_rl_veh_arrival'] = \
@@ -311,6 +318,8 @@ def on_episode_end(info):
         episode.custom_metrics["discounted_reward"] = episode.user_data['discounted_reward']
         episode.custom_metrics['ped_side_collisions'] = episode.user_data['ped_side_collisions']
         episode.custom_metrics['ped_front_collisions'] = episode.user_data['ped_front_collisions']
+        if "exit_time" in episode.user_data.keys():
+            episode.custom_metrics['exit_time'] = episode.user_data['exit_time']
 
 
 def setup_exps_DQN(args, flow_params):
@@ -339,17 +348,17 @@ def setup_exps_DQN(args, flow_params):
     config["num_workers"] = min(args.n_cpus, args.n_rollouts)
     if args.render:
         config["num_workers"] = 0
-    config['train_batch_size'] = args.horizon * args.n_rollouts
     config['no_done_at_end'] = False
     config['lr'] = 1e-4
     config['n_step'] = 10
-    config['gamma'] = 0.995  # discount rate
+    config['gamma'] = 0.99  # discount rate
     config['model'].update({'fcnet_hiddens': [64, 64, 64]})
     config['learning_starts'] = 20000
     config['prioritized_replay'] = True
+    config["train_batch_size"] = 32
     # increase buffer size
     config['buffer_size'] = 200000
-    config["train_batch_size"] = 320
+    # config["train_batch_size"] = 320
     # config['model']['fcnet_activation'] = 'relu'
     if args.grid_search:
         config['n_step'] = tune.grid_search([1, 10])
@@ -411,6 +420,7 @@ def setup_exps_DQN(args, flow_params):
     })
 
     return alg_run, env_name, config
+
 
 def setup_exps_PPO(args, flow_params):
     """
@@ -506,6 +516,90 @@ def setup_exps_PPO(args, flow_params):
     return alg_run, env_name, config
 
 
+def setup_exps_TD3(args, flow_params):
+    """
+    Experiment setup with PPO using RLlib.
+
+    Parameters
+    ----------
+    flow_params : dictionary of flow parameters
+
+    Returns
+    -------
+    str
+        name of the training algorithm
+    str
+        name of the gym environment to be trained
+    dict
+        training configuration parameters
+    """
+
+    # from flow.algorithms.ppo.ppo import DEFAULT_CONFIG as PPO_DEFAULT_CONFIG, PPOTrainer
+    alg_run = "TD3"
+    agent_cls = get_agent_class(alg_run)
+    config = agent_cls._default_config.copy()
+
+    config['no_done_at_end'] = False
+    config['gamma'] = 0.995  # discount rate
+    if args.grid_search:
+        config['gamma'] = tune.grid_search([.995, 0.99, 0.9])  # discount rate
+
+    config['horizon'] = args.horizon
+    config['observation_filter'] = 'NoFilter'
+
+    # define callbacks for tensorboard
+
+    def on_train_result(info):
+        result = info['result']
+        trainer = info['trainer']
+        trainer.workers.foreach_worker(
+                lambda ev: ev.foreach_env(
+                    lambda env: env.update_curriculum(result['training_iteration'])
+                )
+        )
+
+    config['callbacks'] = {
+            "on_episode_start":tune.function(on_episode_start),
+            "on_episode_step":tune.function(on_episode_step),
+            "on_episode_end":tune.function(on_episode_end),
+            "on_train_result":tune.function(on_train_result)}
+
+    # save the flow params for replay
+    flow_json = json.dumps(
+        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
+    config['env_config']['flow_params'] = flow_json
+    config['env_config']['run'] = "TD3"
+
+    create_env, env_name = make_create_env(params=flow_params, version=0)
+    config['env'] = env_name
+
+    # Register as rllib env
+    register_env(env_name, create_env)
+
+    test_env = create_env()
+    obs_space = test_env.observation_space
+    act_space = test_env.action_space
+
+    def gen_policy():
+        return None, obs_space, act_space, {}
+
+    # Setup PG with a single policy graph for all agents
+    policy_graphs = {'av': gen_policy()}
+
+    def policy_mapping_fn(_):
+        return 'av'
+
+    config.update({
+        'multiagent': {
+            'policies': policy_graphs,
+            'policy_mapping_fn': tune.function(policy_mapping_fn),
+            'policies_to_train': ['av']
+        }
+    })
+
+    return alg_run, env_name, config
+
+
 if __name__ == '__main__':
     EXAMPLE_USAGE = """
     example usage:
@@ -542,7 +636,7 @@ if __name__ == '__main__':
                         help="Experiment run mode (local | cluster)")
     parser.add_argument('--algo', type=str, default='PPO',
                         help="RL method to use (PPO, TD3, QMIX, DQN)")
-    parser.add_argument("--pedestrians", default=True,
+    parser.add_argument("--pedestrians", default=False,
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
     parser.add_argument("--randomize_vehicles", default=True,
@@ -595,7 +689,8 @@ if __name__ == '__main__':
         alg_run, env_name, config = setup_exps_PPO(args, flow_params)
     elif ALGO == 'DQN':
         alg_run, env_name, config = setup_exps_DQN(args, flow_params)
-
+    elif ALGO == 'TD3':
+        alg_run, env_name, config = setup_exps_TD3(args, flow_params)
     else:
         raise NotImplementedError
 
