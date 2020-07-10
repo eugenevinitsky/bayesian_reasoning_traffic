@@ -112,6 +112,8 @@ def construct_agent(args):
         if config_run == "CustomPPO":
             agent_cls = get_agent_class("PPO")
         else:
+            if config_run == 'DQN':
+                config['exploration_config']['final_epsilon'] = 0
             agent_cls = get_agent_class(config_run)
     else:
         print('visualizer_rllib.py: error: could not find flow parameter '

@@ -154,10 +154,12 @@ class Bayesian0NoGridEnv(MultiEnv):
                          "(0.1)--(1.1)",
                          "(1.0)--(1.1)"]
 
-        max_accel, max_decel = self.env_params.additional_params['max_decel'], -np.abs(
+        max_accel, max_decel = self.env_params.additional_params['max_accel'], -np.abs(
             self.env_params.additional_params['max_decel'])
-        step_size = (max_accel - max_decel) / (DISCRETE_VALS + 1)
-        self.discrete_actions_to_accels = [round(max_decel + i * step_size, 2) for i in range(DISCRETE_VALS)]
+        step_size = (max_accel - max_decel) / (DISCRETE_VALS - 1)
+        self.discrete_actions_to_accels = [max_decel + i * step_size for i in range(DISCRETE_VALS)]
+        # the space should always include zero for coasting
+        self.discrete_actions_to_accels.append(0)
 
         # this is used for inference
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
@@ -184,8 +186,8 @@ class Bayesian0NoGridEnv(MultiEnv):
     def action_space(self):
         """See class definition."""
         if self.discrete:
-            # 10 different accelerations
-            return Discrete(10)
+            # 10 different accelerations plus 0
+            return Discrete(DISCRETE_VALS + 1)
         else:
             return Box(
                 low=-np.abs(self.env_params.additional_params['max_decel']),
