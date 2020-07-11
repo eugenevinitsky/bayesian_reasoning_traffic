@@ -540,9 +540,37 @@ def setup_exps_TD3(args, flow_params):
     config = agent_cls._default_config.copy()
 
     config['no_done_at_end'] = False
-    config['gamma'] = 0.995  # discount rate
+
+    config['gamma'] = 0.99  # discount rate
+    config['learning_starts'] = 20000
+    config['prioritized_replay'] = True
+    # config["train_batch_size"] = 32
+    # increase buffer size
+    # config['buffer_size'] = 200000
+    # config["train_batch_size"] = 320
+    # config['model']['fcnet_activation'] = 'relu'
+    config['exploration_config'] = {
+            # TD3 uses simple Gaussian noise on top of deterministic NN-output
+            # actions (after a possible pure random phase of n timesteps).
+            "type": "GaussianNoise",
+            # For how many timesteps should we return completely random
+            # actions, before we start adding (scaled) noise?
+            "random_timesteps": 10000,
+            # Gaussian stddev of action noise for exploration.
+            "stddev": 0.1,
+            # Scaling settings by which the Gaussian noise is scaled before
+            # being added to the actions. NOTE: The scale timesteps start only
+            # after(!) any random steps have been finished.
+            # By default, do not anneal over time (fixed 1.0).
+            "initial_scale": 1.0,
+            "final_scale": 0.02,
+            "scale_timesteps": 100000
+        }
     if args.grid_search:
-        config['gamma'] = tune.grid_search([.995, 0.99, 0.9])  # discount rate
+        config['n_step'] = tune.grid_search([1, 10])
+        # config['lr'] = tune.grid_search([1e-3, 1e-2, 1e-4])
+        config["train_batch_size"] = tune.grid_search([32, 320])
+        config['gamma'] = tune.grid_search([0.999, 0.99])  # discount rate
 
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'

@@ -22,7 +22,7 @@ b = np.array([nop, pp])
 
 TRANSITION_MATRIX = np.array([a, b])
 
-PED_IDX_LST = [8, 9, 10, 11]
+PED_IDX_LST = [9, 10, 11, 12]
 PED_FRONT = PED_IDX_LST[0]
 PED_BACK = PED_IDX_LST[-1]
 

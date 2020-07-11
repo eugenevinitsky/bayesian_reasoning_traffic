@@ -90,7 +90,9 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         super().__init__(env_params, sim_params, network, simulator)
         self.discrete = env_params.additional_params.get("discrete", False)
+        self.max_num_objects = env_params.additional_params.get("max_num_objects", 3)
         self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
+
         # setup information for the gridding if it is needed
         self.use_grid = env_params.additional_params.get("use_grid", False)
         if self.use_grid:
@@ -98,7 +100,9 @@ class Bayesian0NoGridEnv(MultiEnv):
             self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3", "ped_in_4", "ped_in_5"]
         else:
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
+            # last_seen this tracks when we last saw a vehicle so we don't forget it immediately
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y",
+                                   "last_seen"]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
 
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
@@ -168,7 +172,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         if self.inference_in_state:
             path_to_inferrer = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
             self.agent = get_inferrer(path=path_to_inferrer, inferrer_type="imitation")
-        self.max_num_objects = env_params.additional_params.get("max_num_objects", 3)
 
     @property
     def observation_space(self):
@@ -299,12 +302,21 @@ class Bayesian0NoGridEnv(MultiEnv):
                 #                                        self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
                 # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-                observation[:num_self_obs + num_ped_obs] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
+                observation[:num_self_obs + num_ped_obs - 1] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
+                if len(visible_vehicles) == 0:
+                    self.last_seen += 1 / 50.0
+                else:
+                    self.last_seen = 0
+                observation[num_self_obs + num_ped_obs - 1] = self.last_seen
                 self.ped_variables = observation[num_self_obs: num_self_obs + num_ped_obs]
 
                 veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
+                # This value tracks how long its been since we've seen X vehicles
+
+
                 # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
+
                 # print('number of visible vehicles is ', len(visible_vehicles))
                 for index, veh_id in enumerate(visible_vehicles):
 
@@ -538,6 +550,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                                                                       veh_id not in self.done_ids)]
         done_ids = [done_id for done_id in done_ids if 'human' not in done_id]
 
+        # if crash:
+        #     import ipdb; ipdb.set_trace()
+
         for rl_id in done_ids:
             done[rl_id] = True
             if rl_id in collide_ids:
@@ -571,6 +586,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         """
         # print(self.ped_transition_cnt)
         self.time_counter = 0
+        # last time we saw a vehicle
+        self.last_seen = 0
         self.reward = {}
         self.exit_time = {}
         self.done_ids = set()

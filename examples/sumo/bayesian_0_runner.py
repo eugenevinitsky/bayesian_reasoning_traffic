@@ -160,7 +160,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
             speed_mode="right_of_way",
         ),
         lane_change_params=lane_change_params,
-        num_vehicles=num_cars_left)
+        num_vehicles=4)
 
     # For now, just have the one human car and one pedestrian
     #
@@ -194,7 +194,12 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         "speed_limit": 35,
         "horizontal_lanes": 1,
         "vertical_lanes": 1,
-        "randomize_routes": False
+        "randomize_routes": True,
+        # "vehicle_kernel": vehicles,
+        "pedestrian_kernel": pedestrian_params,
+        "num_cars": 4,
+        # the vehicles can be on any edge and take any route
+        # "full_randomization": True
     }
 
     initial_config, net_params = get_non_flow_params(
@@ -239,4 +244,4 @@ if __name__ == "__main__":
     # import the experiment variable
     exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
-    exp.run(1, 150)
+    exp.run(10, 500)
