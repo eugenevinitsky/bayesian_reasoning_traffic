@@ -115,6 +115,11 @@ def construct_agent(args):
             if config_run == 'DQN':
                 config['exploration_config']['final_epsilon'] = 0
             agent_cls = get_agent_class(config_run)
+            if config_run == 'TD3':
+                config['exploration_config']['initial_scale'] = 0.0
+                config['exploration_config']['final_scale'] = 0.0
+
+            agent_cls = get_agent_class(config_run)
     else:
         print('visualizer_rllib.py: error: could not find flow parameter '
               '\'run\' in params.json, '

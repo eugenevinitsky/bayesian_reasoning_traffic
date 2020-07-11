@@ -543,7 +543,12 @@ def setup_exps_TD3(args, flow_params):
 
     config['gamma'] = 0.99  # discount rate
     config['learning_starts'] = 20000
-    config['prioritized_replay'] = True
+    # config['prioritized_replay'] = True
+    config['prioritized_replay'] = False
+    config["evaluation_interval"] = 10
+    # Number of episodes to run per evaluation period.
+    config["evaluation_num_episodes"] = 2
+    config["grad_norm_clipping"] = 40.0
     # config["train_batch_size"] = 32
     # increase buffer size
     # config['buffer_size'] = 200000
@@ -563,7 +568,7 @@ def setup_exps_TD3(args, flow_params):
             # after(!) any random steps have been finished.
             # By default, do not anneal over time (fixed 1.0).
             "initial_scale": 1.0,
-            "final_scale": 0.02,
+            "final_scale": 1.0,
             "scale_timesteps": 100000
         }
     if args.grid_search:
