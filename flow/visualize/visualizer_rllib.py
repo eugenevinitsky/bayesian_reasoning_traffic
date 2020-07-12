@@ -109,12 +109,13 @@ def construct_agent(args):
         from flow.algorithms.custom_ppo import CustomPPOTrainer
         agent_cls = CustomPPOTrainer
     elif config_run:
+        config["in_evaluation"] = True
+        config["evaluation_interval"] = True
         if config_run == "CustomPPO":
             agent_cls = get_agent_class("PPO")
         else:
             if config_run == 'DQN':
                 config['exploration_config']['final_epsilon'] = 0
-            agent_cls = get_agent_class(config_run)
             if config_run == 'TD3':
                 config['exploration_config']['initial_scale'] = 0.0
                 config['exploration_config']['final_scale'] = 0.0
@@ -286,15 +287,18 @@ def visualizer_rllib(agent, env_name, multiagent, config):
                         action[agent_id], state_init[agent_id], logits = \
                             agent.compute_action(
                             state[agent_id], state=state_init[agent_id],
-                            policy_id=policy_map_fn(agent_id))
+                            policy_id=policy_map_fn(agent_id),
+                            explore=False)
                     else:
                         a_action = agent.compute_action(
                             a_obs,
                             prev_action=prev_actions[agent_id],
                             prev_reward=prev_rewards[agent_id],
-                            policy_id=policy_id)
+                            policy_id=policy_id,
+                            explore=False)
                         action[agent_id] = a_action
                         prev_actions[agent_id] = a_action
+                        print(a_action)
             else:
                 action = agent.compute_action(state)
             state, reward, done, _ = env.step(action)

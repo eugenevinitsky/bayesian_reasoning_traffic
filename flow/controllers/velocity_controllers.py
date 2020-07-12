@@ -114,12 +114,11 @@ class RuleBasedIntersectionController(BaseController):
 
     def get_accel(self, env):
         """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
-        state = env.get_state()
+        state = env.state_for_id(self.veh_id)
         ped_pos = [9, 10, 11, 12]
-        turn_num_idx = 2
 
         # we are not yet at the intersection and we are on the first edge
-        desired_pos = 49
+        desired_pos = 48
         if env.k.vehicle.get_position(self.veh_id) < desired_pos and (env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
             action = 2.0
             lead_vel = 0
@@ -145,14 +144,14 @@ class RuleBasedIntersectionController(BaseController):
 
         start, end = env.k.vehicle.get_route(self.veh_id)
         start, end = self.edge_to_num[start], self.edge_to_num[end]
-        if state[self.veh_id][ped_pos][start] or state[self.veh_id][ped_pos][end]:
+        if state[ped_pos][start] or state[ped_pos][end]:
             return -3.0
 
         arrival_order = [env.arrival_order[veh_id] for veh_id in env.inside_intersection]
         if len(arrival_order) == 0:
             return 2.0
         if env.arrival_order[self.veh_id] == np.min(arrival_order):
-            return 1.0
+            return 2.0
         else:
             return -3.0
 

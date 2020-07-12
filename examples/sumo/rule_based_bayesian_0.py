@@ -164,7 +164,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         ),
         acceleration_controller=(RuleBasedIntersectionController, {}),
         lane_change_params=lane_change_params,
-        num_vehicles=3)
+        num_vehicles=4)
 
     # For now, just have the one human car and one pedestrian
 
@@ -239,4 +239,4 @@ if __name__ == "__main__":
     # import the experiment variable
     exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
-    exp.run(10, 600, multiagent=True)
+    exp.run(40, 600, multiagent=True)

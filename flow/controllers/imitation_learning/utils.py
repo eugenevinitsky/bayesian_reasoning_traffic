@@ -3,6 +3,7 @@ import os
 import numpy as np
 import math
 from flow.core.params import SumoCarFollowingParams
+from flow.controllers import RuleBasedIntersectionController
 from flow.controllers.imitation_learning.imitating_controller import ImitatingController
 from flow.controllers.imitation_learning.imitating_network import ImitatingNetwork
 from flow.controllers.car_following_models import IDMController, SimCarFollowingController

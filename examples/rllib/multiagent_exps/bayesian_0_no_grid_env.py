@@ -23,7 +23,7 @@ from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, In
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.core.params import PedestrianParams
 
-from flow.controllers import SimCarFollowingController, GridRouter, RLController, IDMController
+from flow.controllers import SimCarFollowingController, GridRouter, RLController, RuleBasedIntersectionController
 # from flow.controllers.car_following_models import IDMController
 
 
@@ -121,7 +121,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         if args.randomize_vehicles:
             vehicles.add(
                 veh_id="human",
-                acceleration_controller=(SimCarFollowingController, {}),
+                acceleration_controller=(RuleBasedIntersectionController, {}),
                 car_following_params=SumoCarFollowingParams(
                     min_gap=2.5,
                     decel=7.5,  # avoid collisions at emergency stops
@@ -543,15 +543,14 @@ def setup_exps_TD3(args, flow_params):
 
     config['gamma'] = 0.99  # discount rate
     config['learning_starts'] = 20000
-    # config['prioritized_replay'] = True
-    config['prioritized_replay'] = False
+    config['prioritized_replay'] = True
     config["evaluation_interval"] = 10
     # Number of episodes to run per evaluation period.
-    config["evaluation_num_episodes"] = 2
+    config["evaluation_num_episodes"] = 10
     config["grad_norm_clipping"] = 40.0
     # config["train_batch_size"] = 32
     # increase buffer size
-    # config['buffer_size'] = 200000
+    # config['buffer_size'] = 20000
     # config["train_batch_size"] = 320
     # config['model']['fcnet_activation'] = 'relu'
     config['exploration_config'] = {
@@ -568,7 +567,7 @@ def setup_exps_TD3(args, flow_params):
             # after(!) any random steps have been finished.
             # By default, do not anneal over time (fixed 1.0).
             "initial_scale": 1.0,
-            "final_scale": 1.0,
+            "final_scale": 0.4,
             "scale_timesteps": 100000
         }
     if args.grid_search:
