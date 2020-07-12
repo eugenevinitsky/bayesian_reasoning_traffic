@@ -147,58 +147,65 @@ class RuleBasedIntersectionController(BaseController):
         if state[ped_pos][start] or state[ped_pos][end]:
             return -3.0
 
-        arrival_order = [env.arrival_order[veh_id] for veh_id in env.inside_intersection]
+        # inch forward if no vehicle is before you in the order, otherwise go
+        arrival_order = [env.arrival_order[veh_id] for veh_id in env.arrival_order
+                         if (env.k.vehicle.get_position(self.veh_id) > desired_pos + 1 and
+                             env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0])
+                         and not env.past_intersection(veh_id)]
         if len(arrival_order) == 0:
+            print('arrival order was zero for vehicle {}'.format(self.veh_id))
             return 2.0
         if env.arrival_order[self.veh_id] == np.min(arrival_order):
+            print('vehicle {} was first in arrival order'.format(self.veh_id))
+
             return 2.0
         else:
             return -3.0
 
-    # def get_action(self, env, allow_junction_control=False):
-    #     """Convert the get_accel() acceleration into an action.
-    #
-    #     If no acceleration is specified, the action returns a None as well,
-    #     signifying that sumo should control the accelerations for the current
-    #     time step.
-    #
-    #     This method also augments the controller with the desired level of
-    #     stochastic noise, and utlizes the "instantaneous" or "safe_velocity"
-    #     failsafes if requested.
-    #
-    #     Parameters
-    #     ----------
-    #     env : flow.envs.Env
-    #         state of the environment at the current time step
-    #
-    #     Returns
-    #     -------
-    #     float
-    #         the modified form of the acceleration
-    #     """
-    #     # this is to avoid abrupt decelerations when a vehicle has just entered
-    #     # a network and it's data is still not subscribed
-    #     if len(env.k.vehicle.get_edge(self.veh_id)) == 0:
-    #         return None
-    #
-    #     accel = self.get_accel(env)
-    #
-    #     # if no acceleration is specified, let sumo take over for the current
-    #     # time step
-    #     if accel is None:
-    #         return None
-    #
-    #     # add noise to the accelerations, if requested
-    #     if self.accel_noise > 0:
-    #         accel += np.random.normal(0, self.accel_noise)
-    #
-    #     # run the failsafes, if requested
-    #     if self.fail_safe == 'instantaneous':
-    #         accel = self.get_safe_action_instantaneous(env, accel)
-    #     elif self.fail_safe == 'safe_velocity':
-    #         accel = self.get_safe_velocity_action(env, accel)
-    #
-    #     return accel
+    def get_action(self, env, allow_junction_control=False):
+        """Convert the get_accel() acceleration into an action.
+
+        If no acceleration is specified, the action returns a None as well,
+        signifying that sumo should control the accelerations for the current
+        time step.
+
+        This method also augments the controller with the desired level of
+        stochastic noise, and utlizes the "instantaneous" or "safe_velocity"
+        failsafes if requested.
+
+        Parameters
+        ----------
+        env : flow.envs.Env
+            state of the environment at the current time step
+
+        Returns
+        -------
+        float
+            the modified form of the acceleration
+        """
+        # this is to avoid abrupt decelerations when a vehicle has just entered
+        # a network and it's data is still not subscribed
+        if len(env.k.vehicle.get_edge(self.veh_id)) == 0:
+            return None
+
+        accel = self.get_accel(env)
+
+        # if no acceleration is specified, let sumo take over for the current
+        # time step
+        if accel is None:
+            return None
+
+        # add noise to the accelerations, if requested
+        if self.accel_noise > 0:
+            accel += np.random.normal(0, self.accel_noise)
+
+        # run the failsafes, if requested
+        if self.fail_safe == 'instantaneous':
+            accel = self.get_safe_action_instantaneous(env, accel)
+        elif self.fail_safe == 'safe_velocity':
+            accel = self.get_safe_velocity_action(env, accel)
+
+        return accel
 
 
 class FollowerStopper(BaseController):

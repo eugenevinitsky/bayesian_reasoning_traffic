@@ -252,7 +252,8 @@ class Bayesian0NoGridEnv(MultiEnv):
             on_post_intersection_edge = self.k.vehicle.get_route(veh_id) == "" or self.k.vehicle.get_edge(veh_id) == \
                                         self.k.vehicle.get_route(veh_id)[-1]
 
-        if on_post_intersection_edge and not self.inside_intersection:  # vehicle arrived at final destination, 8 is a random distance
+        if on_post_intersection_edge and self.k.vehicle.get_position(
+                veh_id) > 4:  # vehicle arrived at final destination, 8 is a random distance
             return True
         elif self.k.vehicle.get_edge(veh_id) == '':
             return True
@@ -350,7 +351,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         # avs are trained via DQN, rl is the L2 car. We have all these conditions so we can use pre-trained controllers later.
         valid_ids = [veh_id for veh_id in veh_ids if ('av' in veh_id or 'rl' in veh_id or veh_id in rl_ids)]
         for rl_id in valid_ids:
-            if rl_id in self.inside_intersection or self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+            if rl_id in self.inside_intersection or self.arrived_intersection(rl_id) and not self.past_intersection(
+                    rl_id):
 
                 obs.update({rl_id: self.state_for_id(rl_id)})
                 # print('inside intersection', self.inside_intersection)
@@ -521,18 +523,15 @@ class Bayesian0NoGridEnv(MultiEnv):
             if crash:
                 break
 
+        states = self.get_state()
+        infos = {key: {} for key in states.keys()}
+
         # compute the reward
         if self.env_params.clip_actions:
             clipped_actions = self.clip_actions(rl_actions)
             reward = self.compute_reward(clipped_actions, fail=crash)
         else:
             reward = self.compute_reward(rl_actions, fail=crash)
-
-        states = self.get_state()
-        infos = {key: {} for key in states.keys()}
-
-        if reward.keys() != states.keys():
-            import ipdb; ipdb.set_trace()
         # if states.keys() != reward.keys():
         #     reward = self.compute_reward(rl_actions, fail=crash)
         #     states = self.get_state()
@@ -843,9 +842,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def update_intersection_state(self, rl_id):
         curr_edge = self.k.vehicle.get_edge(rl_id)
         if curr_edge in self.edge_to_int:
-            # we add the latter check because the vehicle position is measured from the frunk
-            # so you're not fully on the end edge when your edge number changes to the end edge
-            if rl_id in self.inside_intersection and self.k.vehicle.get_position(rl_id) > 4:
+            if rl_id in self.inside_intersection and self.k.vehicle.get_position(rl_id) > 5:
                 self.inside_intersection.remove(rl_id)
         else:
             self.inside_intersection.add(rl_id)

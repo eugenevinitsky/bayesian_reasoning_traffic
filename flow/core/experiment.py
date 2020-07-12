@@ -125,7 +125,6 @@ class Experiment:
                 # print(rl_actions(state), 2222)
                 # print(state)
                 state, reward, done, _ = self.env.step(rl_actions(state))
-                print(reward, done)
                 vel[j] = np.mean(
                     self.env.k.vehicle.get_speed(self.env.k.vehicle.get_ids()))     # TODO(KL) Check w Eugene what the point of that the mean is?
                 # import ipdb;ipdb.set_trace()
