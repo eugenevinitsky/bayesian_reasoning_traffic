@@ -153,11 +153,8 @@ class RuleBasedIntersectionController(BaseController):
                              env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0])
                          and not env.past_intersection(veh_id)]
         if len(arrival_order) == 0:
-            print('arrival order was zero for vehicle {}'.format(self.veh_id))
             return 2.0
         if env.arrival_order[self.veh_id] == np.min(arrival_order):
-            print('vehicle {} was first in arrival order'.format(self.veh_id))
-
             return 2.0
         else:
             return -3.0
