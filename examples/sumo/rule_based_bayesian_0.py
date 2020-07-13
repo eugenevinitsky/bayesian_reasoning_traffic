@@ -127,7 +127,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         "cars_bot": num_cars_bot
     }
 
-    sim_params = SumoParams(sim_step=0.1, render=True, restart_instance=True)
+    sim_params = SumoParams(sim_step=1.0, render=True, restart_instance=True)
 
     if render is not None:
         sim_params.render = render
@@ -239,4 +239,4 @@ if __name__ == "__main__":
     # import the experiment variable
     exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
-    exp.run(3, 600, multiagent=True)
+    exp.run(3, 100, multiagent=True)

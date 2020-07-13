@@ -177,13 +177,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     @property
     def observation_space(self):
         """See class definition."""
-        max_objects = self.env_params.additional_params["max_num_objects"]
-        # observations of your own state and other cars
-        num_obs = len(self.self_obs_names) + len(self.ped_names) + max_objects * len(self.veh_obs_names)
-        # belief variable over whether a pedestrian is there
-        if self.inference_in_state:
-            num_obs += len(self.ped_names)
-        obs_space = Box(-float('inf'), float('inf'), shape=(num_obs,), dtype=np.float32)
+        obs_space = Box(-float('inf'), float('inf'), shape=(10,), dtype=np.float32)
         return obs_space
 
     @property
@@ -262,9 +256,6 @@ class Bayesian0NoGridEnv(MultiEnv):
 
     def state_for_id(self, rl_id):
 
-        num_self_obs = len(self.self_obs_names)
-        num_ped_obs = len(self.ped_names)
-        num_veh_obs = len(self.veh_obs_names)
         self.update_intersection_state(rl_id)
         if 'av_0' == rl_id:
             # this is just used for tracking the reward of av_0 for tensorboards
@@ -272,64 +263,30 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.rl_set.add(rl_id)
         # assert rl_id in self.arrival_order
 
-        observation = -np.ones(self.observation_space.shape[0])
+        observation = -np.ones(10)
 
-        visible_vehicles, visible_pedestrians, visible_lanes = self.find_visible_objects(rl_id,
-                                                                                         self.search_veh_radius)
-
-        # sort visible vehicles by angle where 0 degrees starts facing the right side of the vehicle
-        # visible_vehicles = sorted(visible_vehicles, key=lambda v: \
-        #     (self.k.vehicle.get_relative_angle(rl_id, \
-        #                                        self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
-
-        # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
-        observation[:num_self_obs + num_ped_obs - 1] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
-        # shift the peds over by 1 so that self obs all come first
-        observation[num_self_obs + 1: num_self_obs + num_ped_obs + 1] = observation[num_self_obs: num_self_obs + num_ped_obs]
-        if len(visible_vehicles) == 0:
-            self.last_seen += 1 / 50.0
-        else:
-            self.last_seen = 0
-        observation[num_self_obs - 1] = self.last_seen
-        self.ped_variables = observation[num_self_obs: num_self_obs + num_ped_obs]
-
-        veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
-
-        # setting the 'arrival' order feature: 1 is if agent arrives before; 0 if agent arrives after
-
-        # print('number of visible vehicles is ', len(visible_vehicles))
-        # print('visible vehiclesares ', visible_vehicles)
-
-        for index, veh_id in enumerate(visible_vehicles):
-
-            before = self.arrival_position(veh_id)
-
-            observed_yaw = self.k.vehicle.get_yaw(veh_id)
-            observed_speed = self.k.vehicle.get_speed(veh_id)
-            observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
-            rel_x = observed_x - veh_x
-            rel_y = observed_y - veh_y
-            # print('rel_x: {}, rel_y: {} '.format(rel_x, rel_y))
-
-            # Consider the first 3 visible vehicles
-            if index < self.max_num_objects:
-                observation[(index * num_veh_obs) + num_self_obs + num_ped_obs:
-                            num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
-                    [observed_yaw / 360, observed_speed / 20,
-                     rel_x / 50, rel_y / 50, before / 5]
-                if self.inference_in_state:
-                    # only perform inference if the visible veh has arrived
-                    if self.arrived_intersection(veh_id):
-                        acceleration = self.k.vehicle.get_acceleration(veh_id)
-                        visible_veh_non_ped_obs = self.get_non_ped_obs(veh_id)
-                        updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(acceleration,
-                                                                                         visible_veh_non_ped_obs,
-                                                                                         self.priors.get(veh_id,
-                                                                                                         {}),
-                                                                                         self.agent)
-                    else:
-                        # probabilities set to -1 if not performing inference
-                        updated_ped_probs = [-1 for _ in range(self.num_grid_cells)]
+        # for i, veh_id in enumerate(sorted(self.k.vehicle.get_ids())):
+        #     if not self.past_intersection(veh_id):
+        #         observation[i] = self.arrival_order.get(veh_id, -1)
+        # observation[4] = self.k.vehicle.get_position(rl_id) / 100.0
+        # observation[5:9] = np.zeros(4)
+        # observation[9] = self.edge_to_int.get(self.k.vehicle.get_edge(rl_id), -1)
+        # observation[10] = self.k.vehicle.get_route(rl_id)[-1] == self.k.vehicle.get_edge(rl_id)
+        #
+        # for i, veh_id in enumerate(sorted(self.k.vehicle.get_ids())):
+        #     if not self.past_intersection(veh_id):
+        #         observation[10 + 2*i] = self.k.vehicle.get_position(veh_id) / 100.0
+        #         observation[11 + 2*i] = self.k.vehicle.get_edge(veh_id) == self.k.vehicle.get_route(veh_id)[0]
+        #
+        # if rl_id == 'av_0':
+        #     print(self.arrival_order)
+        #     print(observation)
+        temp_list = [self.arrival_order[veh_id] for veh_id in list(sorted(self.arrival_order.keys()))
+                    if not self.past_intersection(veh_id)]
+        observation[0:len(temp_list)] = temp_list
+        observation[4] = self.k.vehicle.get_position(rl_id) / 100.0
+        observation[5] = self.k.vehicle.get_edge(rl_id) == self.k.vehicle.get_route(rl_id)[0]
+        observation[6:10] = np.zeros(4)
         return observation
 
 
@@ -396,10 +353,20 @@ class Bayesian0NoGridEnv(MultiEnv):
                 collision_vehicles = self.k.simulation.get_collision_vehicle_ids()
                 collision_pedestrians = self.k.vehicle.get_pedestrian_crash(rl_id, self.k.pedestrian)
 
+                # TODO(@evinitsky) put back
                 if len(collision_pedestrians) > 0:
                     reward = self.env_params.additional_params.get("ped_collision_penalty", -10)
                 elif rl_id in collision_vehicles:
                     reward = -10.0
+
+                # if rl_actions and 'av_0' in rl_actions:
+                #     copy_action = self.copy_controller.get_action(self)
+                #     if copy_action:
+                #         max_decel = -np.abs(self.env_params.additional_params["max_decel"])
+                #         max_accel = self.env_params.additional_params["max_accel"]
+                #         accel = max_decel + (max_accel - max_decel) * (rl_actions['av_0'][0] + 1) / 2
+                #         print('accel {}, copy action {}'.format(accel, copy_action))
+                #         reward = -np.abs(accel - copy_action)
 
                 # # make the reward positive so you have no incentive to die
                 # # reward += 0.4
@@ -509,6 +476,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             if crash:
                 crash = False
                 collide_ids = self.k.simulation.get_collision_vehicle_ids()
+                print('collide ids are ', collide_ids)
                 for veh_id in self.k.vehicle.get_rl_ids():
                     if veh_id in collide_ids:
                         crash = True
@@ -596,6 +564,8 @@ class Bayesian0NoGridEnv(MultiEnv):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
+        self.copy_controller = RuleBasedIntersectionController('av_0',
+                                                               car_following_params=SumoCarFollowingParams())
         # print(self.ped_transition_cnt)
         self.time_counter = 0
         # last time we saw a vehicle
@@ -904,9 +874,11 @@ class Bayesian0NoGridEnv(MultiEnv):
 
     def arrived_before(self, veh_1, veh_2):
         """Return 1 if vehicle veh_1 arrived at the intersection before vehicle veh_2. Else, return 0."""
-        if veh_1 not in self.arrival_order:
-            return 1
-        elif self.arrival_order[veh_1] < self.arrival_order[veh_2]:
+
+        # if it's not in the arrival order, it definitely arrived later
+        if veh_2 not in self.arrival_order or veh_1 not in self.arrival_order:
+            return 0
+        elif self.arrival_order[veh_1] <= self.arrival_order[veh_2]:
             return 1
         else:
             return 0
