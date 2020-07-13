@@ -461,7 +461,7 @@ def setup_exps_PPO(args, flow_params):
     config['lr'] = 1e-4
     config['gamma'] = 0.99  # discount rate
     # config['entropy_coeff'] = -0.01
-    config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['model'].update({'fcnet_hiddens': [256, 256, 256, 256]})
     config['observation_filter'] = 'MeanStdFilter'
     if args.use_lstm:
         config['model']['use_lstm'] = True
@@ -550,7 +550,8 @@ def setup_exps_TD3(args, flow_params):
     config['no_done_at_end'] = False
 
     config['gamma'] = 0.99  # discount rate
-    config['learning_starts'] = 20000
+    # TODO(@evinitsky) put back
+    config['learning_starts'] = 0
     config['prioritized_replay'] = True
     config["evaluation_interval"] = 10
     # Number of episodes to run per evaluation period.

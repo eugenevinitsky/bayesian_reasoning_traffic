@@ -239,4 +239,4 @@ if __name__ == "__main__":
     # import the experiment variable
     exp = bayesian_0_example(render=render, pedestrians=pedestrians, collect_data=collect_data)
     # run for a set number of rollouts / time steps
-    exp.run(40, 600, multiagent=True)
+    exp.run(3, 600, multiagent=True)
