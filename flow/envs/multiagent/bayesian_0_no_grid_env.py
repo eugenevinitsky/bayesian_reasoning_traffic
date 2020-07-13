@@ -11,6 +11,8 @@ from flow.utils.exceptions import FatalFlowError
 from bayesian_inference.get_inferer import get_inferrer
 from bayesian_inference.inference import get_filtered_posteriors
 
+from flow.controllers import RuleBasedIntersectionController
+from flow.core.params import SumoCarFollowingParams
 
 # TODO(KL) means KL's reminder for KL
 
