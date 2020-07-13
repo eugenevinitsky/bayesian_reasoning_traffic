@@ -294,7 +294,11 @@ def on_episode_step(info):
 
     if 'av_0' in env.reward.keys() and 'av_0' in rl_ids and \
             ('av_0' not in env.done_ids or not episode.user_data['av_past_intersection']):
-        episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.995 ** env.time_counter)
+        episode.user_data["discounted_reward"] += env.reward['av_0'] * (0.99 ** env.time_counter)
+
+    if 'av_0' in env.k.vehicle.get_arrived_ids():
+        episode.user_data["discounted_reward"] += 1 * (0.99 ** env.time_counter)
+
 
     if 'av_0' in env.exit_time.keys():
         episode.user_data["exit_time"] = env.exit_time['av_0']
@@ -356,6 +360,10 @@ def setup_exps_DQN(args, flow_params):
     config['learning_starts'] = 20000
     config['prioritized_replay'] = True
     config["train_batch_size"] = 32
+    config["evaluation_interval"] = 10
+    # Number of episodes to run per evaluation period.
+    config["evaluation_num_episodes"] = 10
+
     # increase buffer size
     config['buffer_size'] = 200000
     # config["train_batch_size"] = 320
@@ -451,9 +459,10 @@ def setup_exps_PPO(args, flow_params):
     config['simple_optimizer'] = False
     config['no_done_at_end'] = False
     config['lr'] = 1e-4
-    config['gamma'] = 0.995  # discount rate
+    config['gamma'] = 0.99  # discount rate
     # config['entropy_coeff'] = -0.01
     config['model'].update({'fcnet_hiddens': [256, 256]})
+    config['observation_filter'] = 'MeanStdFilter'
     if args.use_lstm:
         config['model']['use_lstm'] = True
     if args.grid_search:
@@ -461,7 +470,6 @@ def setup_exps_PPO(args, flow_params):
         # config['entropy_coeff'] = tune.grid_search([-0.005, -0.01, 0])  # entropy coeff
 
     config['horizon'] = args.horizon
-    config['observation_filter'] = 'NoFilter'
 
     # define callbacks for tensorboard
 
@@ -567,8 +575,8 @@ def setup_exps_TD3(args, flow_params):
             # after(!) any random steps have been finished.
             # By default, do not anneal over time (fixed 1.0).
             "initial_scale": 1.0,
-            "final_scale": 0.4,
-            "scale_timesteps": 100000
+            "final_scale": 1.0,
+            "scale_timesteps": 1
         }
     if args.grid_search:
         config['n_step'] = tune.grid_search([1, 10])

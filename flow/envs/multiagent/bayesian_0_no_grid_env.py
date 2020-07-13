@@ -97,11 +97,12 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.use_grid = env_params.additional_params.get("use_grid", False)
         if self.use_grid:
             self.num_grid_cells = 6
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y", ]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y"]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3", "ped_in_4", "ped_in_5"]
         else:
             # last_seen this tracks when we last saw a vehicle so we don't forget it immediately
             self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y",
+                                   "arrival_pos",
                                    "last_seen"]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
 
@@ -348,12 +349,13 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         veh_ids = self.k.vehicle.get_ids()
         rl_ids = self.k.vehicle.get_rl_ids()
+        # print('rl ids are ', rl_ids)
         # avs are trained via DQN, rl is the L2 car. We have all these conditions so we can use pre-trained controllers later.
         valid_ids = [veh_id for veh_id in veh_ids if ('av' in veh_id or 'rl' in veh_id or veh_id in rl_ids)]
+        # print('valid ids are ', valid_ids)
         for rl_id in valid_ids:
-            if rl_id in self.inside_intersection or self.arrived_intersection(rl_id) and not self.past_intersection(
+            if self.arrived_intersection(rl_id) and not self.past_intersection(
                     rl_id):
-
                 obs.update({rl_id: self.state_for_id(rl_id)})
                 # print('inside intersection', self.inside_intersection)
         return obs
@@ -380,7 +382,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             #     rewards[rl_id] = 0.4 / 500.0
             #     continue
 
-            if rl_id in self.inside_intersection or self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
+            if self.arrived_intersection(rl_id) and not self.past_intersection(rl_id):
                 reward = 0
                 self.reward[rl_id] = 0
                 edge_pos = self.k.vehicle.get_position(rl_id)
@@ -842,7 +844,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def update_intersection_state(self, rl_id):
         curr_edge = self.k.vehicle.get_edge(rl_id)
         if curr_edge in self.edge_to_int:
-            if rl_id in self.inside_intersection:
+            if rl_id in self.inside_intersection and self.k.vehicle.get_position(rl_id) > 3:
                 self.inside_intersection.remove(rl_id)
         else:
             self.inside_intersection.add(rl_id)
@@ -892,7 +894,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             turn_num = 2  # turn left
         # subtract by one since we're not including the pedestrian here
         observation = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, end / 8, edge_pos / 50,
-                       veh_x / 300.0, veh_y / 300.0]
+                       veh_x / 300.0, veh_y / 300.0, self.arrival_position(rl_id) / 5.0]
         if self.use_grid:
             ped_param = self.get_grid_ped_params(visible_peds, rl_id)
         else:
