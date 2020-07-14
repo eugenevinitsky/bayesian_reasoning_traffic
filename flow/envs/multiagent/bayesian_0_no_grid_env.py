@@ -544,7 +544,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     self.done_list.extend(['av_0'])
         no_avs_left = len([veh_id for veh_id in self.k.vehicle.get_ids() if ('av' in veh_id or 'rl' in veh_id)]) == 0
         # it can take a little bit for all the AVs to enter the system
-        if crash or (no_avs_left and self.time_counter > 200):
+        if crash or (no_avs_left and self.time_counter > 200) or self.time_counter >= self.env_params.horizon:
             done['__all__'] = True
         else:
             done['__all__'] = False

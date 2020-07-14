@@ -152,7 +152,7 @@ class RuleBasedIntersectionController(BaseController):
 
         start, end = env.k.vehicle.get_route(self.veh_id)
         start, end = self.edge_to_num[start], self.edge_to_num[end]
-        print(state[ped_pos])
+        # print(state[ped_pos])
         if state[ped_pos][start] or state[ped_pos][end]:
             return -4.5
 
