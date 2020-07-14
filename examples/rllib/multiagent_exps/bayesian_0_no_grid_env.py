@@ -161,7 +161,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
         # sumo-related parameters (see flow.core.params.SumoParams)
         sim=SumoParams(
             restart_instance=True,
-            sim_step=0.2,
+            sim_step=1.0,
             render=render,
             print_warnings=False
         ),
@@ -666,7 +666,7 @@ if __name__ == '__main__':
                         help="How frequently to checkpoint")
     parser.add_argument("--n_cpus", type=int, default=1,
                         help="Number of rollouts per iteration")
-    parser.add_argument("--horizon", type=int, default=500,
+    parser.add_argument("--horizon", type=int, default=100,
                         help="Horizon length of a rollout")
 
     # optional input parameters
