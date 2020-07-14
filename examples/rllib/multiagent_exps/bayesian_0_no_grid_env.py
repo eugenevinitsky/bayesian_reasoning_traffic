@@ -738,6 +738,8 @@ if __name__ == '__main__':
         ray.init(num_cpus=args.n_cpus + 1, local_mode=True)
     elif RUN_MODE == 'cluster':
         ray.init(redis_address="localhost:6379")
+    else:
+        ray.init()
 
     # create a custom string that makes looking at the experiment names easier
     def trial_str_creator(trial):

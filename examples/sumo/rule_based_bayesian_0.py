@@ -127,7 +127,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
         "cars_bot": num_cars_bot
     }
 
-    sim_params = SumoParams(sim_step=0.1, render=True, restart_instance=True)
+    sim_params = SumoParams(sim_step=1.0, render=True, restart_instance=True)
 
     if render is not None:
         sim_params.render = render

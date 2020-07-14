@@ -844,7 +844,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def update_intersection_state(self, rl_id):
         curr_edge = self.k.vehicle.get_edge(rl_id)
         if curr_edge in self.edge_to_int:
-            if rl_id in self.inside_intersection and self.k.vehicle.get_position(rl_id) > 3:
+            if rl_id in self.inside_intersection and self.k.vehicle.get_position(rl_id) > 4:
                 self.inside_intersection.remove(rl_id)
         else:
             self.inside_intersection.add(rl_id)

@@ -115,44 +115,57 @@ class RuleBasedIntersectionController(BaseController):
     def get_accel(self, env):
         """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
         state = env.state_for_id(self.veh_id)
-        ped_pos = [10, 11, 12, 13]
+        ped_pos = [i + len(env.self_obs_names) for i in range (4)]
 
         # we are not yet at the intersection and we are on the first edge
         desired_pos = 48
+        # if env.k.vehicle.get_position(self.veh_id) < desired_pos and (env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
+        #     action = 2.6
+        #     lead_vel = 0
+        #     this_vel = env.k.vehicle.get_speed(self.veh_id)
+        #
+        #     h = desired_pos - env.k.vehicle.get_position(self.veh_id)
+        #     dv = lead_vel - this_vel
+        #
+        #     safe_velocity = 2 * h / env.sim_step + dv - this_vel * (2 * self.delay)
+        #
+        #     this_vel = env.k.vehicle.get_speed(self.veh_id)
+        #     sim_step = env.sim_step
+        #
+        #     if this_vel + action * sim_step > safe_velocity:
+        #         if safe_velocity > 0:
+        #             return (safe_velocity - this_vel) / sim_step
+        #         # hard brake to not overshoot
+        #         else:
+        #             return -this_vel / sim_step
+        #     else:
+        #         return action
+        # elif env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[-1]:
+        #     return None
+        #
+        # print(env.k.vehicle.get_position(self.veh_id))
         if env.k.vehicle.get_position(self.veh_id) < desired_pos and (env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
-            action = 2.0
-            lead_vel = 0
-            this_vel = env.k.vehicle.get_speed(self.veh_id)
-
-            h = desired_pos - env.k.vehicle.get_position(self.veh_id)
-            dv = lead_vel - this_vel
-
-            safe_velocity = 2 * h / env.sim_step + dv - this_vel * (2 * self.delay)
-
-            this_vel = env.k.vehicle.get_speed(self.veh_id)
-            sim_step = env.sim_step
-
-            if this_vel + action * sim_step > safe_velocity:
-                if safe_velocity > 0:
-                    return (safe_velocity - this_vel) / sim_step
-                else:
-                    return -this_vel / sim_step
-            else:
-                return action
-        elif env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[-1]:
+            env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
             return None
+        else:
+            env.k.vehicle.set_speed_mode(self.veh_id, 'aggressive')
 
         start, end = env.k.vehicle.get_route(self.veh_id)
         start, end = self.edge_to_num[start], self.edge_to_num[end]
+        print(state[ped_pos])
         if state[ped_pos][start] or state[ped_pos][end]:
             return -4.5
 
         # inch forward if no vehicle is before you in the order, otherwise go
+        # arrival_order = [env.arrival_order[veh_id] for veh_id in env.arrival_order
+        #                  if veh_id in env.k.vehicle.get_ids() and
+        #                  (env.k.vehicle.get_edge(veh_id) == env.k.vehicle.get_route(veh_id)[0]
+        #                  or veh_id in env.inside_intersection)
+        #                  and not env.past_intersection(veh_id)]
         arrival_order = [env.arrival_order[veh_id] for veh_id in env.arrival_order
-                         if (env.k.vehicle.get_position(self.veh_id) > desired_pos + 1 and
-                             env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0])
-                         and not env.past_intersection(veh_id)]
-        if len(arrival_order) == 0:
+                         if veh_id in env.k.vehicle.get_ids() and not env.past_intersection(veh_id)]
+
+        if len(arrival_order) == 0 or env.past_intersection(self.veh_id):
             return 2.6
         if env.arrival_order[self.veh_id] == np.min(arrival_order):
             return 2.6
