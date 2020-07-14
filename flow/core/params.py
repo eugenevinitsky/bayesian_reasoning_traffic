@@ -632,7 +632,7 @@ class SumoParams(SimParams):
                  overtake_right=False,
                  seed=None,
                  restart_instance=False,
-                 print_warnings=True,
+                 print_warnings=False,
                  teleport_time=-1,
                  num_clients=1,
                  rllib_training=False):
