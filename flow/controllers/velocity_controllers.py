@@ -166,7 +166,8 @@ class RuleBasedIntersectionController(BaseController):
                          if veh_id in env.k.vehicle.get_ids() and not env.past_intersection(veh_id)]
 
         if len(arrival_order) == 0 or env.past_intersection(self.veh_id):
-            return 2.6
+            env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
+            return None
         if env.arrival_order[self.veh_id] == np.min(arrival_order):
             return 2.6
         else:
