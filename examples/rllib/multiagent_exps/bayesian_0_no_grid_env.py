@@ -60,7 +60,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 depart_time='0.00',
                 start='(1.2)--(1.1)',
                 end='(1.1)--(1.0)',
-                depart_pos=f'{46 + 0.5*i}',
+                depart_pos=f'{43 + 0.5*i}',
                 arrival_pos='5')
     else:
         pedestrian_params = None
