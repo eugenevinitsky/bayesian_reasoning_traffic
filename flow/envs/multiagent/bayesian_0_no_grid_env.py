@@ -507,24 +507,25 @@ class Bayesian0NoGridEnv(MultiEnv):
             # we only want to call crash if an RL car collides though
             crash = self.k.simulation.check_collision()
             collide_ids = []
+            veh_crash = False
             if crash:
-                crash = False
                 collide_ids += self.k.simulation.get_collision_vehicle_ids()
                 for veh_id in self.k.vehicle.get_rl_ids():
                     if veh_id in collide_ids:
-                        crash = True
+                        veh_crash = True
 
             # update crash if there's an pedestrian-vehicle collision
+            ped_crash = False
             if self.k.pedestrian:
                 for veh_id in self.k.vehicle.get_rl_ids():
                     if len(self.k.vehicle.get_pedestrian_crash(veh_id, self.k.pedestrian)) > 0:
                         collide_ids.append(veh_id)
-                        crash = True
+                        ped_crash = True
             # if crash:
             #     import ipdb; ipdb.set_trace()
 
             # stop collecting new simulation steps if there is a collision
-            if crash:
+            if veh_crash or ped_crash:
                 break
 
         states = self.get_state()
@@ -546,14 +547,13 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     self.done_list.extend(['av_0'])
         no_avs_left = len([veh_id for veh_id in self.k.vehicle.get_ids() if ('av' in veh_id or 'rl' in veh_id)]) == 0
         # it can take a little bit for all the AVs to enter the system
-        if crash or (no_avs_left and self.time_counter > 200) or self.time_counter >= self.env_params.horizon:
+        if veh_crash or ped_crash or (no_avs_left and self.time_counter > 200) or self.time_counter >= self.env_params.horizon:
             done['__all__'] = True
         else:
             done['__all__'] = False
 
         # done_ids = [veh_id for veh_id in self.k.vehicle.get_arrived_ids() if ('av' in veh_id or 'rl' in veh_id
         #                                                                        or veh_id in self.observed_rl_ids)]
-        collide_ids = self.k.simulation.get_collision_vehicle_ids()
         arrived_ids = self.k.vehicle.get_arrived_ids()
         ids_to_check = copy(self.k.vehicle.get_ids())
         ids_to_check += [veh_id for veh_id in self.k.vehicle.get_arrived_ids()]
