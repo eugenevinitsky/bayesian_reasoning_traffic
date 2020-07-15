@@ -917,7 +917,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def arrival_position(self, veh_1):
         """Return arrival position if vehicle has arrived. Else, return -1"""
         if veh_1 not in self.arrival_order:
-            return -1
+            return -2
         else:
             return self.arrival_order[veh_1]
 
