@@ -112,12 +112,11 @@ class RuleBasedIntersectionController(BaseController):
             "(1.1)--(0.1)" : 3
         }
 
-    def get_accel(self, env):
-        """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
-        state = env.state_for_id(self.veh_id)
+    def get_action_with_ped(self, env, state):
+        """Compute the action given the state. Lets us pass in modified states."""
+        # we are not yet at the intersection and we are on the first edge
         ped_pos = [i + len(env.self_obs_names) for i in range (4)]
 
-        # we are not yet at the intersection and we are on the first edge
         desired_pos = 48
         # if env.k.vehicle.get_position(self.veh_id) < desired_pos and (env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
         #     action = 2.6
@@ -144,7 +143,8 @@ class RuleBasedIntersectionController(BaseController):
         #     return None
         #
         # print(env.k.vehicle.get_position(self.veh_id))
-        if env.k.vehicle.get_position(self.veh_id) < desired_pos and (env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
+        if env.k.vehicle.get_position(self.veh_id) < desired_pos and (
+                env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
             env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
             return None
         else:
@@ -152,7 +152,8 @@ class RuleBasedIntersectionController(BaseController):
 
         start, end = env.k.vehicle.get_route(self.veh_id)
         start, end = self.edge_to_num[start], self.edge_to_num[end]
-        # print(state[ped_pos])
+
+        print(state[ped_pos])
         if state[ped_pos][start] or state[ped_pos][end]:
             return -4.5
 
@@ -165,6 +166,9 @@ class RuleBasedIntersectionController(BaseController):
         arrival_order = [env.arrival_order[veh_id] for veh_id in env.arrival_order
                          if veh_id in env.k.vehicle.get_ids() and not env.past_intersection(veh_id)]
 
+        arrival_order_dict = {veh_id: env.arrival_order[veh_id] for veh_id in env.arrival_order
+                              if veh_id in env.k.vehicle.get_ids() and not env.past_intersection(veh_id)}
+        print(arrival_order_dict)
         if len(arrival_order) == 0 or env.past_intersection(self.veh_id):
             env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
             return None
@@ -172,6 +176,11 @@ class RuleBasedIntersectionController(BaseController):
             return 2.6
         else:
             return -4.5
+
+    def get_accel(self, env):
+        """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
+        state = env.state_for_id(self.veh_id)
+        return self.get_action_with_ped(env, state)
 
     def get_action(self, env, allow_junction_control=False):
         """Convert the get_accel() acceleration into an action.

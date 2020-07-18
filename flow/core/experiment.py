@@ -1,5 +1,6 @@
 """Contains an experiment class for running simulations."""
 
+from collections import defaultdict
 import logging
 import datetime
 import numpy as np
@@ -105,7 +106,7 @@ class Experiment:
             def rl_actions(*_):
                 return None
 
-        rets = []
+        rets = defaultdict(list)
         mean_rets = []
         ret_lists = []
         vels = []
