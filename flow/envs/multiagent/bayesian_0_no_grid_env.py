@@ -341,8 +341,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                         # TODO(we are currently using the vehicle id as an index but that doesn't give us any way to correlate it
                         # to the other state variables; the index doesn't tell us which car is which
                         self.prior_probs[veh_idx * len(self.ped_names): (veh_idx + 1) * len(self.ped_names)] = updated_ped_probs
-        prior_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs
-        observation[prior_index:] = self.prior_probs
+        if self.inference_in_state:
+            prior_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs
+            observation[prior_index:] = self.prior_probs
         return observation
 
 
