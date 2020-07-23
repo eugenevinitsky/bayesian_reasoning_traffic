@@ -1,4 +1,5 @@
 """Environment testing scenario one of the bayesian envs."""
+from collections import defaultdict
 from copy import deepcopy, copy
 import math
 import numpy as np
@@ -94,6 +95,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         # setup information for the gridding if it is needed
         self.use_grid = env_params.additional_params.get("use_grid", False)
+        self.priors = defaultdict(dict)
         if self.use_grid:
             self.num_grid_cells = 6
             self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y"]
@@ -107,6 +109,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         # list of tracked priors
         self.prior_names = ["infer_{}_{}".format(loc_id, veh_idx) for veh_idx in range(self.max_num_objects)
                             for loc_id in range(len(self.ped_names))]
+        self.prior_probs = -1 * np.ones(len(self.prior_names))
 
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
         # self.search_ped_radius = self.env_params.additional_params["search_ped_radius"]
@@ -172,9 +175,9 @@ class Bayesian0NoGridEnv(MultiEnv):
         # wonder if it's better to specify the file path or the kind of policy (the latter?)
         self.inference_in_state = env_params.additional_params.get("inference_in_state", False)
         # TODO(@evinitsky) the inference code is not merged yet
-        if self.inference_in_state:
-            path_to_inferrer = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
-            self.agent = get_inferrer(path=path_to_inferrer, inferrer_type="imitation")
+        # if self.inference_in_state:
+        #     path_to_inferrer = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
+        #     self.agent = get_inferrer(path=path_to_inferrer, inferrer_type="imitation")
 
     @property
     def observation_space(self):
@@ -284,7 +287,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     (self.k.vehicle.get_relative_angle(rl_id, \
         #                                        self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
 
-        # TODO(@nliu)add get x y as something that we store from TraCI (no magic numbers)
         observation[:num_self_obs + num_ped_obs - 1] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
         # shift the peds over by 1 so that self obs all come first
         observation[num_self_obs + 1: num_self_obs + num_ped_obs + 1] = observation[num_self_obs: num_self_obs + num_ped_obs]
@@ -303,7 +305,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         # print('visible vehiclesares ', visible_vehicles)
 
         for index, veh_id in enumerate(visible_vehicles):
-
             before = self.arrival_position(veh_id)
 
             observed_yaw = self.k.vehicle.get_yaw(veh_id)
@@ -313,8 +314,8 @@ class Bayesian0NoGridEnv(MultiEnv):
             rel_y = observed_y - veh_y
             # print('rel_x: {}, rel_y: {} '.format(rel_x, rel_y))
 
-            # Consider the first 3 visible vehicles
-            if index < self.max_num_objects:
+            # Consider the first 3 visible vehicles, but we don't need to do inference for the humans, we only need a dummy state
+            if index < self.max_num_objects and 'human' not in rl_id:
                 observation[(index * num_veh_obs) + num_self_obs + num_ped_obs:
                             num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
                     [observed_yaw / 360, observed_speed / 20,
@@ -322,21 +323,26 @@ class Bayesian0NoGridEnv(MultiEnv):
                 if self.inference_in_state:
                     # only perform inference if the visible veh has arrived
                     if self.arrived_intersection(veh_id) and not self.past_intersection(veh_id):
-                        acceleration = self.k.vehicle.get_acceleration(veh_id)
-                        visible_veh_non_ped_obs = self.get_non_ped_obs(veh_id)
+                        dummy_obs = np.zeros(self.observation_space.shape[0])
+                        _, visible_pedestrians, visible_lanes = self.find_visible_objects(veh_id,
+                                                                                                         self.search_veh_radius)
+                        ped_params = self.four_way_ped_params(visible_pedestrians, visible_lanes)
+                        # TODO fix magic numbers
+                        dummy_obs[[10, 11, 12, 13]] = ped_params
+                        acceleration = self.k.vehicle.get_acc_controller(veh_id).get_action_with_ped(self,
+                                                                                       dummy_obs)
+                        # we pass a zero of states because it's just a dummy obs, only the ped part of it affects the behavior
                         updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(self, acceleration,
-                                                                                         visible_veh_non_ped_obs,
+                                                                                         np.zeros(self.observation_space.shape[0]),
                                                                                          self.priors.get(veh_id,
                                                                                                          {}),
                                                                                          veh_id)
-                    else:
-                        # probabilities set to -1 if not performing inference
-                        updated_ped_probs = [-1 for _ in range(self.num_grid_cells)]
-
-                    enter_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs
-                    veh_idx = veh_id.split('_')[-1]
-                    observation[enter_index + veh_idx * len(self.ped_names):
-                                enter_index + (veh_idx + 1) * len(self.ped_names)] = updated_ped_probs
+                        veh_idx = int(veh_id.split('_')[-1])
+                        # TODO(we are currently using the vehicle id as an index but that doesn't give us any way to correlate it
+                        # to the other state variables; the index doesn't tell us which car is which
+                        self.prior_probs[veh_idx * len(self.ped_names): (veh_idx + 1) * len(self.ped_names)] = updated_ped_probs
+        prior_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs
+        observation[prior_index:] = self.prior_probs
         return observation
 
 
@@ -614,6 +620,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.reward = {}
         self.exit_time = {}
         self.done_ids = set()
+        self.prior_probs = -1 * np.ones(len(self.prior_names))
         self.prev_loc_ped_state = {loc: 0 for loc in range(NUM_PED_LOCATIONS)}
         # dict to store the counts for each possible transiion
         self.ped_transition_cnt = {loc: {'00': 1, '01': 1, '10': 1, '11': 1} for loc in range(NUM_PED_LOCATIONS)}

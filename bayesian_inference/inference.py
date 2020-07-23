@@ -75,11 +75,11 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
     single_posteriors_filter = {comb: [] for comb in single_ped_combs_str}
     joint_posteriors_filter = {comb: [] for comb in joint_ped_combos_str}
     # this is the value we are going to return for the pedestrian probabilities
-    single_priors_filter = {comb: 0 for comb in joint_ped_combos_str}
+    single_priors_filter = {comb: 0 for comb in single_ped_combs_str}
 
     # # if this is the first timestep, we need to initialize the priors
     if joint_priors == {}:
-        joint_priors = {comb : [1 / len(flag_set) ** num_locs] for comb in single_ped_combs_str}
+        joint_priors = {comb : 1 / len(flag_set) ** num_locs for comb in joint_ped_combos_str}
 
     # 2 f(a|e) # 4 M
     M_filter = 0
@@ -106,7 +106,10 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
         joint_likelihood_densities[str_comb].append(joint_likelihood_density)
         # M
         # Get p(e)
-        filtered_prior = joint_priors[str_comb][-1]
+        try:
+            filtered_prior = joint_priors[str_comb]
+        except:
+            import ipdb; ipdb.set_trace()
 
         M_filter += joint_likelihood_density * filtered_prior
 
@@ -115,7 +118,7 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
         # f(a|e)
         joint_likelihood_density = joint_likelihood_densities[str_comb][-1]
         # p(e)
-        filtered_prior = joint_priors[str_comb][-1]
+        filtered_prior = joint_priors[str_comb]
 
         # p(e|a)
         joint_posterior_filtered = joint_likelihood_density * filtered_prior / M_filter
@@ -151,8 +154,7 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
     for loc_ in range(num_locs):
         for val_ in flag_set:
             single_prior_str = f'o_{loc_} = {val_}'
-            single_priors_filter[single_prior_str].append(
-                single_posteriors_filter[single_prior_str][-1])
+            single_priors_filter[single_prior_str] = single_posteriors_filter[single_prior_str]
 
     # 8 FILTER Update joint priors p(o|a) = \prod_{o_i \in o} p(o_i)
     for str_comb in joint_ped_combos_str:
@@ -169,7 +171,7 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
     ped_vals = []
     for loc_ in range(num_locs):
         single_prior_str = f'o_{loc_} = 0'
-        ped_vals.append(single_priors_filter[single_prior_str])
+        ped_vals.append(single_priors_filter[single_prior_str][-1])
     return ped_vals, joint_priors
 
     # joint_priors = {}

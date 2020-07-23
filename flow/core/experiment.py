@@ -134,7 +134,7 @@ class Experiment:
                 # print(ret_list)
                 if multiagent:
                     for key in reward.keys():
-                        ret += reward[key]     
+                        ret += reward[key]
                     if done["__all__"]:
                         break
                 else:
