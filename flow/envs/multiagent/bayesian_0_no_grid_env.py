@@ -92,7 +92,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         self.discrete = env_params.additional_params.get("discrete", False)
         self.max_num_objects = env_params.additional_params.get("max_num_objects", 3)
         self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
-
         # setup information for the gridding if it is needed
         self.use_grid = env_params.additional_params.get("use_grid", False)
         if self.use_grid:
@@ -105,6 +104,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                                    "arrival_pos",
                                    "last_seen"]
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
+        # list of tracked priors
+        self.prior_names = ["infer_{}_{}".format(loc_id, veh_idx) for veh_idx in range(self.max_num_objects)
+                            for loc_id in range(len(self.ped_names))]
 
         self.search_veh_radius = self.env_params.additional_params["search_veh_radius"]
         # self.search_ped_radius = self.env_params.additional_params["search_ped_radius"]
@@ -182,7 +184,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         num_obs = len(self.self_obs_names) + len(self.ped_names) + max_objects * len(self.veh_obs_names)
         # belief variable over whether a pedestrian is there
         if self.inference_in_state:
-            num_obs += len(self.ped_names)
+            num_obs += len(self.prior_names)
         obs_space = Box(-float('inf'), float('inf'), shape=(num_obs,), dtype=np.float32)
         return obs_space
 
@@ -319,17 +321,22 @@ class Bayesian0NoGridEnv(MultiEnv):
                      rel_x / 50, rel_y / 50, before / 5]
                 if self.inference_in_state:
                     # only perform inference if the visible veh has arrived
-                    if self.arrived_intersection(veh_id):
+                    if self.arrived_intersection(veh_id) and not self.past_intersection(veh_id):
                         acceleration = self.k.vehicle.get_acceleration(veh_id)
                         visible_veh_non_ped_obs = self.get_non_ped_obs(veh_id)
-                        updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(acceleration,
+                        updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(self, acceleration,
                                                                                          visible_veh_non_ped_obs,
                                                                                          self.priors.get(veh_id,
                                                                                                          {}),
-                                                                                         self.agent)
+                                                                                         veh_id)
                     else:
                         # probabilities set to -1 if not performing inference
                         updated_ped_probs = [-1 for _ in range(self.num_grid_cells)]
+
+                    enter_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs
+                    veh_idx = veh_id.split('_')[-1]
+                    observation[enter_index + veh_idx * len(self.ped_names):
+                                enter_index + (veh_idx + 1) * len(self.ped_names)] = updated_ped_probs
         return observation
 
 
@@ -547,7 +554,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     self.done_list.extend(['av_0'])
         no_avs_left = len([veh_id for veh_id in self.k.vehicle.get_ids() if ('av' in veh_id or 'rl' in veh_id)]) == 0
         # it can take a little bit for all the AVs to enter the system
-        if veh_crash or ped_crash or (no_avs_left and self.time_counter > 200) or self.time_counter >= self.env_params.horizon:
+        if veh_crash or ped_crash or (no_avs_left and self.time_counter > 50 / self.sim_step) \
+                or self.time_counter >= self.env_params.horizon:
             done['__all__'] = True
         else:
             done['__all__'] = False

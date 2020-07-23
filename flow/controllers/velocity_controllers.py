@@ -153,7 +153,6 @@ class RuleBasedIntersectionController(BaseController):
         start, end = env.k.vehicle.get_route(self.veh_id)
         start, end = self.edge_to_num[start], self.edge_to_num[end]
 
-        print(state[ped_pos])
         if state[ped_pos][start] or state[ped_pos][end]:
             return -4.5
 
@@ -168,7 +167,6 @@ class RuleBasedIntersectionController(BaseController):
 
         arrival_order_dict = {veh_id: env.arrival_order[veh_id] for veh_id in env.arrival_order
                               if veh_id in env.k.vehicle.get_ids() and not env.past_intersection(veh_id)}
-        print(arrival_order_dict)
         if len(arrival_order) == 0 or env.past_intersection(self.veh_id):
             env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
             return None

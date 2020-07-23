@@ -1,16 +1,10 @@
-"""Black box predictor of probability of pedestrian in a vehicle's grid cell using a pre-trained RL policy"""
+"""Black box predictor of probability of pedestrian in a vehicle's grid cell using a rules based agent"""
 
-import gym
-import os
-import sys
-import time
-import matplotlib.pyplot as plt
+from copy import copy
 import numpy as np
 
-import ray
 try: from ray.rllib.agents.agent import get_agent_class
 except ImportError: from ray.rllib.agents.registry import get_agent_class
-from ray.tune.registry import register_env
 
 pp = 14516 / (107 + 14516)
 pno = 107 / (107 + 164579)
@@ -26,7 +20,9 @@ PED_IDX_LST = [10, 11, 12, 13]
 PED_FRONT = PED_IDX_LST[0]
 PED_BACK = PED_IDX_LST[-1]
 
-def get_filtered_posteriors(action, dummy_obs, priors, agent, filter_matrix, policy_type="Imitation", num_locs=4):
+NOISE_STD = 0.0
+
+def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_locs=4):
     """Black box predictor of the probability of pedestrian in each of the 4 crosswalk locations
     
     Parameters
@@ -37,16 +33,15 @@ def get_filtered_posteriors(action, dummy_obs, priors, agent, filter_matrix, pol
         self_obs: [yaw, speed, turn_num, edge_pos]
         other_veh_obs: ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
         [None] * num_locs: dummy place holders for the 4 ped params
-    priors: dict[str:float]
+    joint_priors: dict[str:float]
         (single pedestrian location observation : probability)
         ex: priors["o_3 = 1"] = 0.1
 
         (total of 2^4 pedestrian observation combinations and their 
         corresponding updated prior probabilities)
 
-    agent: agent_object
-        ray.rllib agent / policy object used to model the actions of vehicles  
-        TODO(KL) Terminology - agent or policy? RL land :D
+    agent_id: str
+        ID of agent we want to query
     policy_type: string
         type of policy used to model vehicle behavior and do inference
     
@@ -66,90 +61,221 @@ def get_filtered_posteriors(action, dummy_obs, priors, agent, filter_matrix, pol
         (total of 2^4 pedestrian observation combinations and their 
         corresponding updated prior probabilities)    
     """
-    joint_priors = {}
-    joint_posteriors = {}
-    prob_ped_in_cross_walk = [None]*4
+    s_all = copy(dummy_obs)
 
     flag_set = ("0", "1")
-    single_ped_combs_str = single_ped_posteriors_strs(num_locs, flag_set)
+
+    # Permutation lists
     joint_ped_combos_str = all_ped_combos_strs(num_locs, flag_set)
+    joint_ped_combos_int_list = all_ped_combos_lsts(num_locs, flag_set)
+    single_ped_combs_str = single_ped_posteriors_strs(num_locs, flag_set)
 
-    
-    # p(o_1 = 1) = 0.887, p(o_2 = 1) = 0.443
-    if priors == {}:
-        priors = {comb : [1 / len(flag_set)] for comb in single_ped_combs_str}
-    # p(o_0, o_1, o_2, o_3)
+    # initialize the dicts we store things in
+    joint_likelihood_densities = {comb: [] for comb in joint_ped_combos_str}
+    single_posteriors_filter = {comb: [] for comb in single_ped_combs_str}
+    joint_posteriors_filter = {comb: [] for comb in joint_ped_combos_str}
+    # this is the value we are going to return for the pedestrian probabilities
+    single_priors_filter = {comb: 0 for comb in joint_ped_combos_str}
 
-    # 3 Update joint priors p(o|a) = \prod_{o_i \in o} p(o_i)
-    for str_comb in joint_ped_combos_str:
-        joint_prior = 1
-        
-        single_ped_lst = joint_ped_combo_str_to_single_ped_combo(str_comb)
-        for single_ped in single_ped_lst:
-            joint_prior *= priors[single_ped][-1]
+    # # if this is the first timestep, we need to initialize the priors
+    if joint_priors == {}:
+        joint_priors = {comb : [1 / len(flag_set) ** num_locs] for comb in single_ped_combs_str}
 
-        joint_priors[str_comb] = joint_prior
+    # 2 f(a|e) # 4 M
+    M_filter = 0
 
-    # 2 
-    C = 0
     for str_comb, lst_comb in zip(joint_ped_combos_str, joint_ped_combos_int_list):
 
-        s_all_modified = np.copy(dummy_obs) # s_all_modified = hypothetical state that an agent observes
-        s_all_modified[ped_front : ped_back + 1] = lst_comb
-
-        if policy_type == "DQN":
-            _, _, logit = agent.compute_action(s_all_modified, policy_id='av', full_fetch=True)
-            q_vals = logit['q_values']
-            soft_max = scipy.special.softmax(q_vals)
-            joint_likelihood_density = soft_max[action_index]
-
-        elif policy_type == "imitation":
-            mu, sigma = agent.get_accel_gaussian_params_from_observation(s_all_modified)
-            sigma = sigma[0][0]
-            mu = mu[0]
-
-            # f(a|e)
-            joint_likelihood_density = accel_pdf(mu, sigma, action)
-
+        s_all_modified = np.copy(
+            s_all)  # s_all_modified = hypothetical state that an agent observes
+        s_all_modified[PED_IDX_LST] = lst_comb
+        #                                 _, _, logit = agent.compute_action(s_all_modified, policy_id=policy_map_fn(agent_id), full_fetch=True)
+        mu = env.k.vehicle.get_acc_controller(agent_id).get_action_with_ped(env,
+                                                                            s_all_modified)
+        sigma = NOISE_STD
+        # noise up your model
+        if sigma > 0.0:
+            mu += np.random.normal(loc=0.0, scale=sigma)
+            joint_likelihood_density = max(min(accel_pdf(mu, sigma, action), 10.0), 0.01)
+        else:
+            if mu == action:
+                joint_likelihood_density = 1
+            else:
+                # we don't want to set it to zero exactly or else it'll always be zero
+                joint_likelihood_density = 0.01
         joint_likelihood_densities[str_comb].append(joint_likelihood_density)
+        # M
+        # Get p(e)
+        filtered_prior = joint_priors[str_comb][-1]
 
-        # Get p(e), for f(a|e) p(e)
-        updated_prior = joint_priors[str_comb]
+        M_filter += joint_likelihood_density * filtered_prior
 
-        C += joint_likelihood_density * updated_prior
-    
     # 5 p(e|a) joint posterior masses
     for str_comb in joint_ped_combos_str:
         # f(a|e)
         joint_likelihood_density = joint_likelihood_densities[str_comb][-1]
         # p(e)
-        joint_prior = joint_priors_updated[str_comb][-1]
+        filtered_prior = joint_priors[str_comb][-1]
 
-        # p(e|a) = f(a|e) p(e) / C
-        joint_posterior = joint_likelihood_density * updated_prior / C
-        joint_posteriors[str_comb] = joint_posterior
+        # p(e|a)
+        joint_posterior_filtered = joint_likelihood_density * filtered_prior / M_filter
+        joint_posteriors_filter[str_comb].append(joint_posterior_filtered)
 
-    # 6 Single posterior probabilities p(o_i = 1|a) = sum relevant posteriors
+    # 6 & 7
     for loc_ in range(num_locs):
         for val_ in flag_set:
-            single_posterior = 0
-            for key in ped_combos_one_loc_fixed_strs(loc_, val_):
-                single_posterior += joint_posteriors[key]
-            single_posterior_str = f'o_{loc_} = {val_}'
-            single_posteriors[single_posterior_str] = single_posterior
 
+            single_posterior_filter = 0
+
+            for key in ped_combos_one_loc_fixed_strs(loc_, val_):
+                single_posterior_filter += joint_posteriors_filter[key][-1]
+
+            single_posterior_str = f'o_{loc_} = {val_}'
+            single_posteriors_filter[single_posterior_str].append(single_posterior_filter)
+
+    # FILTER (part after step 6: filter p(o|a))
     for loc_ in range(num_locs):
         val0, val1 = "0", "1"
         single_0 = f'o_{loc_} = {val0}'
         single_1 = f'o_{loc_} = {val1}'
-        filtered = TRANSITION_MATRIX @ np.array([single_posteriors_filter[single_0][-1], single_posteriors_filter[single_1][-1]])
-        single_posteriors[single_0], single_posteriors_filter[single_1] = filtered[0], filtered[1]
+        try:
+            filtered = TRANSITION_MATRIX @ np.array([single_posteriors_filter[single_0][-1],
+                                                     single_posteriors_filter[single_1][-1]])
+        except:
+            import ipdb;
+            ipdb.set_trace()
+        single_posteriors_filter[single_0][-1], single_posteriors_filter[single_1][-1] = \
+            filtered[0], filtered[1]
 
-    for loc__ in range(num_locs):
-        single_1 = f'o_{loc__} = 1'
-        posterior_prob_ped[loc_] = single_posteriors[single_1]
+    # 7 Filter Update single priors Pr(o_i | a) using posteriors
+    for loc_ in range(num_locs):
+        for val_ in flag_set:
+            single_prior_str = f'o_{loc_} = {val_}'
+            single_priors_filter[single_prior_str].append(
+                single_posteriors_filter[single_prior_str][-1])
 
-    return prob_ped_in_cross_walk, single_posteriors
+    # 8 FILTER Update joint priors p(o|a) = \prod_{o_i \in o} p(o_i)
+    for str_comb in joint_ped_combos_str:
+        new_joint_prior_filter = 1
+
+        single_ped_lst = joint_ped_combo_str_to_single_ped_combo(str_comb)
+
+        for single_ped in single_ped_lst:
+            new_joint_prior_filter *= single_priors_filter[single_ped][-1]
+
+        joint_priors[str_comb] = new_joint_prior_filter
+
+    # now return both the priors and the marginalized estimates
+    ped_vals = []
+    for loc_ in range(num_locs):
+        single_prior_str = f'o_{loc_} = 0'
+        ped_vals.append(single_priors_filter[single_prior_str])
+    return ped_vals, joint_priors
+
+    # joint_priors = {}
+    # joint_posteriors = {}
+    # prob_ped_in_cross_walk = [None]*4
+    #
+    # flag_set = ("0", "1")
+    # single_ped_combs_str = single_ped_posteriors_strs(num_locs, flag_set)
+    # joint_ped_combos_str = all_ped_combos_strs(num_locs, flag_set)
+    #
+    # # Permutation lists
+    # joint_ped_combos_str = all_ped_combos_strs(num_locs, flag_set)
+    # joint_ped_combos_int_list = all_ped_combos_lsts(num_locs, flag_set)
+    # single_ped_combs_str = single_ped_posteriors_strs(num_locs, flag_set)
+    #
+    # # if this is the first timestep, we need to initialize the priors
+    # if priors == {}:
+    #     priors = {comb : [1 / len(flag_set)] for comb in single_ped_combs_str}
+    #
+    # # 3 Update joint priors p(o|a) = \prod_{o_i \in o} p(o_i)
+    # for str_comb in joint_ped_combos_str:
+    #     joint_prior = 1
+    #
+    #     single_ped_lst = joint_ped_combo_str_to_single_ped_combo(str_comb)
+    #     for single_ped in single_ped_lst:
+    #         joint_prior *= priors[single_ped][-1]
+    #
+    #     joint_priors[str_comb] = joint_prior
+    #
+    # # 2
+    # C = 0
+    # joint_likelihood_densities = {}
+    # for str_comb, lst_comb in zip(joint_ped_combos_str, joint_ped_combos_int_list):
+    #
+    #     s_all_modified = np.copy(dummy_obs) # s_all_modified = hypothetical state that an agent observes
+    #     s_all_modified[PED_IDX_LST] = lst_comb
+    #
+    #     if policy_type == "DQN":
+    #         _, _, logit = agent.compute_action(s_all_modified, policy_id='av', full_fetch=True)
+    #         q_vals = logit['q_values']
+    #         soft_max = scipy.special.softmax(q_vals)
+    #         joint_likelihood_density = soft_max[action_index]
+    #
+    #     elif policy_type == "imitation":
+    #         mu, sigma = agent.get_accel_gaussian_params_from_observation(s_all_modified)
+    #         sigma = sigma[0][0]
+    #         mu = mu[0]
+    #
+    #         # f(a|e)
+    #         joint_likelihood_density = accel_pdf(mu, sigma, action)
+    #
+    #     # this is the only one that works right now
+    #     elif policy_type == "rule_based":
+    #         mu = env.k.vehicle.get_acc_controller(agent).get_action_with_ped(env,
+    #                                                                             s_all_modified)
+    #         sigma = NOISE_STD
+    #         # noise up your model
+    #         if sigma > 0.0:
+    #             mu += np.random.normal(loc=0.0, scale=sigma)
+    #             joint_likelihood_density = max(min(accel_pdf(mu, sigma, action), 10.0), 0.01)
+    #         else:
+    #             if mu == action:
+    #                 joint_likelihood_density = 1
+    #             else:
+    #                 # we don't want to set it to zero exactly or else it'll always be zero
+    #                 joint_likelihood_density = 0.01
+    #
+    #     joint_likelihood_densities[str_comb].append(joint_likelihood_density)
+    #
+    #     # Get p(e), for f(a|e) p(e)
+    #     updated_prior = joint_priors[str_comb]
+    #
+    #     C += joint_likelihood_density * updated_prior
+    #
+    # # 5 p(e|a) joint posterior masses
+    # for str_comb in joint_ped_combos_str:
+    #     # f(a|e)
+    #     joint_likelihood_density = joint_likelihood_densities[str_comb][-1]
+    #     # p(e)
+    #     joint_prior = joint_priors_updated[str_comb][-1]
+    #
+    #     # p(e|a) = f(a|e) p(e) / C
+    #     joint_posterior = joint_likelihood_density * updated_prior / C
+    #     joint_posteriors[str_comb] = joint_posterior
+    #
+    # # 6 Single posterior probabilities p(o_i = 1|a) = sum relevant posteriors
+    # for loc_ in range(num_locs):
+    #     for val_ in flag_set:
+    #         single_posterior = 0
+    #         for key in ped_combos_one_loc_fixed_strs(loc_, val_):
+    #             single_posterior += joint_posteriors[key]
+    #         single_posterior_str = f'o_{loc_} = {val_}'
+    #         single_posteriors[single_posterior_str] = single_posterior
+    #
+    # for loc_ in range(num_locs):
+    #     val0, val1 = "0", "1"
+    #     single_0 = f'o_{loc_} = {val0}'
+    #     single_1 = f'o_{loc_} = {val1}'
+    #     filtered = TRANSITION_MATRIX @ np.array([single_posteriors_filter[single_0][-1], single_posteriors_filter[single_1][-1]])
+    #     single_posteriors[single_0], single_posteriors_filter[single_1] = filtered[0], filtered[1]
+    #
+    # for loc__ in range(num_locs):
+    #     single_1 = f'o_{loc__} = 1'
+    #     posterior_prob_ped[loc_] = single_posteriors[single_1]
+    #
+    # return prob_ped_in_cross_walk, single_posteriors
 
     #############################
     #############################
@@ -322,109 +448,3 @@ def accel_pdf(mu, sigma, actual):
     coeff = 1 / np.sqrt(2 * np.pi * (sigma**2))
     exp = -0.5 * ((actual - mu) / sigma)**2
     return coeff * np.exp(exp)
-
-def run_transfer(args, action_pairs_lst=[], imitation_model=True, is_discrete=False):
-    """To run inference using the imitation model, set imitation_model True, is_discrete False.
-    To run DQN inference, set imitation_model = False, is_discrete = True"""
-    # run transfer on the bayesian 1 env first
-    action_pairs_lst = []
-    bayesian_0_params = bayesian_1_flow_params(args, pedestrians=True, render=False)
-    env, env_name = create_env(args, bayesian_0_params)
-    if imitation_model:
-        agent = get_inference_network(os.path.abspath("../flow/controllers/imitation_learning/model_files/c_test.h5"), flow_params=bayesian_0_params)
-    else:
-        agent, config = create_agent(args, flow_params=bayesian_0_params)
-    action_pairs_lst = run_env(env, agent, bayesian_0_params, is_discrete)
-    
-    return action_pairs_lst
-def plot_2_lines(y1, y2, legend, viewable_ped=False):
-    x = np.arange(len(y1))
-    plt.plot(x, y1)
-    plt.plot(x, y2)
-    if viewable_ped:
-        plt.plot(x, viewable_ped)
-    plt.legend(legend, bbox_to_anchor=(0.5, 1.05), loc=3, borderaxespad=0.)
-    plt.ylim(-0.1, 1.1)
-
-    plt.draw()
-    plt.pause(0.001)
-    
-def plot_lines(y_val_lsts, legends):
-    assert len(y_val_lsts) == len(legends)
-    x = np.arange(len(y_val_lsts[0]))
-    for y_vals in y_val_lsts:
-        plt.plot(x, y_vals)
-    plt.ylim(-0.1, 1.1)
-
-    plt.legend(legends, bbox_to_anchor=(0.5, 1.05), loc=3, borderaxespad=0.)
-    plt.draw()
-    plt.pause(0.001)
-    
-def create_parser():
-    """Create the parser to capture CLI arguments."""
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description='[Flow] Evaluates a reinforcement learning agent '
-                    'given a checkpoint.',
-        epilog=EXAMPLE_USAGE)
-
-    # required input parameters
-    parser.add_argument(
-        'result_dir', type=str, help='Directory containing results')
-    parser.add_argument('checkpoint_num', type=str, help='Checkpoint number.')
-
-    # optional input parameters
-    parser.add_argument(
-        '--run',
-        type=str,
-        help='The algorithm or model to train. This may refer to '
-             'the name of a built-on algorithm (e.g. RLLib\'s DQN '
-             'or PPO), or a user-defined trainable function or '
-             'class registered in the tune registry. '
-             'Required for results trained with flow-0.2.0 and before.')
-    parser.add_argument(
-        '--num_rollouts',
-        type=int,
-        default=1,
-        help='The number of rollouts to visualize.')
-    parser.add_argument(
-        '--gen_emission',
-        action='store_true',
-        help='Specifies whether to generate an emission file from the '
-             'simulation')
-    parser.add_argument(
-        '--evaluate',
-        action='store_true',
-        help='Specifies whether to use the \'evaluate\' reward '
-             'for the environment.')
-    parser.add_argument(
-        '--render_mode',
-        type=str,
-        default='sumo_gui',
-        help='Pick the render mode. Options include sumo_web3d, '
-             'rgbd and sumo_gui')
-    parser.add_argument(
-        '--save_render',
-        action='store_true',
-        help='Saves a rendered video to a file. NOTE: Overrides render_mode '
-             'with pyglet rendering.')
-    parser.add_argument(
-        '--horizon',
-        type=int,
-        help='Specifies the horizon.')
-    parser.add_argument(
-        "--randomize_vehicles", default=True,
-        help="randomize the number of vehicles in the system and where they come from",
-        action="store_true")
-    
-    parser.add_argument('--grid_search', action='store_true', default=False,
-                        help='If true, a grid search is run')
-    parser.add_argument('--run_mode', type=str, default='local',
-                        help="Experiment run mode (local | cluster)")
-    parser.add_argument('--algo', type=str, default='TD3',
-                        help="RL method to use (PPO, TD3, MADDPG)")
-    parser.add_argument("--pedestrians",
-                        help="use pedestrians, sidewalks, and crossings in the simulation",
-                        action="store_true")
-    
-    return parser
