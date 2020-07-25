@@ -81,8 +81,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         A rollout is terminated if the time horizon is reached or if two
         vehicles collide into one another.
     """
-
-    # TODO(KL) Not sure how to feed in params to the _init_: the envs object is created in registry.py (??)  Hard
     def __init__(self, env_params, sim_params, network, simulator='traci', ):
         # for p in ADDITIONAL_ENV_PARAMS.keys():
         #     if p not in env_params.additional_params:
@@ -614,6 +612,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
+        print(f'-------------------- reset() called ----------------------')
         # print(self.ped_transition_cnt)
         self.time_counter = 0
         # last time we saw a vehicle
@@ -659,6 +658,16 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         if self.sim_params.restart_instance or \
                 (self.step_counter > 2e6 and self.simulator != 'aimsun'):
+
+            # print(f'####### restart_instance happens #######')
+            if self.network.net_params.additional_params["randomize_num_lanes"] == True:
+                self.network.net_params.additional_params["vertical_lanes"] = 2 if np.random.rand(1) >= 0.5 else 1
+                self.network.net_params.additional_params["horizontal_lanes"] = self.network.net_params.additional_params["vertical_lanes"]
+                self.network.vertical_lanes = self.network.net_params.additional_params["vertical_lanes"]
+                self.network.horizontal_lanes = self.network.net_params.additional_params["vertical_lanes"]
+                self.network.types = self.network.specify_types(self.network.net_params)
+                self.network.connections = self.network.specify_connections(self.net_params)
+
             self.step_counter = 0
             # issue a random seed to induce randomness into the next rollout
             self.sim_params.seed = np.random.randint(0, 1e5)
@@ -805,7 +814,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         # perform (optional) warm-up steps before training
         for _ in range(self.env_params.warmup_steps):
             observation, _, _, _ = self.step(rl_actions=None)
-
         # render a frame
         self.render(reset=True)
 

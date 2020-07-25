@@ -102,6 +102,10 @@ class Bayesian0Network(TrafficLightGridNetwork):
                  traffic_lights=TrafficLightParams(),
                  pedestrians=None):
         """Initialize an n*m traffic light grid network."""
+        print(f'___________initializing bayesian_0 no grid_______________________')
+        # if net_params.additional_params["randomize_num_lanes"]: // might be no need for this
+        #     net_params.additional_params["horizontal_lanes"] = 1 if np.random.rand(1) <= 0.5 else 2
+        #     net_params.additional_params["vertical_lanes"] = net_params.additional_params["horizontal_lanes"]
         super().__init__(name, vehicles, net_params, initial_config,
                          traffic_lights, pedestrians, use_traffic_lights=False)
         self.nodes = self._nodes
