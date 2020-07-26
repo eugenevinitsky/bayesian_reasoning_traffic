@@ -102,6 +102,9 @@ class Bayesian0Network(TrafficLightGridNetwork):
                  traffic_lights=TrafficLightParams(),
                  pedestrians=None):
         """Initialize an n*m traffic light grid network."""
+        # if net_params.additional_params["randomize_num_lanes"]: // might be no need for this
+        #     net_params.additional_params["horizontal_lanes"] = 1 if np.random.rand(1) <= 0.5 else 2
+        #     net_params.additional_params["vertical_lanes"] = net_params.additional_params["horizontal_lanes"]
         super().__init__(name, vehicles, net_params, initial_config,
                          traffic_lights, pedestrians, use_traffic_lights=False)
         self.nodes = self._nodes
@@ -138,6 +141,8 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
         if net_params == None:
             net_params = self.net_params
+        if self.vertical_lanes == 2 and self.horizontal_lanes == 2:
+            return super().specify_routes(net_params)
 
         if net_params.additional_params.get("randomize_routes", False):
             start_edges = ['(1.2)--(1.1)',
@@ -178,8 +183,8 @@ class Bayesian0Network(TrafficLightGridNetwork):
             car_3_start_edge = "(1.0)--(1.1)"
             car_3_end_edge = "(1.1)--(2.1)"
             rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
-                   car_2_start_edge: [car_2_start_edge, car_2_end_edge],
-                   car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
+                car_2_start_edge: [car_2_start_edge, car_2_end_edge],
+                car_3_start_edge: [car_3_start_edge, car_3_end_edge]}
 
         return rts
 
@@ -332,7 +337,6 @@ class Bayesian0Network(TrafficLightGridNetwork):
         Return 2 lists:
         1. list of start positions [(edge0, pos0), (edge1, pos1), ...]
         2. list of start lanes [lane0, lane1, lane 2, ...]"""
-
         if net_params.additional_params.get("randomize_routes", False):
             # Randomized paths with distinct starting edges but not necessarily
             # distinct ending edges
@@ -349,6 +353,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 for i in range(net_params.additional_params.get("num_cars", 4)):
                     car_start_edge = start_edges[start_indices[np.random.randint(4)]]
                     car_start_pos = max(np.random.normal(30, 10), 0)
+                    car_start_pos = 0
                     start_pos.append((car_start_edge, car_start_pos))
                 # In SUMO, lanes are zero-indexed starting from the right-most lane
             else:
@@ -361,6 +366,11 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 car_2_start_pos = max(np.random.normal(30, 10), 0)
                 car_3_start_pos = max(np.random.normal(30, 10), 0)
                 car_4_start_pos = max(np.random.normal(30, 10), 0)
+
+                car_1_start_pos = 0
+                car_2_start_pos = 0
+                car_3_start_pos = 0
+                car_4_start_pos = 0
 
                 start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos),
                              (car_3_start_edge, car_3_start_pos), (car_4_start_edge, car_4_start_pos)]
@@ -378,7 +388,9 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
             start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos),
                          (car_4_start_edge, car_4_start_pos)]
-            start_lanes = [0, 0, 0, 0]
+
+        if net_params.additional_params.get("vertical_lanes", 1) == 2 and net_params.additional_params.get("horizontal_lanes", 1) == 2:
+            start_lanes = [np.random.randint(0, 2) for _ in range(net_params.additional_params.get("num_cars", 4))]
 
         return start_pos, start_lanes
 

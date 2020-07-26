@@ -114,13 +114,13 @@ class TrafficLightGridNetwork(Network):
         
         #TODO add param for this
         self.sidewalk_width = 2
-
         # retrieve all additional parameters
         # refer to the ADDITIONAL_NET_PARAMS dict for more documentation
+
         self.vertical_lanes = net_params.additional_params["vertical_lanes"]
-        self.horizontal_lanes = net_params.additional_params[
-            "horizontal_lanes"]
+        self.horizontal_lanes = net_params.additional_params["horizontal_lanes"]
         self.speed_limit = net_params.additional_params["speed_limit"]
+
         if not isinstance(self.speed_limit, dict):
             self.speed_limit = {
                 "horizontal": self.speed_limit,
@@ -542,6 +542,7 @@ class TrafficLightGridNetwork(Network):
         dict<list<dict>>
             Dict of all the connections in the network
         """
+        # print(f'____________________specify_connections called____________________ ')
 
         con_dict = {}
         x_max = self.col_num + 1
@@ -600,7 +601,7 @@ class TrafficLightGridNetwork(Network):
             right_most_lane, left_most_lane = 0, self.horizontal_lanes - 1
             if self.pedestrians:
                 right_most_lane, left_most_lane = 1, self.horizontal_lanes
-            
+
             # TODO: ONLY leftmost lanes can turn left i.e stop non leftmost lanes from turning left as well
             # build vertical connections for RIGHT edge (1,0)
             for hor_l in range(self.horizontal_lanes):

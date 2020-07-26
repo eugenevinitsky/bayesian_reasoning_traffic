@@ -68,7 +68,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         (veh_id, action, non_ped_states, prev_probs) 
 
     States
-        TBD
+        num_lanes + self_obs + veh_obs
 
     Actions
         The action consists of an acceleration, bound according to the
@@ -81,8 +81,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         A rollout is terminated if the time horizon is reached or if two
         vehicles collide into one another.
     """
-
-    # TODO(KL) Not sure how to feed in params to the _init_: the envs object is created in registry.py (??)  Hard
     def __init__(self, env_params, sim_params, network, simulator='traci', ):
         # for p in ADDITIONAL_ENV_PARAMS.keys():
         #     if p not in env_params.additional_params:
@@ -92,19 +90,19 @@ class Bayesian0NoGridEnv(MultiEnv):
         super().__init__(env_params, sim_params, network, simulator)
         self.discrete = env_params.additional_params.get("discrete", False)
         self.max_num_objects = env_params.additional_params.get("max_num_objects", 3)
-        self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before"]
+        self.veh_obs_names = ["rel_x", "rel_y", "speed", "yaw", "arrive_before", "lane_idx"] # lane_idx = 0 if on rightmost lane
         # setup information for the gridding if it is needed
         self.use_grid = env_params.additional_params.get("use_grid", False)
         self.priors = defaultdict(dict)
+        self.global_obs_names = ["num_lanes"]
         if self.use_grid:
             self.num_grid_cells = 6
-            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y"]
+            self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y"] # not up to date
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3", "ped_in_4", "ped_in_5"]
         else:
-            # last_seen this tracks when we last saw a vehicle so we don't forget it immediately
+            # last_seen: this tracks when we last saw a vehicle so we don't forget it immediately
             self.self_obs_names = ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y",
-                                   "arrival_pos",
-                                   "last_seen"]
+                                   "arrival_pos", "last_seen", "lane_idx"] # lane_idx = 0 if on rightmost lane
             self.ped_names = ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"]
         # list of tracked priors
         self.prior_names = ["infer_{}_{}".format(loc_id, veh_idx) for veh_idx in range(self.max_num_objects)
@@ -184,7 +182,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         """See class definition."""
         max_objects = self.env_params.additional_params["max_num_objects"]
         # observations of your own state and other cars
-        num_obs = len(self.self_obs_names) + len(self.ped_names) + max_objects * len(self.veh_obs_names)
+        num_obs = len(self.global_obs_names) + len(self.self_obs_names) + len(self.ped_names) + max_objects * len(self.veh_obs_names)
         # belief variable over whether a pedestrian is there
         if self.inference_in_state:
             num_obs += len(self.prior_names)
@@ -266,7 +264,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         return False
 
     def state_for_id(self, rl_id):
-
+        num_global_obs = len(self.global_obs_names)
         num_self_obs = len(self.self_obs_names)
         num_ped_obs = len(self.ped_names)
         num_veh_obs = len(self.veh_obs_names)
@@ -286,16 +284,12 @@ class Bayesian0NoGridEnv(MultiEnv):
         # visible_vehicles = sorted(visible_vehicles, key=lambda v: \
         #     (self.k.vehicle.get_relative_angle(rl_id, \
         #                                        self.k.vehicle.get_orientation(v)[:2]) + 90) % 360)
-
-        observation[:num_self_obs + num_ped_obs - 1] = self.get_self_obs(rl_id, visible_pedestrians, visible_lanes)
-        # shift the peds over by 1 so that self obs all come first
-        observation[num_self_obs + 1: num_self_obs + num_ped_obs + 1] = observation[num_self_obs: num_self_obs + num_ped_obs]
-        if len(visible_vehicles) == 0:
-            self.last_seen += 1 / 50.0
-        else:
-            self.last_seen = 0
-        observation[num_self_obs - 1] = self.last_seen
-        self.ped_variables = observation[num_self_obs: num_self_obs + num_ped_obs]
+        # TODO Change magic numbers
+        observation[:num_global_obs] = self.k.network.network.vertical_lanes
+        observation[num_global_obs: num_global_obs + num_self_obs + num_ped_obs] = self.get_self_obs(rl_id, visible_pedestrians, visible_vehicles, visible_lanes)
+        # shift the peds over by 1 so that self obs all come first <- not necessary? get_self_obs() does everything
+        # # TODO 
+        # observation[num_global_obs + num_self_obs + 1: num_global_obs + num_self_obs + num_ped_obs + 1] = observation[num_self_obs: num_self_obs + num_ped_obs]
 
         veh_x, veh_y = self.k.vehicle.get_orientation(rl_id)[:2]
 
@@ -312,6 +306,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             observed_x, observed_y = self.k.vehicle.get_orientation(veh_id)[:2]
             rel_x = observed_x - veh_x
             rel_y = observed_y - veh_y
+            lane_idx = self.k.vehicle.get_lane(veh_id)
             # print('rel_x: {}, rel_y: {} '.format(rel_x, rel_y))
 
             # Consider the first 3 visible vehicles, but we don't need to do inference for the humans, we only need a dummy state
@@ -319,16 +314,16 @@ class Bayesian0NoGridEnv(MultiEnv):
                 observation[(index * num_veh_obs) + num_self_obs + num_ped_obs:
                             num_veh_obs * (index + 1) + num_self_obs + num_ped_obs] = \
                     [observed_yaw / 360, observed_speed / 20,
-                     rel_x / 50, rel_y / 50, before / 5]
+                     rel_x / 50, rel_y / 50, before / 5, lane_idx]
                 if self.inference_in_state:
                     # only perform inference if the visible veh has arrived
                     if self.arrived_intersection(veh_id) and not self.past_intersection(veh_id):
                         dummy_obs = np.zeros(self.observation_space.shape[0])
-                        _, visible_pedestrians, visible_lanes = self.find_visible_objects(veh_id,
-                                                                                                         self.search_veh_radius)
+                        _, visible_pedestrians, visible_lanes = self.find_visible_objects(veh_id, self.search_veh_radius)
                         ped_params = self.four_way_ped_params(visible_pedestrians, visible_lanes)
                         # TODO fix magic numbers
-                        dummy_obs[[10, 11, 12, 13]] = ped_params
+                        # dummy_obs[[10, 11, 12, 13]] = ped_params
+                        dummy_obs[num_global_obs + num_self_obs: num_global_obs + num_self_obs + 4]
                         acceleration = self.k.vehicle.get_acc_controller(veh_id).get_action_with_ped(self,
                                                                                        dummy_obs)
                         # we pass a zero of states because it's just a dummy obs, only the ped part of it affects the behavior
@@ -341,8 +336,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                         # TODO(we are currently using the vehicle id as an index but that doesn't give us any way to correlate it
                         # to the other state variables; the index doesn't tell us which car is which
                         self.prior_probs[veh_idx * len(self.ped_names): (veh_idx + 1) * len(self.ped_names)] = updated_ped_probs
+        
         if self.inference_in_state:
-            prior_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs
+            prior_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs + num_global_obs
             observation[prior_index:] = self.prior_probs
         return observation
 
@@ -350,6 +346,7 @@ class Bayesian0NoGridEnv(MultiEnv):
     def get_state(self):
         """For a radius around the car, return the 3 closest objects with their X, Y position relative to you,
         their speed, a flag indicating if they are a pedestrian or not, and their yaw."""
+        # import ipdb; ipdb.set_trace()
         new_loc_states = self.curr_ped_state()
         for loc, val in enumerate(new_loc_states):
             prev = self.prev_loc_ped_state[loc]
@@ -614,6 +611,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             the initial observation of the space. The initial reward is assumed
             to be zero.
         """
+        # print(f'-------------------- reset() called ----------------------')
         # print(self.ped_transition_cnt)
         self.time_counter = 0
         # last time we saw a vehicle
@@ -659,6 +657,16 @@ class Bayesian0NoGridEnv(MultiEnv):
 
         if self.sim_params.restart_instance or \
                 (self.step_counter > 2e6 and self.simulator != 'aimsun'):
+
+            # print(f'####### restart_instance happens #######')
+            if self.network.net_params.additional_params["randomize_num_lanes"] == True:
+                self.network.net_params.additional_params["vertical_lanes"] = 2 if np.random.rand(1) >= 0.5 else 1
+                self.network.net_params.additional_params["horizontal_lanes"] = self.network.net_params.additional_params["vertical_lanes"]
+                self.network.vertical_lanes = self.network.net_params.additional_params["vertical_lanes"]
+                self.network.horizontal_lanes = self.network.net_params.additional_params["vertical_lanes"]
+                self.network.types = self.network.specify_types(self.network.net_params)
+                self.network.connections = self.network.specify_connections(self.net_params)
+
             self.step_counter = 0
             # issue a random seed to induce randomness into the next rollout
             self.sim_params.seed = np.random.randint(0, 1e5)
@@ -805,7 +813,6 @@ class Bayesian0NoGridEnv(MultiEnv):
         # perform (optional) warm-up steps before training
         for _ in range(self.env_params.warmup_steps):
             observation, _, _, _ = self.step(rl_actions=None)
-
         # render a frame
         self.render(reset=True)
 
@@ -876,7 +883,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             curr_edge = -1
         return curr_edge
 
-    def get_self_obs(self, rl_id, visible_peds, visible_lanes):
+    def get_self_obs(self, rl_id, visible_peds, visible_vehicles, visible_lanes):
         """For a given vehicle ID, get the observation info related explicitly to the given vehicle itself
         
         Parameters
@@ -885,11 +892,15 @@ class Bayesian0NoGridEnv(MultiEnv):
             vehicle id
         visible_peds: [ped_obj, ped_obj, ...]
             list of pedestrian objects visible to vehicle id
+        visible_vehs: [veh_obj, veh_obj, ...]
+            list of vehicle objects visible to vehicle id
 
         Returns
         -------
         observation : [int / float]
-            list of integer / float values [yaw, speed, turn_num, edge_pos, ped_1, ..., ped_4]
+            list of integer / float values 
+            ["yaw", "speed", "turn_num", "curr_edge", "end_edge", "edge_pos", "veh_x", "veh_y","arrival_pos", "last_seen", "lane_idx"]
+            + ["ped_in_0", "ped_in_1", "ped_in_2", "ped_in_3"] (depending on use_grid or not)
             ped_i is a binary value indicating whether (1) or not (0) 
             there's a pedestrian in grid cell i of veh in question
         
@@ -911,15 +922,25 @@ class Bayesian0NoGridEnv(MultiEnv):
             turn_num = 1  # go straight
         else:
             turn_num = 2  # turn left
-        # subtract by one since we're not including the pedestrian here
+        if len(visible_vehicles) == 0:
+            self.last_seen += 1 / 50.0
+        else:
+            self.last_seen = 0
+        # subtract by one since we're not including the pedestrian here TODO Ask @ev? substract by one?
         observation = [yaw / 360, speed / 20, turn_num / 2, curr_edge / 8, end / 8, edge_pos / 50,
-                       veh_x / 300.0, veh_y / 300.0, self.arrival_position(rl_id) / 5.0]
+                       veh_x / 300.0, veh_y / 300.0, self.arrival_position(rl_id) / 5.0, self.last_seen, self.k.vehicle.get_lane(rl_id)]
+
         if self.use_grid:
             ped_param = self.get_grid_ped_params(visible_peds, rl_id)
         else:
             ped_param = self.four_way_ped_params(visible_peds, visible_lanes, ground_truth=False)
+    
+        self.ped_variables = ped_param
+
         observation.extend(ped_param)
+
         return observation
+
 
     def arrived_before(self, veh_1, veh_2):
         """Return 1 if vehicle veh_1 arrived at the intersection before vehicle veh_2. Else, return 0."""
