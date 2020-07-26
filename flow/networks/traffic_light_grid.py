@@ -601,8 +601,6 @@ class TrafficLightGridNetwork(Network):
             right_most_lane, left_most_lane = 0, self.horizontal_lanes - 1
             if self.pedestrians:
                 right_most_lane, left_most_lane = 1, self.horizontal_lanes
-            print(f'self.horizontal_lanes in TLG.py is {self.horizontal_lanes}')
-            print(f'self.vertical_lanes in TLG.py is {self.vertical_lanes}')
 
             # TODO: ONLY leftmost lanes can turn left i.e stop non leftmost lanes from turning left as well
             # build vertical connections for RIGHT edge (1,0)

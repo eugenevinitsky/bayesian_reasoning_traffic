@@ -254,7 +254,6 @@ class Env(gym.Env):
         if sim_params.emission_path is not None:
             ensure_dir(sim_params.emission_path)
             self.sim_params.emission_path = sim_params.emission_path
-
         self.network.routes = self.network.specify_routes(self.net_params)
 
         self.k.network.generate_network(self.network)
@@ -453,6 +452,7 @@ class Env(gym.Env):
 
         if self.sim_params.restart_instance or \
                 (self.step_counter > 2e6 and self.simulator != 'aimsun'):
+
             self.step_counter = 0
             # issue a random seed to induce randomness into the next rollout
             self.sim_params.seed = random.randint(0, 1e5)
