@@ -216,7 +216,8 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 "pedestrian_kernel": pedestrian_params,
                 "num_cars": args.num_vehicles,
                 # the vehicles can be on any edge and take any route
-                "full_randomization": True
+                "full_randomization": True,
+                "randomize_num_lanes": args.randomize_num_lanes
             },
         ),
 
@@ -708,6 +709,10 @@ if __name__ == '__main__':
                         help="how much to penalize a collision",
                         type=int,
                         default=10)
+    parser.add_argument("--randomize_num_lanes",
+                        help="randomize the number of lanes going in one direction of an edge - if true, switch between 1 and 2 lanes",
+                        default=False,
+                        action="store_true")
 
     # Model arguments
     parser.add_argument("--use_lstm", action="store_true", default=False, help="Use LSTM")

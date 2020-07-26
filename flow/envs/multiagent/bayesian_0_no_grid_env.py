@@ -664,8 +664,10 @@ class Bayesian0NoGridEnv(MultiEnv):
                 self.network.net_params.additional_params["horizontal_lanes"] = self.network.net_params.additional_params["vertical_lanes"]
                 self.network.vertical_lanes = self.network.net_params.additional_params["vertical_lanes"]
                 self.network.horizontal_lanes = self.network.net_params.additional_params["vertical_lanes"]
+                # print(f'reset() with vertical_lanes = {self.network.vertical_lanes}')
                 self.network.types = self.network.specify_types(self.network.net_params)
                 self.network.connections = self.network.specify_connections(self.net_params)
+
 
             self.step_counter = 0
             # issue a random seed to induce randomness into the next rollout
