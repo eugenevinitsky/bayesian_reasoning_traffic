@@ -332,7 +332,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                         acceleration = self.k.vehicle.get_acc_controller(veh_id).get_action_with_ped(self,
                                                                                        dummy_obs)
                         # we pass a zero of states because it's just a dummy obs, only the ped part of it affects the behavior
-                        updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(self, acceleration,
+                        updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(self, self.k.vehicle.get_acc_controller(veh_id),
+                                                                                         acceleration,
                                                                                          np.zeros(self.observation_space.shape[0]),
                                                                                          self.priors.get(veh_id,
                                                                                                          {}),

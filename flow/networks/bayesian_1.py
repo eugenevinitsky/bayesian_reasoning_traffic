@@ -450,3 +450,69 @@ class Bayesian4Network(Bayesian1Network):
         #     else:
         #         pos = max(np.random.normal(5, 5), 0)
         #     pedestrians.params[ped_id]['departPos'] = str(pos)
+
+class L2ObscuredNetwork(Bayesian1Network):
+    @staticmethod
+    def gen_custom_start_pos(cls, net_params, initial_config, num_vehicles):
+        """See parent class for full explanation
+
+        Return 2 lists:
+        1. list of start positions [(edge0, pos0), (edge1, pos1), ...]
+        2. list of start lanes [lane0, lane1, lane 2, ...]"""
+
+        # Randomized paths with distinct starting edges but not necessarily
+        # distinct ending edges
+        start_edges = ['(1.2)--(1.1)',
+                       '(1.2)--(1.1)']
+
+        start_indices = [0, 0, 0, 0]
+
+        car_1_start_edge = start_edges[start_indices[0]]
+        car_2_start_edge = start_edges[start_indices[1]]
+
+        car_1_start_pos = 20
+        car_2_start_pos = 25
+
+        start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos)]
+        # In SUMO, lanes are zero-indexed starting from the right-most lane
+        start_lanes = [0, 1]
+
+        return start_pos, start_lanes
+
+    def randomize_pedestrian_routes(self, pedestrians):
+        pass
+        #
+        # if not pedestrians:
+        #     return None
+        #
+        # edges = ['(1.2)--(1.1)',
+        #          '(0.1)--(1.1)',
+        #          '(1.0)--(1.1)',
+        #          '(2.1)--(1.1)',
+        #          '(1.1)--(1.2)',
+        #          '(1.1)--(0.1)',
+        #          '(1.1)--(1.0)',
+        #          '(1.1)--(2.1)']
+        #
+        # for ped_id in pedestrians.params:
+        #     edge_indices = [0, 1, 2, 3, 4, 5, 6, 7]
+        #
+        #     pedestrians.params[ped_id]['from'] = edges[edge_indices[0]]
+        #     pedestrians.params[ped_id]['to'] = edges[edge_indices[1]]
+        #
+        #     if edge_indices[0] <= 3:
+        #         pos = min(np.random.normal(45, 5), 50)
+        #     else:
+        #         pos = max(np.random.normal(5, 5), 0)
+        #     pedestrians.params[ped_id]['departPos'] = str(pos)
+
+    def specify_routes(self, net_params=None):
+
+        car_1_start_edge = "(1.2)--(1.1)"
+        car_1_end_edge = "(1.1)--(1.0)"
+        car_2_start_edge = "(1.2)--(1.1)"
+        car_2_end_edge = "(1.1)--(2.1)"
+        rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
+               car_2_start_edge: [car_2_start_edge, car_2_end_edge]}
+
+        return rts

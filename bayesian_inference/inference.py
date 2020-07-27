@@ -22,7 +22,7 @@ PED_BACK = PED_IDX_LST[-1]
 
 NOISE_STD = 0.0
 
-def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_locs=4):
+def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, agent_id, num_locs=4):
     """Black box predictor of the probability of pedestrian in each of the 4 crosswalk locations
     
     Parameters
@@ -90,8 +90,9 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
             s_all)  # s_all_modified = hypothetical state that an agent observes
         s_all_modified[PED_IDX_LST] = lst_comb
         #                                 _, _, logit = agent.compute_action(s_all_modified, policy_id=policy_map_fn(agent_id), full_fetch=True)
-        mu = env.k.vehicle.get_acc_controller(agent_id).get_action_with_ped(env,
-                                                                            s_all_modified)
+        mu = controller.get_action_with_ped(env, s_all_modified, change_speed_mode=False)
+        if mu is not None:
+            controller.get_action_with_ped(env, s_all_modified, change_speed_mode=False)
         sigma = NOISE_STD
         # noise up your model
         if sigma > 0.0:

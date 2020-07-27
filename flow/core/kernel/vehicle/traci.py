@@ -751,6 +751,9 @@ class TraCIVehicle(KernelVehicle):
             return [self.get_acc_controller(vehID, error) for vehID in veh_id]
         return self.__vehicles.get(veh_id, {}).get("acc_controller", error)
 
+    def set_controller_directly(self, veh_id, acc_controller):
+        self.__vehicles[veh_id]["acc_controller"] = acc_controller
+
     def set_acc_controller(self, veh_id, acc_controller):
         """Manually set acceleration controller"""
         veh_type = self.get_type(veh_id)
@@ -1107,7 +1110,8 @@ class TraCIVehicle(KernelVehicle):
             if acc[i] is not None and vid in self.get_ids():
                 this_vel = self.get_speed(vid)
                 next_vel = max([this_vel + acc[i] * self.sim_step, 0])
-                self.kernel_api.vehicle.slowDown(vid, next_vel, 1e-3)
+                # import ipdb; ipdb.set_trace()
+                self.kernel_api.vehicle.setSpeed(vid, next_vel)
 
     def apply_lane_change(self, veh_ids, direction):
         """See parent class."""
