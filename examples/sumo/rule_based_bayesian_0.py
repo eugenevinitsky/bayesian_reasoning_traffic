@@ -144,7 +144,7 @@ def bayesian_0_example(render=None, pedestrians=False, collect_data=False):
     pedestrian_params = None
     if pedestrians:
         pedestrian_params = PedestrianParams()
-        for i in range(20):
+        for i in range(6):
             pedestrian_params.add(
                 ped_id='ped_{}'.format(i),
                 depart_time='0.00',

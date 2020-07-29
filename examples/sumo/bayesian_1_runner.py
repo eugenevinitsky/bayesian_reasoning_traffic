@@ -1,12 +1,12 @@
 """Sets up and runs the basic bayesian example. This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
-from flow.controllers import GridRouter
+from flow.controllers import GridRouter, RuleBasedInferenceController, RuleBasedIntersectionController
 from flow.core.experiment import Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams, SumoLaneChangeParams
 from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
-from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
+from flow.envs.multiagent.bayesian_0_no_grid_env import ADDITIONAL_ENV_PARAMS, Bayesian0NoGridEnv
 from flow.networks import Bayesian1Network
 from flow.core.params import PedestrianParams
 import argparse
@@ -124,7 +124,7 @@ def bayesian_1_example(render=None, pedestrians=False):
         "cars_bot": num_cars_bot
     }
 
-    sim_params = SumoParams(sim_step=1, render=True)
+    sim_params = SumoParams(sim_step=1, render=True, restart_instance=True)
 
     if render is not None:
         sim_params.render = render
@@ -157,8 +157,10 @@ def bayesian_1_example(render=None, pedestrians=False):
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="right_of_way",
         ),
+        acceleration_controller=(RuleBasedIntersectionController, {}),
         lane_change_params=lane_change_params,
         num_vehicles=2)
+
     vehicles.add(
         veh_id="av",
         routing_controller=(GridRouter, {}),
@@ -167,6 +169,7 @@ def bayesian_1_example(render=None, pedestrians=False):
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="aggressive",
         ),
+        acceleration_controller=(RuleBasedInferenceController, {}),
         lane_change_params=lane_change_params,
         num_vehicles=1)
 
@@ -192,7 +195,7 @@ def bayesian_1_example(render=None, pedestrians=False):
         pedestrians=pedestrian_params,
         initial_config=initial_config)
 
-    env = AccelEnv(env_params, sim_params, network)
+    env = Bayesian0NoGridEnv(env_params, sim_params, network)
 
     return Experiment(env)
 
@@ -210,4 +213,4 @@ if __name__ == "__main__":
     # import the experiment variable
     exp = bayesian_1_example(pedestrians=pedestrians)
     # run for a set number of rollouts / time steps
-    exp.run(1, 1500)
+    exp.run(10, 1500, multiagent=True)

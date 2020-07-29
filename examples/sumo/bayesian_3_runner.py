@@ -3,11 +3,12 @@ stopped and so we should also slow down and stop.
  This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
+from flow.controllers import RuleBasedInferenceController, RuleBasedIntersectionController
 from flow.controllers.velocity_controllers import FullStop
 from flow.core.experiment import Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.envs.test import TestEnv
-from flow.envs.multiagent.bayesian_1_env import ADDITIONAL_ENV_PARAMS
+from flow.envs.multiagent.bayesian_0_no_grid_env import ADDITIONAL_ENV_PARAMS, Bayesian0NoGridEnv
 from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.controllers import GridRouter
 
@@ -128,8 +129,9 @@ def bayesian_3_example(render=None, pedestrians=False):
     }
 
     sim_params = SumoParams(
-                        sim_step=0.1,
+                        sim_step=0.4,
                         render=True,
+                        restart_instance=True,
                         emission_path="./data/")
 
     if render is not None:
@@ -143,26 +145,39 @@ def bayesian_3_example(render=None, pedestrians=False):
              depart_time='0.00',
              start='(1.2)--(1.1)',
              end='(2.1)--(1.1)',
-             depart_pos='43')
+             depart_pos='47')
         pedestrian_params.add(
              ped_id='ped_1',
              depart_time='0.00',
              start='(1.2)--(1.1)',
              end='(2.1)--(1.1)',
-             depart_pos='45')
+             depart_pos='48')
 
     vehicles = VehicleParams()
 
     vehicles.add(
-        veh_id="human",
+        veh_id="rl",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
-            speed_mode="right_of_way",
+            speed_mode="aggressive",
         ),
+        color='red',
+        acceleration_controller=(RuleBasedInferenceController, {"inference_noise": 0.1}),
         num_vehicles=1)
 
+    # vehicles.add(
+    #     veh_id="obstacle",
+    #     routing_controller=(GridRouter, {}),
+    #     car_following_params=SumoCarFollowingParams(
+    #         min_gap=2.5,
+    #         decel=7.5,  # avoid collisions at emergency stops
+    #         speed_mode="right_of_way",
+    #         # max_speed=0.0000000000001
+    #     ),
+    #     acceleration_controller=(RuleBasedIntersectionController, {}),
+    #     num_vehicles=3)
     vehicles.add(
         veh_id="obstacle",
         routing_controller=(GridRouter, {}),
@@ -196,7 +211,7 @@ def bayesian_3_example(render=None, pedestrians=False):
         pedestrians=pedestrian_params,
         initial_config=initial_config)
 
-    env = TestEnv(env_params, sim_params, network)
+    env = Bayesian0NoGridEnv(env_params, sim_params, network)
 
     return Experiment(env)
 
@@ -215,5 +230,5 @@ if __name__ == "__main__":
     exp = bayesian_3_example(pedestrians=pedestrians)
     # run for a set number of rollouts / time steps
     # import ipdb;ipdb.set_trace()
-    exp.run(1, 1000, convert_to_csv=True)
+    exp.run(20, 100, convert_to_csv=True, multiagent=True)
 

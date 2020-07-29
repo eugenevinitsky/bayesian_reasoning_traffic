@@ -3,20 +3,18 @@ stopped and so we should also slow down and stop.
  This script is just for debugging and checking that everything
 actually arrives at the desired time so that the conflict occurs. """
 
-import argparse
-import os
-
-from flow.controllers import BayesianPredictController, RuleBasedInferenceController
+from flow.controllers import RuleBasedInferenceController, RuleBasedIntersectionController
+from flow.controllers.velocity_controllers import FullStop
 from flow.core.experiment import Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
-from flow.envs.multiagent import BayesianL2CooperativeEnv, BayesianL2CooperativeEnvWithQueryEnv
-from flow.envs.multiagent.bayesian_0_no_grid_env import ADDITIONAL_ENV_PARAMS
+from flow.envs.test import TestEnv
+from flow.envs.multiagent.bayesian_0_no_grid_env import ADDITIONAL_ENV_PARAMS, Bayesian0NoGridEnv
 from flow.core.params import SumoCarFollowingParams, VehicleParams
-from flow.controllers import GridRouter, PreTrainedController
-from flow.networks import L2ObscuredNetwork
-from flow.core.params import PedestrianParams
+from flow.controllers import GridRouter
 
-import ray
+from flow.networks import Bayesian4Network
+from flow.core.params import PedestrianParams
+import argparse
 
 
 def gen_edges(col_num, row_num):
@@ -93,7 +91,7 @@ def get_non_flow_params(enter_speed, add_net_params, pedestrians=False):
 
     return initial, net
 
-def l2_obscured_example(render=None, pedestrians=False):
+def bayesian_4_example(render=None, pedestrians=False):
     """
     Perform a simulation of vehicles on a traffic light grid.
 
@@ -131,9 +129,9 @@ def l2_obscured_example(render=None, pedestrians=False):
     }
 
     sim_params = SumoParams(
-                        sim_step=0.4,
-                        restart_instance=True,
+                        sim_step=0.1,
                         render=True,
+                        restart_instance=True,
                         emission_path="./data/")
 
     if render is not None:
@@ -147,78 +145,61 @@ def l2_obscured_example(render=None, pedestrians=False):
              depart_time='0.00',
              start='(1.2)--(1.1)',
              end='(2.1)--(1.1)',
-             depart_pos='43')
-        pedestrian_params.add(
-             ped_id='ped_1',
-             depart_time='0.00',
-             start='(1.2)--(1.1)',
-             end='(2.1)--(1.1)',
-             depart_pos='45')
+             depart_pos='47.1')
+        # pedestrian_params.add(
+        #      ped_id='ped_1',
+        #      depart_time='0.00',
+        #      start='(1.2)--(1.1)',
+        #      end='(2.1)--(1.1)',
+        #      depart_pos='49')
 
     vehicles = VehicleParams()
 
-    if args.pretrained:
-        vehicles.add(
-            veh_id="av",
-            routing_controller=(GridRouter, {}),
-            car_following_params=SumoCarFollowingParams(
-                min_gap=2.5,
-                decel=7.5,  # avoid collisions at emergency stops
-                speed_mode="aggressive",
-            ),
-            acceleration_controller=(PreTrainedController,
-                                     {"path": os.path.expanduser(
-                                         "/Users/eugenevinitsky/Desktop/Research/Data/bayesian_traffic/07-23-2020/l0_training_ppo_veh4_rollout240_30pen_filter_ped/l0_training_ppo_veh4_rollout240_30pen_filter_ped/PPO_2_gamma=0.9_2_gamma=0.9_2020-07-23_17-02-585x7qwgmx"),
-                                      "checkpoint_num": str(200)}),
-            color='yellow',
-            num_vehicles=1)
-    else:
-        vehicles.add(
-            veh_id="rl",
-            routing_controller=(GridRouter, {}),
-            car_following_params=SumoCarFollowingParams(
-                min_gap=2.5,
-                decel=7.5,  # avoid collisions at emergency stops
-                speed_mode="right_of_way",
-            ),
-            acceleration_controller=(RuleBasedInferenceController, {}),
-            num_vehicles=1)
-
     vehicles.add(
-        veh_id="temp",
+        veh_id="obstacle",
         routing_controller=(GridRouter, {}),
         car_following_params=SumoCarFollowingParams(
             min_gap=2.5,
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="right_of_way",
+            # max_speed=0.0000000000001
         ),
-        acceleration_controller=(BayesianPredictController, {}),
-        color='red',
+        acceleration_controller=(RuleBasedIntersectionController, {}),
         num_vehicles=1)
 
-    env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
+    vehicles.add(
+        veh_id="av",
+        routing_controller=(GridRouter, {}),
+        car_following_params=SumoCarFollowingParams(
+            min_gap=2.5,
+            decel=7.5,  # avoid collisions at emergency stops
+            speed_mode="aggressive",
+        ),
+        color='red',
+        acceleration_controller=(RuleBasedInferenceController, {'inference_noise': 0.0}),
+        num_vehicles=1)
 
     additional_net_params = {
         "grid_array": grid_array,
         "speed_limit": 35,
-        "horizontal_lanes": 2,
-        "vertical_lanes": 2
+        "horizontal_lanes": 1,
+        "vertical_lanes": 1
     }
-
     initial_config, net_params = get_non_flow_params(
         enter_speed=v_enter,
         add_net_params=additional_net_params,
         pedestrians=pedestrians)
 
-    network = L2ObscuredNetwork(
-        name="l2_obscured",
+    network = Bayesian4Network(
+        name="bayesian_4",
         vehicles=vehicles,
         net_params=net_params,
         pedestrians=pedestrian_params,
         initial_config=initial_config)
 
-    env = BayesianL2CooperativeEnvWithQueryEnv(env_params, sim_params, network)
-    env.query_env = BayesianL2CooperativeEnv(env_params, sim_params, network)
+    env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
+
+    env = Bayesian0NoGridEnv(env_params, sim_params, network)
 
     return Experiment(env)
 
@@ -229,17 +210,13 @@ if __name__ == "__main__":
     parser.add_argument("--pedestrians",
                         help="use pedestrians, sidewalks, and crossings in the simulation",
                         action="store_true")
-    parser.add_argument("--pretrained",
-                        action="store_true")
 
     args = parser.parse_args()
     pedestrians = args.pedestrians
 
     # import the experiment variable
-    exp = l2_obscured_example(pedestrians=pedestrians)
+    exp = bayesian_4_example(pedestrians=pedestrians)
     # run for a set number of rollouts / time steps
     # import ipdb;ipdb.set_trace()
-    if args.pretrained:
-        ray.init(local_mode=True)
-    exp.run(1, 1000, multiagent=True)
+    exp.run(100, 1000, convert_to_csv=False, multiagent=True)
 
