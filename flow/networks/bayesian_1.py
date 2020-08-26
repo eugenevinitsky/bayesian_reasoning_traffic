@@ -344,7 +344,7 @@ class Bayesian3Network(Bayesian1Network):
         car_3_start_edge = start_edges[start_indices[2]]
         car_4_start_edge = start_edges[start_indices[3]]
 
-        car_1_start_pos = 35
+        car_1_start_pos = 45
         car_2_start_pos = 30
         car_3_start_pos = 40
         car_4_start_pos = 50
@@ -355,6 +355,24 @@ class Bayesian3Network(Bayesian1Network):
         start_lanes = [1, 0, 0, 0]
 
         return start_pos, start_lanes
+
+    def specify_routes(self, net_params=None):
+
+        car_1_start_edge = "(1.2)--(1.1)"
+        car_1_end_edge = "(1.1)--(1.0)"
+        car_2_start_edge = "(1.2)--(1.1)"
+        car_2_end_edge = "(1.1)--(1.0)"
+        car_3_start_edge = "(1.2)--(1.1)"
+        car_3_end_edge = "(1.1)--(1.0)"
+        car_4_start_edge = "(1.2)--(1.1)"
+        car_4_end_edge = "(1.1)--(1.0)"
+        rts = {car_1_start_edge: [car_1_start_edge, car_1_end_edge],
+               car_2_start_edge: [car_2_start_edge, car_2_end_edge],
+               car_3_start_edge: [car_3_start_edge, car_3_end_edge],
+               car_4_start_edge: [car_4_start_edge, car_4_end_edge]
+               }
+
+        return rts
 
     def randomize_pedestrian_routes(self, pedestrians):
         pass
@@ -404,7 +422,7 @@ class Bayesian4Network(Bayesian1Network):
         car_1_start_edge = start_edges[start_indices[0]]
         car_2_start_edge = start_edges[start_indices[1]]
 
-        car_1_start_pos = 48
+        car_1_start_pos = 53.0
         car_2_start_pos = 49
 
         start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos)]
@@ -471,7 +489,7 @@ class L2ObscuredNetwork(Bayesian1Network):
         car_2_start_edge = start_edges[start_indices[1]]
 
         car_1_start_pos = 20
-        car_2_start_pos = 25
+        car_2_start_pos = 30
 
         start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos)]
         # In SUMO, lanes are zero-indexed starting from the right-most lane

@@ -255,7 +255,7 @@ class Bayesian0Network(TrafficLightGridNetwork):
                 ped_num = int(ped_id.split("ped_")[1])
                 # place peds where they're likely to collide with vehicle - teach vehicle to go when it doesn't see ped
                 # guard against the vehicle from stochastically stopping
-                pedestrians.params[ped_id]['departPos'] = str(30.1 + ped_spacing*ped_num)
+                pedestrians.params[ped_id]['departPos'] = str(43.1 + ped_spacing * ped_num)
 
         else:
             for ped_id in pedestrians.params:
@@ -368,13 +368,13 @@ class Bayesian0Network(TrafficLightGridNetwork):
 
         else:
             car_1_start_edge = "(2.1)--(1.1)"
-            car_1_start_pos = 20
+            car_1_start_pos = 0
             car_2_start_edge = "(1.2)--(1.1)"
-            car_2_start_pos = 10
+            car_2_start_pos = 5
             car_3_start_edge = "(1.0)--(1.1)"
-            car_3_start_pos = 0
+            car_3_start_pos = 7
             car_4_start_edge = "(0.1)--(1.1)"
-            car_4_start_pos = 0
+            car_4_start_pos = 8
 
             start_pos = [(car_1_start_edge, car_1_start_pos), (car_2_start_edge, car_2_start_pos), (car_3_start_edge, car_3_start_pos),
                          (car_4_start_edge, car_4_start_pos)]

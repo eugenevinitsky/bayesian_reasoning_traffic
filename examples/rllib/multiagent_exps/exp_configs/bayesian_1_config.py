@@ -48,7 +48,6 @@ def make_flow_params():
     # support traffic light compliance
     vehicles = VehicleParams()
 
-    #TODO(klin) make sure the autonomous vehicle being placed here is placed in the right position
     vehicles.add(
         veh_id="human",
         acceleration_controller=(SimCarFollowingController, {}),

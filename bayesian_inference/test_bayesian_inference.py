@@ -56,7 +56,8 @@ TRANSITION_MATRIX = np.array([a, b])
 
 # Convert constants to uppercase
 K = 5
-NOISE_STD = 0.0
+NOISE_STD = 0.1001
+FONT_SIZE = 20
 ped_idx_lst = [10, 11, 12, 13]
 ped_front = ped_idx_lst[0]
 ped_back = ped_idx_lst[-1]
@@ -260,18 +261,20 @@ def run_env(env, agent, flow_params, is_discrete, rule_based, render):
 
                             for str_comb, lst_comb in zip(joint_ped_combos_str, joint_ped_combos_int_list):
 
+                                int_list = [int(element) for element in lst_comb]
                                 s_all_modified = np.copy(
                                     s_all)  # s_all_modified = hypothetical state that an agent observes
                                 s_all_modified[ped_idx_lst] = lst_comb
                                 #                                 _, _, logit = agent.compute_action(s_all_modified, policy_id=policy_map_fn(agent_id), full_fetch=True)
                                 if rule_based:
-                                    mu = env.k.vehicle.get_acc_controller(agent_id).get_action_with_ped(env,
-                                                                                                        s_all_modified)
+                                    mu = env.k.vehicle.get_acc_controller(agent_id).get_action_with_ped(env, s_all_modified,
+                                                                                                        ped=int_list, change_speed_mode=False)
                                     sigma = NOISE_STD
                                     # noise up your model
                                     if sigma > 0.0:
                                         mu += np.random.normal(loc=0.0, scale=sigma)
-                                        joint_likelihood_density = max(min(accel_pdf(mu, sigma, action_), 10.0), 0.01)
+                                        # joint_likelihood_density = max(min(accel_pdf(mu, sigma, action_), 10.0), 0.01)
+                                        joint_likelihood_density = accel_pdf(mu, sigma, action_)
                                     else:
                                         if mu == action_:
                                             joint_likelihood_density = 1
@@ -470,61 +473,86 @@ def run_env(env, agent, flow_params, is_discrete, rule_based, render):
             b_ = single_posteriors_fixed[single_posterior_str]
             c_ = single_posteriors_updated_K[single_posterior_str]
             d_ = single_posteriors_filter[single_posterior_str]
+            if val == 1:
+                title = 'Probability of Pedestrian'
+            else:
+                title = 'Probability of No Pedestrian'
             plot_2_lines(a_, b_, [f'Pr(ped in grid {loc} = {val}) using updated priors K = all',
                                   f'Pr(ped in grid {loc} = {val}) using fixed priors'],
-                         'figures/all_v_fixed_loc_{}_val_{}'.format(loc, val))
+                         'figures/all_v_fixed_loc_{}_val_{}'.format(loc, val),
+                         fig_title=title)
             plot_2_lines(c_, b_, [f'Pr(ped in grid {loc} = {val}) using updated priors K = 5',
                                   f'Pr(ped in grid {loc} = {val}) using fixed priors'],
-                         'figures/5_v_fixed_loc_{}_val_{}'.format(loc, val))
-            plot_2_lines(d_, b_, [f'Pr(ped in grid {loc} = {val}) using filtered priors',
-                                  f'Pr(ped in grid {loc} = {val}) using fixed priors'],
-                         'figures/filter_v_fixed_loc_{}_val_{}'.format(loc, val))
+                         'figures/5_v_fixed_loc_{}_val_{}'.format(loc, val), fig_title=title)
+            plot_2_lines(d_, c_, [f'Filtered priors',
+                                  f'Updated priors'],
+                         'figures/filter_v_updated_loc_{}_val_{}'.format(loc, val), fig_title=title)
 
-    fig = plt.figure(figsize=(15, 15))
     y0 = visible_pedestrian_dct[0]
     y1 = visible_pedestrian_dct[1]
     y2 = visible_pedestrian_dct[2]
     y3 = visible_pedestrian_dct[3]
 
-    vis_ped_0 = plt.subplot(2, 4, 1)
+    fig = plt.figure(figsize=(12, 12))
+    vis_ped_0 = plt.subplot(1, 1, 1)
     plt.plot(y0, 'o-')
     vis_ped_0.set_title('Pedestrian in loc 0')
-    vis_ped_0.set_xlabel('time (s)')
-    vis_ped_0.set_ylabel('in loc 1?')
+    vis_ped_0.set_xlabel('Time (s)')
+    vis_ped_0.set_ylabel('Pedestrian Boolean Value')
     vis_ped_0.set_ylim([-1, 1])
+    for item in ([vis_ped_0.title, vis_ped_0.xaxis.label, vis_ped_0.yaxis.label] +
+                 vis_ped_0.get_xticklabels() + vis_ped_0.get_yticklabels()):
+        item.set_fontsize(FONT_SIZE)
+    plt.savefig('figures/ground_truth_0.png')
 
-    vis_ped_1 = plt.subplot(2, 4, 2)
+    fig = plt.figure(figsize=(12, 12))
+    vis_ped_1 = plt.subplot(1, 1, 1)
     plt.plot(y1, 'o-')
     vis_ped_1.set_title('Pedestrian in loc 1')
-    vis_ped_1.set_xlabel('time (s)')
-    vis_ped_1.set_ylabel('in loc 1?')
+    vis_ped_1.set_xlabel('Time (s)')
+    vis_ped_1.set_ylabel('Pedestrian Boolean Value')
     vis_ped_1.set_ylim([-1, 1])
+    for item in ([vis_ped_1.title, vis_ped_1.xaxis.label, vis_ped_1.yaxis.label] +
+                 vis_ped_1.get_xticklabels() + vis_ped_1.get_yticklabels()):
+        item.set_fontsize(FONT_SIZE)
+    plt.savefig('figures/ground_truth_1.png')
 
-    vis_ped_2 = plt.subplot(2, 4, 3)
-    vis_ped_2.plot(y2, '.-')
+    fig = plt.figure(figsize=(12, 12))
+    vis_ped_2 = plt.subplot(1, 1, 1)
+    plt.plot(y2, 'o-')
     vis_ped_2.set_title('Pedestrian in loc 2')
-
-    vis_ped_2.set_xlabel('time (s)')
-    vis_ped_2.set_ylabel('in loc 2?')
+    vis_ped_2.set_xlabel('Time (s)')
+    vis_ped_2.set_ylabel('Pedestrian Boolean Value')
     vis_ped_2.set_ylim([-1, 1])
+    for item in ([vis_ped_2.title, vis_ped_2.xaxis.label, vis_ped_2.yaxis.label] +
+                 vis_ped_2.get_xticklabels() + vis_ped_2.get_yticklabels()):
+        item.set_fontsize(FONT_SIZE)
+    plt.savefig('figures/ground_truth_2.png')
 
-    vis_ped_3 = plt.subplot(2, 4, 4)
-    vis_ped_3.plot(y3, '.-')
-    vis_ped_3.set_title('Pedestrian in loc 3')
-
-    vis_ped_3.set_xlabel('time (s)')
-    vis_ped_3.set_ylabel('in loc 3?')
+    fig = plt.figure(figsize=(12, 12))
+    vis_ped_3 = plt.subplot(1, 1, 1)
+    plt.plot(y3, 'o-')
+    vis_ped_3.set_title('Pedestrian in loc 2')
+    vis_ped_3.set_xlabel('Time (s)')
+    vis_ped_3.set_ylabel('Pedestrian Boolean Value')
     vis_ped_3.set_ylim([-1, 1])
+    for item in ([vis_ped_3.title, vis_ped_3.xaxis.label, vis_ped_3.yaxis.label] +
+                 vis_ped_3.get_xticklabels() + vis_ped_3.get_yticklabels()):
+        item.set_fontsize(FONT_SIZE)
+    plt.savefig('figures/ground_truth_3.png')
 
+    fig = plt.figure(figsize=(12, 12))
     print(intersection_status, len(intersection_status))
-    intersection = plt.subplot(2, 4, 5)
+    intersection = plt.subplot(1, 1, 1)
     intersection.plot(intersection_status)
-    intersection.set_title('-1 = approaching, 0 = on intersection, 1 = past')
-    intersection.set_xlabel('time (s)')
-    intersection.set_ylabel('rl car location')
+    intersection.set_title('Time vs. Car Position')
+    intersection.set_xlabel('Time (s)')
+    intersection.set_ylabel('Observed Car Location')
     intersection.set_ylim([-1, 1])
-
-    plt.savefig('figures/ground_truth.png')
+    for item in ([intersection.title, intersection.xaxis.label, intersection.yaxis.label] +
+                 intersection.get_xticklabels() + intersection.get_yticklabels()):
+        item.set_fontsize(FONT_SIZE)
+    plt.savefig('figures/vehicle_location.png')
 
     #     sigma = plt.subplot(2, 4, 6)
     #     sigma.plot(sigma_vals)
@@ -745,15 +773,23 @@ def run_transfer(args, action_pairs_lst=[], imitation_model=True, is_discrete=Fa
     return action_pairs_lst
 
 
-def plot_2_lines(y1, y2, legend, title, viewable_ped=False):
-    plt.figure()
+def plot_2_lines(y1, y2, legend, title, fig_title, viewable_ped=False):
+    plt.figure(figsize=(12, 12))
+    vis_ped_0 = plt.subplot(1, 1, 1)
     x = np.arange(len(y1))
     plt.plot(x, y1)
     plt.plot(x, y2)
     if viewable_ped:
         plt.plot(x, viewable_ped)
-    plt.legend(legend, bbox_to_anchor=(0.5, 1.05), loc=3, borderaxespad=0.)
+    # plt.legend(legend, bbox_to_anchor=(0.5, 1.05), loc=3, borderaxespad=0.)
+    plt.legend(legend)
     plt.ylim(-0.1, 1.1)
+    plt.xlabel('Time')
+    plt.ylabel('Probability')
+    plt.title(fig_title)
+    for item in ([vis_ped_0.title, vis_ped_0.xaxis.label, vis_ped_0.yaxis.label] +
+                 vis_ped_0.get_xticklabels() + vis_ped_0.get_yticklabels()):
+        item.set_fontsize(FONT_SIZE)
 
     # plt.draw()
     # plt.pause(0.001)

@@ -11,7 +11,7 @@ class BayesianL2CooperativeEnv(Bayesian0NoGridEnv):
 
     def compute_reward(self, rl_actions, **kwargs):
         reward = 0
-        if self.k.vehicle.get_position('rl_0') > 45.0:
+        if self.k.vehicle.get_position('rl_0') > 40.0:
             reward = -10
         reward_dict = {}
         for veh_id in self.k.vehicle.get_ids():
@@ -19,10 +19,10 @@ class BayesianL2CooperativeEnv(Bayesian0NoGridEnv):
                 reward_dict[veh_id] = reward
             else:
                 speed = self.k.vehicle.get_speed(veh_id)
-                if speed > 5.0:
+                if speed > 20.0:
                     reward_dict[veh_id] = -1
                 else:
-                    reward_dict[veh_id] = self.k.vehicle.get_speed(veh_id)
+                    reward_dict[veh_id] = self.k.vehicle.get_speed(veh_id) / 10.0
         return reward_dict
 
 class BayesianL2CooperativeEnvWithQueryEnv(BayesianL2CooperativeEnv):

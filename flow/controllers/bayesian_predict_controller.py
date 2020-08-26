@@ -1,10 +1,12 @@
+from copy import copy
 from flow.controllers.base_controller import BaseController
+from itertools import combinations_with_replacement
 # from examples.sumo.bayesian_1_runner import bayesian_1_example as query_env_generator
 
 import numpy as np
 
 class BayesianPredictController(BaseController):
-    def __init__(self, veh_id, car_following_params, look_ahead_len=3):
+    def __init__(self, veh_id, car_following_params, look_ahead_len=4):
         BaseController.__init__(self, veh_id, car_following_params, delay=1.0)
 
         self.look_ahead_len = look_ahead_len
@@ -43,7 +45,8 @@ class BayesianPredictController(BaseController):
             controller = env.k.vehicle.get_acc_controller(veh_id)
             if hasattr(controller, 'priors'):
                 query_controller = env.query_env.k.vehicle.get_acc_controller(veh_id)
-                query_controller.priors = controller.priors
+                # reset it because we would never know what the priors are
+                query_controller.priors = {} #copy(controller.priors)
 
         env.query_env.step(None)
 
@@ -83,22 +86,23 @@ class BayesianPredictController(BaseController):
         self.sync_envs(env)
 
         # Perform recursive look ahead
-        _, _, action_scores_ped = self.look_ahead(env, self.look_ahead_len)
+        best_action_sequence, best_score, action_scores_ped = self.look_ahead(env, self.look_ahead_len)
 
         # Compute weighted average for scores to determine best action
-        best_action = 0
-        best_score = 0
-        for a in action_scores_ped:
-            score = (ped_prob * action_scores_ped[a]) + \
-                    ((1 - ped_prob) * action_scores_no_ped[a])
-            if score >= best_score:
-                best_score = score
-                best_action = a
+        # best_action = (0.0) * self.look_ahead_len
+        # best_score = -1e6
+        # for a in action_scores_ped:
+        #     score = (ped_prob * action_scores_ped[a]) + \
+        #             ((1 - ped_prob) * action_scores_no_ped[a])
+        #     if score >= best_score:
+        #         best_score = score
+        #         best_action = a
 
         # store it for replay
-        self.accel = best_action
-        # import ipdb; ipdb.set_trace()
-        return best_action
+        self.accel = best_action_sequence[0]
+        if best_score < 0:
+            import ipdb; ipdb.set_trace()
+        return best_action_sequence[0]
 
     def store_info(self, env):
         # save current state information
@@ -126,43 +130,54 @@ class BayesianPredictController(BaseController):
         '''
 
         # Set score that vehicle tries to maximize
-        score = self.compute_reward(env)
+        # score = self.compute_reward(env)
 
         near_exit = self.check_near_exit(env.query_env)
         # base case or collision (negative score)
-        if steps == 0 or score < 0 or near_exit:
-            return 0, score, {}
+        # if steps == 0 or score < 0 or near_exit:
+
+        # don't do any control once you're near the exit
+        if near_exit:
+            return 0, 0, {}
 
         # Different accelerations to iterate over
         accels = [-4.5, 0, 2.6] # TODO:add as a param
 
         # save current state information
-        states, ped_states, controllers = self.store_info(env.query_env)
+        states, ped_states, controllers = self.store_info(env)
 
         action_scores = {}
-        best_action = 0
+        best_action = [0, 0, 0]
         best_score = -1e6
 
         # Iterate through each acceleration
-        for a in accels:
+        for action_comb in combinations_with_replacement(accels, steps):
+            score_total = 0
+            for a in action_comb:
 
-            # Forward step
-            env.query_env.k.vehicle.get_acc_controller(self.veh_id).set_accel(a)
-            env.query_env.step(None)
-            # import ipdb; ipdb.set_trace()
-            _, score, _ = self.look_ahead(env, steps - 1)
-            # print('vehicle position in env is ', env.k.vehicle.get_position(self.veh_id))
-            # print('vehicle position in query env is ', env.query_env.k.vehicle.get_position(self.veh_id))
-            # print('examining action {} on step {}'.format(a, steps))
+                # Forward step
+                env.query_env.k.vehicle.get_acc_controller(self.veh_id).set_accel(a)
+                env.query_env.step(None)
+                score = self.compute_reward(env)
+                score_total += score
+                # import ipdb; ipdb.set_trace()
+                # _, score, _ = self.look_ahead(env, steps - 1)
+                # print('vehicle position in env is ', env.k.vehicle.get_position(self.veh_id))
+                # print('vehicle position in query env is ', env.query_env.k.vehicle.get_position(self.veh_id))
+                # print('examining action {} on step {}'.format(a, steps))
 
-            # Update if best accel so far
-            action_scores[a] = score
-            if steps == 3:
-                print('score of action {} is {}'.format(a, score))
-                print('speed of vehicle is {}'.format(env.query_env.k.vehicle.get_speed('temp_0')))
-            if score >= best_score:
-                best_score = score
-                best_action = a
+                # Update if best accel so far
+                # action_scores[a] = score
+            # if steps == 3:
+            #     print('score of action {} is {}'.format(a, score))
+            #     print('speed of vehicle is {}'.format(env.query_env.k.vehicle.get_speed('temp_0')))
+
+            if score_total < 0 and action_comb == [-4.5, -4.5, -4.5, -4.5]:
+                import ipdb; ipdb.set_trace()
+            # break ties by going slower earlier
+            if (score_total == best_score and action_comb[0] < best_action[0]) or score_total > best_score:
+                best_score = score_total
+                best_action = action_comb
 
             # Restore query_env to before the forward step was taken
             for veh_id in env.query_env.k.vehicle.get_ids():
@@ -181,6 +196,8 @@ class BayesianPredictController(BaseController):
             # Take a step to reset vehicle positions and speed
             env.query_env.step(None)
 
+        # make sure the query env has the right action
+        env.query_env.k.vehicle.get_acc_controller(self.veh_id).accel = best_action[0]
         return best_action, best_score, action_scores
 
     def compute_reward(self, env):
@@ -307,7 +324,7 @@ class BayesianManualController(BaseController):
     def get_accel(self, env):
         accel = self.accel
         # TODO(@evinitsky) why is this here?
-        # self.accel = None
+        self.accel = None
         return accel
 
     def get_action(self, env, allow_junction_control=True):
