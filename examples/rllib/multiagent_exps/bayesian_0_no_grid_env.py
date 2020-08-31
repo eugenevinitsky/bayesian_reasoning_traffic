@@ -191,7 +191,9 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 # whether to grid the cone "search_veh_radius" in front of us into 6 grid cells
                 "use_grid": False,
                 # how much to penalize a collision
-                "ped_collision_penalty": -abs(args.ped_collision_penalty)
+                "ped_collision_penalty": -abs(args.ped_collision_penalty),
+                # whether we use the multi-agent algorithm MADDPG
+                "maddpg": args.algo == "MADDPG"
             },
         ),
         # network-related parameters (see flow.core.params.NetParams and the
@@ -519,6 +521,84 @@ def setup_exps_PPO(args, flow_params):
             'policy_mapping_fn': tune.function(policy_mapping_fn),
             'policies_to_train': ['av']
         }
+    })
+
+    return alg_run, env_name, config
+
+
+def setup_exps_MADDPG(args, flow_params):
+    """
+    Experiment setup with PPO using RLlib.
+    Parameters
+    ----------
+    flow_params : dictionary of flow parameters
+    Returns
+    -------
+    str
+        name of the training algorithm
+    str
+        name of the gym environment to be trained
+    dict
+        training configuration parameters
+    """
+
+    from flow.algorithms.maddpg.maddpg import DEFAULT_CONFIG as MADDPG_DEFAULT_CONFIG, MADDPGTrainer
+    alg_run = MADDPGTrainer
+    config = MADDPG_DEFAULT_CONFIG.copy()
+    config['no_done_at_end'] = True
+    config['gamma'] = 0.95  # discount rate
+    if args.grid_search:
+        config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
+        config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
+        config['n_step'] = tune.grid_search([1, 10])
+    config['horizon'] = args.horizon
+    config['observation_filter'] = 'NoFilter'
+
+
+    # define callbacks for tensorboard
+
+    config['callbacks'] = {
+            "on_episode_start":tune.function(on_episode_start),
+            "on_episode_step":tune.function(on_episode_step),
+            "on_episode_end":tune.function(on_episode_end)
+    }
+
+    # save the flow params for replay
+    flow_json = json.dumps(
+        flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
+    config['env_config']['flow_params'] = flow_json
+    config['env_config']['run'] = alg_run
+
+    create_env, env_name = make_create_env(params=flow_params, version=0)
+
+    # Register as rllib env
+    register_env(env_name, create_env)
+
+    env = create_env()
+    observation_space_dict = {i: env.observation_space for i in range(env.max_num_agents)}
+    action_space_dict = {i: env.action_space for i in range(env.max_num_agents)}
+
+    def gen_policy(i):
+        return (
+            None,
+            env.observation_space,
+            env.action_space,
+            {
+                "agent_id": i,
+                "use_local_critic": False,
+                "obs_space_dict": observation_space_dict,
+                "act_space_dict": action_space_dict,
+            }
+        )
+
+    policies = {"av": gen_policy(0)}
+    policy_ids = list(policies.keys())
+    config.update({"multiagent": {
+                    "policies": policies,
+                    "policy_mapping_fn": ray.tune.function(
+                        lambda i: "av"
+                    )
+                }
     })
 
     return alg_run, env_name, config

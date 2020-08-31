@@ -453,8 +453,8 @@ class Bayesian0NoGridEnv(MultiEnv):
                 # if inside_intersection and self.k.vehicle.get_speed(rl_id) < 1.0:
                 #     reward -= 0.1
 
-                if reward < 0:
-                    import ipdb; ipdb.set_trace()
+                # if reward < 0:
+                #     import ipdb; ipdb.set_trace()
                 rewards[rl_id] = reward
                 self.reward[rl_id] = reward
 
@@ -590,6 +590,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         # it can take a little bit for all the AVs to enter the system
         if veh_crash or ped_crash or (no_avs_left and self.time_counter > 50 / self.sim_step) \
                 or self.time_counter >= self.env_params.horizon:
+            # import ipdb; ipdb.set_trace()
             done['__all__'] = True
         else:
             done['__all__'] = False
@@ -606,6 +607,11 @@ class Bayesian0NoGridEnv(MultiEnv):
                                                                       veh_id not in self.done_ids)]
 
         done_ids = [done_id for done_id in done_ids if 'human' not in done_id]
+        # vehicles might not have exited so if done all is true, we need to return a state for
+        # every vehicle currently in the system that hasn't recieved a done yet
+        if done["__all__"]:
+            done_ids += [veh_id for veh_id in self.k.vehicle.get_rl_ids() if (veh_id not in self.done_ids
+                                                                              and veh_id not in done_ids)]
 
         # if crash:
         #     import ipdb; ipdb.set_trace()
@@ -617,8 +623,14 @@ class Bayesian0NoGridEnv(MultiEnv):
                 reward[rl_id] = self.env_params.additional_params["ped_collision_penalty"]
             else:
                 self.exit_time[rl_id] = self.time_counter * self.sim_step
-                self.reward[rl_id] = 1.0
-                reward[rl_id] = 1.0
+                # the episode ended because of a crash so we probably shouldn't be getting a postiive
+                # reward for it
+                if done['__all__']:
+                    self.reward[rl_id] = 0.0
+                    reward[rl_id] = 0.0
+                else:
+                    self.reward[rl_id] = 1.0
+                    reward[rl_id] = 1.0
 
             states[rl_id] = -1 * np.ones(self.observation_space.shape[0])
             self.done_ids.update([rl_id])

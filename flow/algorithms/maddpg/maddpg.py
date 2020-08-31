@@ -31,6 +31,8 @@ DEFAULT_CONFIG = with_common_config({
     "agent_id": None,
     # Use a local critic for this policy.
     "use_local_critic": False,
+    # How many agent policies to expect
+    "num_agents": 1,
 
     # === Evaluation ===
     # Evaluation interval
