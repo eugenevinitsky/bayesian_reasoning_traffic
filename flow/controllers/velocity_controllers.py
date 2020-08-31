@@ -2,7 +2,7 @@
 
 # TODO(@evinitsky) move to util
 # from flow.utils.rllib import create_agent_from_path
-from flow.core.params import SumoCarFollowingParams
+# from flow.core.params import SumoCarFollowingParams
 from flow.controllers.base_controller import BaseController
 from bayesian_inference.inference import get_filtered_posteriors
 import numpy as np
