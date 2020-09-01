@@ -351,19 +351,23 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
                 #                                             {}),
                 #                             veh_id)
                 # the second condition is just so videos don't look stupid
-                if np.any(np.array(updated_ped_probs) > 0.8) and env.k.vehicle.get_position(self.veh_id) > 45.0:
+                print(f'vehicle id for RuleBasedInferenceController is {self.veh_id}')
+
+                if np.any(np.array(updated_ped_probs) > 0.8) and env.k.vehicle.get_position(self.veh_id) > 20.0:
                     # we use this to check if we got it correctly. We should uh, automate this.
                     # TODO(@evinitsky) automate this
-                    if not hasattr(env, 'query_env'):
-                        if env.time_counter < 20.0:
-                            print('acceleration is', acceleration)
-                            print(updated_ped_probs)
+                    # import ipdb; ipdb.set_trace()
+                    # if not hasattr(env, 'query_env'):
+                    #     if env.time_counter < 2000.0:
+                            # print('acceleration is', acceleration)
+                            # print(updated_ped_probs)
                     get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
                                             np.zeros(env.observation_space.shape[0]),
                                             self.priors.get(veh_id,
                                                             {}),
                                             veh_id)
                     action = -4.5
+                    print(f'action set to -4.5 for {self.veh_id}')
 
                 self.accel = action
 
