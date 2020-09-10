@@ -21,7 +21,7 @@ dependencies:
         - matplotlib==3.0.0
         - dill
         - lz4
-        - ray==0.8.0
+        - ray==0.8.4
         - setproctitle
         - psutil
         - opencv-python

@@ -113,6 +113,9 @@ def construct_agent(args):
         config["evaluation_interval"] = True
         if config_run == "CustomPPO":
             agent_cls = get_agent_class("PPO")
+        elif config_run == "MADDPG":
+            from flow.algorithms.maddpg.maddpg import MADDPGTrainer
+            agent_cls = MADDPGTrainer
         else:
             if config_run == 'DQN':
                 config['exploration_config']['final_epsilon'] = 0

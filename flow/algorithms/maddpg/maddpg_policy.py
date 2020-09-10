@@ -77,15 +77,26 @@ class MADDPGTFPolicy(MADDPGPostprocessing, TFPolicy):
                 raise UnsupportedSpaceException(
                     "Space {} is not supported.".format(space))
 
+        # obs_space_n = [
+        #     _make_continuous_space(space)
+        #     for _, (_, space, _,
+        #             _) in range(config["num_agents"])
+        # ]
+        # act_space_n = [
+        #     _make_continuous_space(space)
+        #     for _, (_, _, space,
+        #             _) in sorted(config["num_agents"])
+        # ]
+
         obs_space_n = [
             _make_continuous_space(space)
             for _, (_, space, _,
-                    _) in sorted(config["num_agents"])
+                    _) in sorted(config["multiagent"]["policies"].items())
         ]
         act_space_n = [
             _make_continuous_space(space)
             for _, (_, _, space,
-                    _) in sorted(config["num_agents"])
+                    _) in sorted(config["multiagent"]["policies"].items())
         ]
 
         # _____ Placeholders
@@ -242,10 +253,10 @@ class MADDPGTFPolicy(MADDPGPostprocessing, TFPolicy):
             self,
             obs_space,
             act_space,
-            self.sess,
-            action_logp=actor_feature,
+            config=config,
+            sess=self.sess,
             obs_input=obs_ph_n[agent_id],
-            action_sampler=act_sampler,
+            sampled_action=act_sampler,
             loss=actor_loss + critic_loss,
             loss_inputs=loss_inputs)
 

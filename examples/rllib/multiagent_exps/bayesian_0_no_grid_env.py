@@ -183,7 +183,7 @@ def make_flow_params(args, pedestrians=False, render=False, discrete=False):
                 # how large of a radius to search for pedestrians in for a given vehicle in meters (create effect of only seeing pedestrian only when relevant)
                 "search_ped_radius": 22,
                 # whether or not we have a discrete action space,
-                "discrete": discrete,
+                "discrete": discrete and not args.algo == "MADDPG",
                 # whether to randomize which edge the vehicles are coming from
                 "randomize_vehicles": args.randomize_vehicles,
                 # whether to append the prior into the state
@@ -546,14 +546,18 @@ def setup_exps_MADDPG(args, flow_params):
     alg_run = MADDPGTrainer
     config = MADDPG_DEFAULT_CONFIG.copy()
     config['no_done_at_end'] = True
-    config['gamma'] = 0.95  # discount rate
+    config['gamma'] = 0.99  # discount rate
+    config['n_step'] = 10
     if args.grid_search:
-        config['actor_lr'] = tune.grid_search([1e-2, 1e-3])
-        config['critic_lr'] = tune.grid_search([1e-2, 1e-3])
         config['n_step'] = tune.grid_search([1, 10])
+        config['train_batch_size'] = tune.grid_search([100, 1024])
+        config['rollout_fragment_length'] = tune.grid_search([10, 100])
     config['horizon'] = args.horizon
     config['observation_filter'] = 'NoFilter'
 
+    config["evaluation_interval"] = 20
+    # Number of episodes to run per evaluation period.
+    config["evaluation_num_episodes"] = 4
 
     # define callbacks for tensorboard
 
@@ -567,17 +571,19 @@ def setup_exps_MADDPG(args, flow_params):
     flow_json = json.dumps(
         flow_params, cls=FlowParamsEncoder, sort_keys=True, indent=4)
     config['env_config']['flow_params'] = flow_json
-    config['env_config']['run'] = alg_run
+    config['env_config']['run'] = "MADDPG"
+    # config['learning_starts'] = 200
 
     create_env, env_name = make_create_env(params=flow_params, version=0)
+    config['env'] = env_name
 
-    # Register as rllib env
-    register_env(env_name, create_env)
-
+    # TODO(@evinitsky) remove hardcoding
     env = create_env()
-    observation_space_dict = {i: env.observation_space for i in range(env.max_num_agents)}
-    action_space_dict = {i: env.action_space for i in range(env.max_num_agents)}
+    # env.step(None)
+    observation_space_dict = {i: env.observation_space for i in range(4)}
+    action_space_dict = {i: env.action_space for i in range(4)}
 
+    config['num_agents'] = 4
     def gen_policy(i):
         return (
             None,
@@ -591,16 +597,14 @@ def setup_exps_MADDPG(args, flow_params):
             }
         )
 
-    policies = {"av": gen_policy(0)}
-    policy_ids = list(policies.keys())
+    policies = {"av_{}".format(i): gen_policy(i) for i in range(4)}
     config.update({"multiagent": {
                     "policies": policies,
                     "policy_mapping_fn": ray.tune.function(
-                        lambda i: "av"
+                        lambda i: i
                     )
                 }
     })
-
     return alg_run, env_name, config
 
 
@@ -811,6 +815,8 @@ if __name__ == '__main__':
         alg_run, env_name, config = setup_exps_DQN(args, flow_params)
     elif ALGO == 'TD3':
         alg_run, env_name, config = setup_exps_TD3(args, flow_params)
+    elif ALGO == 'MADDPG':
+        alg_run, env_name, config = setup_exps_MADDPG(args, flow_params)
     else:
         raise NotImplementedError
 

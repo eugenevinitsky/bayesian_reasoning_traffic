@@ -182,6 +182,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     self.agent = get_inferrer(path=path_to_inferrer, inferrer_type="imitation")
 
         self.controller_dict = {}
+        self.maddpg = self.env_params.additional_params['maddpg']
 
     @property
     def observation_space(self):
@@ -231,16 +232,18 @@ class Bayesian0NoGridEnv(MultiEnv):
                 else:
                     max_decel = -np.abs(self.env_params.additional_params["max_decel"])
                     max_accel = self.env_params.additional_params["max_accel"]
-                    accel = max_decel + (max_accel - max_decel) * (actions[0] + 1) / 2
+                    accel = max_accel + (max_decel - max_accel) * (actions[0] + 1) / 2
 
                 # if we are past the intersection, go full speed ahead but don't crash
-                # if self.past_intersection(rl_id):
-                #     self.k.vehicle.set_speed_mode(rl_id, 'right_of_way')
-                #     continue
+                if self.past_intersection(rl_id):
+                    self.k.vehicle.set_speed_mode(rl_id, 'right_of_way')
+                    continue
 
                 rl_ids.append(rl_id)
                 accels.append(accel)
 
+            # print(accels)
+            # print(rl_ids)
             self.k.vehicle.apply_acceleration(rl_ids, accels)
 
     def arrived_intersection(self, veh_id):
@@ -263,7 +266,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                                         self.k.vehicle.get_route(veh_id)[-1]
 
         if on_post_intersection_edge and self.k.vehicle.get_position(
-                veh_id) > 4:  # vehicle arrived at final destination, 8 is a random distance
+                veh_id) > 4:  # vehicle arrived at final destination, 4 is a random distance
             return True
         elif self.k.vehicle.get_edge(veh_id) == '':
             return True
@@ -379,7 +382,11 @@ class Bayesian0NoGridEnv(MultiEnv):
             curr = val
             self.ped_transition_cnt[loc][f'{prev}{curr}'] += 1
             self.prev_loc_ped_state[loc] = curr
-        obs = {}
+        if self.maddpg:
+            # TODO(@evinitsky) remove hardcoding
+            obs = {'av_{}'.format(i): -1 * np.ones(self.observation_space.shape[0]) for i in range(4)}
+        else:
+            obs = {}
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
                 self.arrived_intersection(veh_id)
@@ -396,6 +403,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     rl_id):
                 obs.update({rl_id: self.state_for_id(rl_id)})
                 # print('inside intersection', self.inside_intersection)
+
         return obs
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -404,7 +412,10 @@ class Bayesian0NoGridEnv(MultiEnv):
         # if rl_actions is None:
         #     return {}
 
-        rewards = {}
+        if self.maddpg:
+            rewards = {'av_{}'.format(i): 0 for i in range(4)}
+        else:
+            rewards = {}
         veh_ids = self.k.vehicle.get_ids()
 
         # avs are trained via DQN, rl is the L2 car
@@ -456,6 +467,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 # if reward < 0:
                 #     import ipdb; ipdb.set_trace()
                 rewards[rl_id] = reward
+                # tiny little reward to encourage forwards progress
+                if self.maddpg:
+                    rewards[rl_id] += self.k.vehicle.get_speed(rl_id) / 400.0
                 self.reward[rl_id] = reward
 
         return rewards
@@ -629,6 +643,7 @@ class Bayesian0NoGridEnv(MultiEnv):
                     self.reward[rl_id] = 0.0
                     reward[rl_id] = 0.0
                 else:
+                    print('here we are')
                     self.reward[rl_id] = 1.0
                     reward[rl_id] = 1.0
 

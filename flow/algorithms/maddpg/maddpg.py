@@ -39,6 +39,9 @@ DEFAULT_CONFIG = with_common_config({
     "evaluation_interval": None,
     # Number of episodes to run per evaluation period.
     "evaluation_num_episodes": 10,
+    "evaluation_config": {
+        "explore": False
+    },
 
     # === Model ===
     # Apply a state preprocessor with spec given by the "model" config option
@@ -68,7 +71,19 @@ DEFAULT_CONFIG = with_common_config({
     # === Replay buffer ===
     # Size of the replay buffer. Note that if async_updates is set, then
     # each worker will have a replay buffer of this size.
-    "buffer_size": int(1e6),
+    "buffer_size": 50000,
+    # If True prioritized replay buffer will be used.
+    "prioritized_replay": True,
+    # Alpha parameter for prioritized replay buffer.
+    "prioritized_replay_alpha": 0.6,
+    # Beta parameter for sampling from prioritized replay buffer.
+    "prioritized_replay_beta": 0.4,
+    # Final value of beta (by default, we use constant beta=0.4).
+    "final_prioritized_replay_beta": 0.4,
+    # Time steps over which the beta parameter is annealed.
+    "prioritized_replay_beta_annealing_timesteps": 20000,
+    # Epsilon to add to the TD errors when updating priorities.
+    "prioritized_replay_eps": 1e-6,
     # Observation compression. Note that compression makes simulation slow in
     # MPE.
     "compress_observations": False,
@@ -90,7 +105,7 @@ DEFAULT_CONFIG = with_common_config({
     "learning_starts": 1024 * 25,
     # Update the replay buffer with this many samples at once. Note that this
     # setting applies per-worker if num_workers > 1.
-    "sample_batch_size": 100,
+    "rollout_fragment_length": 100,
     # Size of a batched sampled from replay buffer for training. Note that
     # if async_updates is set, then each worker returns gradients for a
     # batch of this size.
