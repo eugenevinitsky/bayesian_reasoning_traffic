@@ -115,7 +115,7 @@ class TraCIPedestrian(KernelPedestrian):
         """See parent class."""
         if ped_id in self.kernel_api.person.getIDList():
             self.kernel_api.person.unsubscribe(ped_id)
-            self.kernel_api.person.remove(ped_id)
+            self.kernel_api.person.removeStages(ped_id)
 
         if ped_id in self.__ids:
             self.__ids.remove(ped_id)

@@ -16,12 +16,12 @@ from flow.networks.multi_ring import MultiRingNetwork
 from flow.networks.minicity import MiniCityNetwork
 from flow.networks.highway_ramps import HighwayRampsNetwork
 from flow.networks.bayesian_0 import Bayesian0Network
-from flow.networks.bayesian_1 import Bayesian1Network, Bayesian3Network, Bayesian4Network
+from flow.networks.bayesian_1 import Bayesian1Network, Bayesian3Network, Bayesian4Network, L2ObscuredNetwork
 
 __all__ = [
     "Network", "BayBridgeNetwork", "BayBridgeTollNetwork",
     "BottleneckNetwork", "FigureEightNetwork", "TrafficLightGridNetwork",
     "HighwayNetwork", "RingNetwork", "MergeNetwork", "MultiRingNetwork",
     "MiniCityNetwork", "HighwayRampsNetwork", "Bayesian0Network",
-    "Bayesian1Network", "Bayesian3Network", "Bayesian4Network"
+    "Bayesian1Network", "Bayesian3Network", "Bayesian4Network", "L2ObscuredNetwork"
 ]

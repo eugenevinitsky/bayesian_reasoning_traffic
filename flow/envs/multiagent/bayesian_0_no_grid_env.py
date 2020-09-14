@@ -4,6 +4,8 @@ from copy import deepcopy, copy
 import math
 import numpy as np
 from gym.spaces import Box, Discrete
+from flow.core.params import SumoCarFollowingParams
+from flow.controllers import RuleBasedIntersectionController
 from flow.envs.multiagent.base import MultiEnv
 
 from traci.exceptions import FatalTraCIError
@@ -179,6 +181,8 @@ class Bayesian0NoGridEnv(MultiEnv):
         #     path_to_inferrer = "/home/thankyou-always/TODO/research/bayesian_reasoning_traffic/flow/controllers/imitation_learning/model_files/c.h5"
         #     self.agent = get_inferrer(path=path_to_inferrer, inferrer_type="imitation")
 
+        self.controller_dict = {}
+
     @property
     def observation_space(self):
         """See class definition."""
@@ -324,15 +328,33 @@ class Bayesian0NoGridEnv(MultiEnv):
                     # only perform inference if the visible veh has arrived
                     if self.arrived_intersection(veh_id) and not self.past_intersection(veh_id):
                         dummy_obs = np.zeros(self.observation_space.shape[0])
-                        _, visible_pedestrians, visible_lanes = self.find_visible_objects(veh_id,
-                                                                                                         self.search_veh_radius)
+
+                        # compute the action it did take. Note that we could store this but this is easier
+                        _, visible_pedestrians, visible_lanes = self.find_visible_objects(veh_id, self.search_veh_radius)
                         ped_params = self.four_way_ped_params(visible_pedestrians, visible_lanes)
                         # TODO fix magic numbers
                         dummy_obs[[10, 11, 12, 13]] = ped_params
-                        acceleration = self.k.vehicle.get_acc_controller(veh_id).get_action_with_ped(self,
-                                                                                       dummy_obs)
+                        if hasattr(self.k.vehicle.get_acc_controller(veh_id), 'get_action_with_ped'):
+                            acceleration = self.k.vehicle.get_acc_controller(veh_id).get_action(self)
+                            controller = self.k.vehicle.get_acc_controller(veh_id)
+                        else:
+                            if veh_id not in self.controller_dict:
+                                self.controller_dict[veh_id] = RuleBasedIntersectionController(veh_id,
+                                                            car_following_params=SumoCarFollowingParams(
+                                                                min_gap=2.5,
+                                                                decel=7.5,
+                                                                # avoid collisions at emergency stops
+                                                                speed_mode="right_of_way",
+                                                            )
+                                                            )
+                            acceleration = self.controller_dict[veh_id].get_action_with_ped(self,
+                                                                                           dummy_obs)
+                            controller = self.controller_dict[veh_id]
+
+                        # now we can do the filtering
                         # we pass a zero of states because it's just a dummy obs, only the ped part of it affects the behavior
-                        updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(self, acceleration,
+                        updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(self, controller,
+                                                                                         acceleration,
                                                                                          np.zeros(self.observation_space.shape[0]),
                                                                                          self.priors.get(veh_id,
                                                                                                          {}),
@@ -344,6 +366,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         if self.inference_in_state:
             prior_index = (self.max_num_objects * num_veh_obs) + num_self_obs + num_ped_obs
             observation[prior_index:] = self.prior_probs
+            print(observation[prior_index:])
         return observation
 
 
@@ -359,6 +382,7 @@ class Bayesian0NoGridEnv(MultiEnv):
         obs = {}
         for veh_id in self.k.vehicle.get_ids():
             if veh_id not in self.arrival_order and self.arrived_intersection(veh_id):
+                self.arrived_intersection(veh_id)
                 self.arrival_order[veh_id] = len(self.arrival_order)
 
         veh_ids = self.k.vehicle.get_ids()
@@ -428,6 +452,9 @@ class Bayesian0NoGridEnv(MultiEnv):
                 #     reward += min(accel, 0) / 50.0
                 # if inside_intersection and self.k.vehicle.get_speed(rl_id) < 1.0:
                 #     reward -= 0.1
+
+                if reward < 0:
+                    import ipdb; ipdb.set_trace()
                 rewards[rl_id] = reward
                 self.reward[rl_id] = reward
 
@@ -615,6 +642,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             to be zero.
         """
         # print(self.ped_transition_cnt)
+        self.controller_dict = {}
         self.time_counter = 0
         # last time we saw a vehicle
         self.last_seen = 0
@@ -837,11 +865,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             a) zebra crossings: these contain a 'w'
             b) intersection ped walkways: these contain a 'c'
         """
-        visible_vehicles, visible_pedestrians, visible_lanes = self.k.vehicle.get_viewable_objects(
-            veh_id,
-            self.k.pedestrian,
-            self.k.network.kernel_api.lane,
-            radius)
+        visible_vehicles, visible_pedestrians, visible_lanes = self.k.vehicle.get_viewable_objects(veh_id, self.k.pedestrian, self.k.network.kernel_api.lane, radius)
 
         return visible_vehicles, visible_pedestrians, visible_lanes
 
@@ -1144,7 +1168,7 @@ class Bayesian0NoGridEnv(MultiEnv):
             elif "-" in ped_edge:
                 edge_num = self.edge_to_num[ped_edge]
                 edge_pos = ped_kernel.get_lane_position(ped_id)
-                return (edge_num % 2 == 0 and edge_pos >= 49) or (edge_num % 2 == 1 and edge_pos <= 1)
+                return (edge_num % 2 == 0 and edge_pos >= 47) or (edge_num % 2 == 1 and edge_pos <= 1)
 
         else:
             return False

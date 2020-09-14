@@ -20,9 +20,8 @@ PED_IDX_LST = [10, 11, 12, 13]
 PED_FRONT = PED_IDX_LST[0]
 PED_BACK = PED_IDX_LST[-1]
 
-NOISE_STD = 0.0
-
-def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_locs=4):
+def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, agent_id, num_locs=4,
+                            noise_std=0.0):
     """Black box predictor of the probability of pedestrian in each of the 4 crosswalk locations
     
     Parameters
@@ -88,15 +87,18 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
 
         s_all_modified = np.copy(
             s_all)  # s_all_modified = hypothetical state that an agent observes
-        s_all_modified[PED_IDX_LST] = lst_comb
+        int_list = [int(element) for element in lst_comb]
+        s_all_modified[PED_IDX_LST] = int_list
         #                                 _, _, logit = agent.compute_action(s_all_modified, policy_id=policy_map_fn(agent_id), full_fetch=True)
-        mu = env.k.vehicle.get_acc_controller(agent_id).get_action_with_ped(env,
-                                                                            s_all_modified)
-        sigma = NOISE_STD
+        mu = controller.get_action_with_ped(env, s_all_modified, ped=int_list, change_speed_mode=False, always_return_action=True)
+        if mu is not None:
+            controller.get_action_with_ped(env, s_all_modified, ped=int_list, change_speed_mode=False, always_return_action=True)
+        sigma = noise_std
         # noise up your model
         if sigma > 0.0:
             mu += np.random.normal(loc=0.0, scale=sigma)
-            joint_likelihood_density = max(min(accel_pdf(mu, sigma, action), 10.0), 0.01)
+            # joint_likelihood_density = max(min(accel_pdf(mu, sigma, action), 10.0), 0.01)
+            joint_likelihood_density = accel_pdf(mu, sigma, action)
         else:
             if mu == action:
                 joint_likelihood_density = 1
@@ -170,7 +172,7 @@ def get_filtered_posteriors(env, action, dummy_obs, joint_priors, agent_id, num_
     # now return both the priors and the marginalized estimates
     ped_vals = []
     for loc_ in range(num_locs):
-        single_prior_str = f'o_{loc_} = 0'
+        single_prior_str = f'o_{loc_} = 1'
         ped_vals.append(single_priors_filter[single_prior_str][-1])
     return ped_vals, joint_priors
 

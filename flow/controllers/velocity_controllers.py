@@ -2,7 +2,9 @@
 
 # TODO(@evinitsky) move to util
 # from flow.utils.rllib import create_agent_from_path
+from flow.core.params import SumoCarFollowingParams
 from flow.controllers.base_controller import BaseController
+from bayesian_inference.inference import get_filtered_posteriors
 import numpy as np
 
 
@@ -20,9 +22,8 @@ class PreTrainedController(BaseController):
     def get_accel(self, env):
         state = env.get_state()
         if not env.past_intersection(self.veh_id) and len(state) > 0 and self.veh_id in state.keys():
-            apparent_index, _, logits = self.agent.compute_action(state[self.veh_id], policy_id='av', full_fetch=True)
-            q_val = logits['q_values']
-            action = env.discrete_actions_to_accels[np.argmax(q_val)]
+            action = self.agent.compute_action(state[self.veh_id], policy_id='av', explore=False)
+            # action = env.discrete_actions_to_accels[np.argmax(q_val)]
             return action
         else:
             return None
@@ -90,14 +91,17 @@ class FullStop(BaseController):
             self, veh_id, car_following_params, delay=1.0)
 
     def get_accel(self, env):
-        return -3.0
+        return -4.5
+    
+    def get_action_with_ped(self, env, state, ped=None, change_speed_mode=True, always_return_action=False):
+        return -4.5
 
 
 class RuleBasedIntersectionController(BaseController):
     def __init__(self,
                  veh_id,
                  car_following_params,
-                 noise=0.1):
+                 noise=0.0):
         BaseController.__init__(
             self, veh_id, car_following_params, noise=noise)
 
@@ -112,11 +116,43 @@ class RuleBasedIntersectionController(BaseController):
             "(1.1)--(0.1)" : 3
         }
 
-    def get_action_with_ped(self, env, state):
-        """Compute the action given the state. Lets us pass in modified states."""
-        # we are not yet at the intersection and we are on the first edge
-        ped_pos = [i + len(env.self_obs_names) for i in range (4)]
+        self.edge_to_int = {
+            "(1.1)--(2.1)": 0,
+            "(2.1)--(1.1)": 1,
+            "(1.1)--(1.2)": 2,
+            "(1.2)--(1.1)": 3,
+            "(1.1)--(0.1)": 4,
+            "(0.1)--(1.1)": 5,
+            "(1.1)--(1.0)": 6,
+            "(1.0)--(1.1)": 7
+        }
 
+    def get_action_with_ped(self, env, state, ped=None, change_speed_mode=True, always_return_action=False):
+        """Compute the action given the state. Lets us pass in modified states.
+
+        # # TODO(KL) compute the ped state normally???
+
+        always_return_action: bool
+            If true, we return an action even if we have no yet 'arrived' at the intersection
+        """
+        # ped_pos = [i + len(env.self_obs_names) for i in range (4)]
+        # import ipdb; ipdb.set_trace()
+        # # TODO(KL) remove this once I've figured out what probs the inference controller gets
+        # if self.veh_id == "temp_0" and 40 > env.k.vehicle.get_position(self.veh_id) > 20.0:
+        #     return -4.5
+        # 2nd mode: 1 = pedestrian in front of me
+        # or, put cars closer to intersection
+
+
+        if ped:
+            visible_peds = ped
+        else:
+            visible_peds = env.four_way_ped_params(env.k.pedestrian.get_ids(), [], ground_truth=True)        
+        
+        # hardcoding things for scenario where both cars are on the top edge
+        if visible_peds[0]:
+            return -4.5
+            
         desired_pos = 48
         # if env.k.vehicle.get_position(self.veh_id) < desired_pos and (env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
         #     action = 2.6
@@ -143,17 +179,25 @@ class RuleBasedIntersectionController(BaseController):
         #     return None
         #
         # print(env.k.vehicle.get_position(self.veh_id))
-        if env.k.vehicle.get_position(self.veh_id) < desired_pos and (
+
+        # we sometimes query this as a dummy controller, we don't want it to change the speed mode at that point
+        if not always_return_action and env.k.vehicle.get_position(self.veh_id) < desired_pos and (
                 env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
-            env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
+            if change_speed_mode:
+                env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
+            # print('position is ', env.k.vehicle.get_position(self.veh_id))
             return None
         else:
-            env.k.vehicle.set_speed_mode(self.veh_id, 'aggressive')
+            if change_speed_mode:
+                env.k.vehicle.set_speed_mode(self.veh_id, 'aggressive')
 
-        start, end = env.k.vehicle.get_route(self.veh_id)
-        start, end = self.edge_to_num[start], self.edge_to_num[end]
+        start_edge, end_edge = env.k.vehicle.get_route(self.veh_id)
+        start, end = self.edge_to_num[start_edge], self.edge_to_num[end_edge]
 
-        if state[ped_pos][start] or state[ped_pos][end]:
+        # if you're past the start edge, you shouldn't stop just because there's a vehicle on the edge behind you
+        if (visible_peds[start] and env.k.vehicle.get_edge(self.veh_id) == start_edge)\
+                or visible_peds[end] and not env.past_intersection(self.veh_id) \
+                and self.veh_id not in env.inside_intersection:
             return -4.5
 
         # inch forward if no vehicle is before you in the order, otherwise go
@@ -167,13 +211,30 @@ class RuleBasedIntersectionController(BaseController):
 
         arrival_order_dict = {veh_id: env.arrival_order[veh_id] for veh_id in env.arrival_order
                               if veh_id in env.k.vehicle.get_ids() and not env.past_intersection(veh_id)}
-        if len(arrival_order) == 0 or env.past_intersection(self.veh_id):
-            env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
-            return None
-        if env.arrival_order[self.veh_id] == np.min(arrival_order):
+
+        # if env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[-1] and env.k.vehicle.get_speed(self.veh_id) < 0.01:
+        #     import ipdb; ipdb.set_trace()
+        # if len(arrival_order) == 0 or env.past_intersection(self.veh_id):
+        if env.past_intersection(self.veh_id):
+            if change_speed_mode:
+                env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
             return 2.6
         else:
-            return -4.5
+            start, end = env.k.vehicle.get_route(self.veh_id)
+            start = self.edge_to_int[start]
+            end = self.edge_to_int[end]
+            turn_num = (end - start) % 8
+            # right turn is always safe unless someone else is also going to end on this edge
+            if turn_num == 1:
+                final_edge = [env.k.vehicle.get_route(veh_id)[-1] == env.k.vehicle.get_route(self.veh_id)[-1]
+                              for veh_id in arrival_order_dict.keys()
+                              if veh_id != self.veh_id]
+                if not np.any(final_edge):
+                    return 2.6
+            if self.veh_id not in env.arrival_order or env.arrival_order[self.veh_id] == np.min(arrival_order):
+                return 2.6
+            else:
+                return -4.5
 
     def get_accel(self, env):
         """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
@@ -224,6 +285,119 @@ class RuleBasedIntersectionController(BaseController):
             accel = self.get_safe_velocity_action(env, accel)
 
         return accel
+
+
+class RuleBasedInferenceController(RuleBasedIntersectionController):
+    def __init__(self,
+                 veh_id,
+                 car_following_params,
+                 noise=0.0,
+                 inference_noise=0.0):
+        RuleBasedIntersectionController.__init__(
+            self, veh_id, car_following_params, noise=noise)
+
+        self.edge_to_num = {
+            "(1.2)--(1.1)" : 0,
+            "(1.1)--(1.2)" : 0,
+            "(2.1)--(1.1)" : 1,
+            "(1.1)--(2.1)" : 1,
+            "(1.0)--(1.1)" : 2,
+            "(1.1)--(1.0)" : 2,
+            "(0.1)--(1.1)" : 3,
+            "(1.1)--(0.1)" : 3
+        }
+        # we use this to track a RuleBasedController for every other controller in the scene
+        # since the L1 controllers assume everything else is a L0 controller
+        self.controller_dict = {}
+        self.priors = {}
+        self.accel = None
+        self.inference_noise = inference_noise
+
+    def get_accel(self, env):
+        """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
+        visible_vehicles, visible_pedestrians, visible_lanes = env.k.vehicle.get_viewable_objects(
+            self.veh_id,
+            env.k.pedestrian,
+            env.k.network.kernel_api.lane,
+            env.search_veh_radius)
+        ped_vals = env.four_way_ped_params(visible_pedestrians, visible_lanes, ground_truth=False)
+        state = env.state_for_id(self.veh_id)
+        action = self.get_action_with_ped(env, state, ped=ped_vals)
+
+        for veh_id in visible_vehicles:
+            if veh_id not in self.controller_dict and veh_id != self.veh_id:
+                self.controller_dict[veh_id] = RuleBasedIntersectionController(veh_id,
+                                                                               car_following_params=SumoCarFollowingParams(
+                                                                                   min_gap=2.5,
+                                                                                   decel=7.5,
+                                                                                   # avoid collisions at emergency stops
+                                                                                   speed_mode="right_of_way",
+                                                                                    )
+                                                                               )
+            # don't do inference on yourself lol
+            if veh_id != self.veh_id and not env.past_intersection(veh_id):
+                dummy_obs = np.zeros(env.observation_space.shape[0])
+                _, visible_pedestrians, visible_lanes = env.find_visible_objects(veh_id,
+                                                                                  env.search_veh_radius)
+                ped_params = env.four_way_ped_params(visible_pedestrians, visible_lanes)
+                # TODO fix magic numbers
+                dummy_obs[[10, 11, 12, 13]] = ped_params
+                # import ipdb; ipdb.set_trace()
+                controller = env.k.vehicle.get_acc_controller(veh_id)
+                if hasattr(controller, 'accel'):
+                    acceleration = env.k.vehicle.get_acc_controller(veh_id).accel
+                else:
+                    acceleration = env.k.vehicle.get_acc_controller(veh_id).get_accel(env)
+                # import ipdb; ipdb.set_trace()
+                # we pass a zero of states because it's just a dummy obs, only the ped part of it affects the behavior
+                # import ipdb; ipdb.set_trace()
+
+                updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
+                                                                                 np.zeros(env.observation_space.shape[0]),
+                                                                                 self.priors.get(veh_id,
+                                                                                                 {}),
+                                                                                 veh_id,
+                                                                                 noise_std=self.inference_noise)
+                print(updated_ped_probs)
+                if self.veh_id == "rl_0":
+                    print(f'updated ped probs is {updated_ped_probs}')
+                # except:
+                #     import ipdb; ipdb.set_trace()
+                #     updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
+                #                                                 np.zeros(env.observation_space.shape[0]),
+                #                                                 self.priors.get(veh_id,
+                #                                                                 {}),
+                #                                                 veh_id,
+                #                                                 noise_std=self.inference_noise)
+                # note that I got this backwards, this is actually the probability of no peds, which
+                # is why this is a less than
+                # if hasattr(env, 'query_env'):
+                #     updated_ped_probs, _ = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
+                #                             np.zeros(env.observation_space.shape[0]),
+                #                             self.priors.get(veh_id,
+                #                                             {}),
+                #                             veh_id)
+                # the second condition is just so videos don't look stupid'
+                if np.any(np.array(updated_ped_probs) > 0.8) and env.k.vehicle.get_position(self.veh_id) > 20.0:
+                    # we use this to check if we got it correctly. We should uh, automate this.
+                    # TODO(@evinitsky) automate this
+                    # import ipdb; ipdb.set_trace()
+                    # if not hasattr(env, 'query_env'):
+                    #     if env.time_counter < 2000.0:
+                            # print('acceleration is', acceleration)
+                            # print(updated_ped_probs)
+                    get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
+                                            np.zeros(env.observation_space.shape[0]),
+                                            self.priors.get(veh_id,
+                                                            {}),
+                                            veh_id)
+                    action = -4.5
+                    print(f'action set to -4.5 for {self.veh_id}')
+                print(action)
+                self.accel = action
+        
+        return action
+
 
 
 class FollowerStopper(BaseController):

@@ -1,6 +1,5 @@
 """Contains an experiment class for running simulations."""
 
-from collections import defaultdict
 import logging
 import datetime
 import numpy as np
@@ -106,7 +105,7 @@ class Experiment:
             def rl_actions(*_):
                 return None
 
-        rets = defaultdict(list)
+        rets = []
         mean_rets = []
         ret_lists = []
         vels = []
@@ -127,8 +126,7 @@ class Experiment:
                 # print(state)
                 state, reward, done, _ = self.env.step(rl_actions(state))
                 vel[j] = np.nan_to_num(np.mean(
-                    self.env.k.vehicle.get_speed(self.env.k.vehicle.get_ids())))     # TODO(KL) Check w Eugene what the point of that the mean is?
-                # import ipdb;ipdb.set_trace()
+                    self.env.k.vehicle.get_speed(self.env.k.vehicle.get_ids())))
                 # ret += reward
                 ret_list.append(reward)
                 # print(ret_list)
