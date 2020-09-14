@@ -101,7 +101,8 @@ class BayesianPredictController(BaseController):
         # store it for replay
         self.accel = best_action_sequence[0]
         if best_score < 0:
-            import ipdb; ipdb.set_trace()
+            print(f'best_score < 0')
+        #     import ipdb; ipdb.set_trace()
         return best_action_sequence[0]
 
     def store_info(self, env):
@@ -264,8 +265,8 @@ class BayesianPredictController(BaseController):
             return None
 
         accel = self.get_accel(env)
-        print('selected action is ', accel)
-        print('stored accel is ', self.accel)
+        print('selected action of l2 (red) is ', accel)
+        print('stored accel of l2 (red) is ', self.accel)
 
         # if no acceleration is specified, let sumo take over for the current
         # time step

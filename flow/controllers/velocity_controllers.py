@@ -92,6 +92,9 @@ class FullStop(BaseController):
 
     def get_accel(self, env):
         return -4.5
+    
+    def get_action_with_ped(self, env, state, ped=None, change_speed_mode=True, always_return_action=False):
+        return -4.5
 
 
 class RuleBasedIntersectionController(BaseController):
@@ -127,17 +130,29 @@ class RuleBasedIntersectionController(BaseController):
     def get_action_with_ped(self, env, state, ped=None, change_speed_mode=True, always_return_action=False):
         """Compute the action given the state. Lets us pass in modified states.
 
+        # # TODO(KL) compute the ped state normally???
+
         always_return_action: bool
             If true, we return an action even if we have no yet 'arrived' at the intersection
         """
-
         # ped_pos = [i + len(env.self_obs_names) for i in range (4)]
+        # import ipdb; ipdb.set_trace()
+        # # TODO(KL) remove this once I've figured out what probs the inference controller gets
+        # if self.veh_id == "temp_0" and 40 > env.k.vehicle.get_position(self.veh_id) > 20.0:
+        #     return -4.5
+        # 2nd mode: 1 = pedestrian in front of me
+        # or, put cars closer to intersection
+
 
         if ped:
             visible_peds = ped
         else:
-            visible_peds = env.four_way_ped_params(env.k.pedestrian.get_ids(), [], ground_truth=True)
-
+            visible_peds = env.four_way_ped_params(env.k.pedestrian.get_ids(), [], ground_truth=True)        
+        
+        # hardcoding things for scenario where both cars are on the top edge
+        if visible_peds[0]:
+            return -4.5
+            
         desired_pos = 48
         # if env.k.vehicle.get_position(self.veh_id) < desired_pos and (env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[0]):
         #     action = 2.6
@@ -336,12 +351,24 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
                 # import ipdb; ipdb.set_trace()
                 # we pass a zero of states because it's just a dummy obs, only the ped part of it affects the behavior
                 # import ipdb; ipdb.set_trace()
+
                 updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
                                                                                  np.zeros(env.observation_space.shape[0]),
                                                                                  self.priors.get(veh_id,
                                                                                                  {}),
                                                                                  veh_id,
                                                                                  noise_std=self.inference_noise)
+                print(updated_ped_probs)
+                if self.veh_id == "rl_0":
+                    print(f'updated ped probs is {updated_ped_probs}')
+                # except:
+                #     import ipdb; ipdb.set_trace()
+                #     updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
+                #                                                 np.zeros(env.observation_space.shape[0]),
+                #                                                 self.priors.get(veh_id,
+                #                                                                 {}),
+                #                                                 veh_id,
+                #                                                 noise_std=self.inference_noise)
                 # note that I got this backwards, this is actually the probability of no peds, which
                 # is why this is a less than
                 # if hasattr(env, 'query_env'):
@@ -350,9 +377,7 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
                 #                             self.priors.get(veh_id,
                 #                                             {}),
                 #                             veh_id)
-                # the second condition is just so videos don't look stupid
-                print(f'vehicle id for RuleBasedInferenceController is {self.veh_id}')
-
+                # the second condition is just so videos don't look stupid'
                 if np.any(np.array(updated_ped_probs) > 0.8) and env.k.vehicle.get_position(self.veh_id) > 20.0:
                     # we use this to check if we got it correctly. We should uh, automate this.
                     # TODO(@evinitsky) automate this
@@ -368,9 +393,9 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
                                             veh_id)
                     action = -4.5
                     print(f'action set to -4.5 for {self.veh_id}')
-
+                print(action)
                 self.accel = action
-
+        
         return action
 
 
