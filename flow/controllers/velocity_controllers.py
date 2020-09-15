@@ -186,6 +186,7 @@ class RuleBasedIntersectionController(BaseController):
             if change_speed_mode:
                 env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
             # print('position is ', env.k.vehicle.get_position(self.veh_id))
+            print("HITTING NONE")
             return None
         else:
             if change_speed_mode:
@@ -324,8 +325,8 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
             env.search_veh_radius)
         ped_vals = env.four_way_ped_params(visible_pedestrians, visible_lanes, ground_truth=False)
         state = env.state_for_id(self.veh_id)
-        action = self.get_action_with_ped(env, state, ped=ped_vals)
-
+        action = self.get_action_with_ped(env, state, ped=ped_vals, always_return_action=True)
+        print(f'action of rl_0 is {action}')
         
         for veh_id in visible_vehicles:
             if veh_id not in self.controller_dict and veh_id != self.veh_id:
@@ -363,7 +364,10 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
                                                                                                  {}),
                                                                                  veh_id,
                                                                                  noise_std=self.inference_noise)
-
+                # if 0.37811544978003175 - 0.05 <= updated_ped_probs[0] <= 0.37811544978003175 + 0.05:
+                    # import ipdb; ipdb.set_trace()
+                print("Updated ped probs")
+                print(updated_ped_probs)
                 # except:
                 #     import ipdb; ipdb.set_trace()
                 #     updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
@@ -382,7 +386,7 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
                 #                             veh_id)
                 # the second condition is just so videos don't look stupid'
                 # if np.any(np.array(updated_ped_probs) > 0.7) and env.k.vehicle.get_position(self.veh_id) > 20.0:
-                if updated_ped_probs[0] > 0.7 and env.k.vehicle.get_position(self.veh_id) > 20.0:
+                if updated_ped_probs[0] > 0.7 and env.k.vehicle.get_position(self.veh_id) > 20.0: #change to 19?
 
                     # we use this to check if we got it correctly. We should uh, automate this.
                     # TODO(@evinitsky) automate this

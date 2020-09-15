@@ -57,7 +57,7 @@ class BayesianPredictController(BaseController):
             print(f'veh_id is {self.veh_id}')
             env.query_env.k.vehicle.kernel_api.vehicle.setSpeedMode(self.veh_id, 0)
             env.query_env.k.vehicle.set_acc_controller(self.veh_id, (BayesianManualController, {}))
-            env.query_env.k.vehicle.set_controlled(self.veh_id)
+            # env.query_env.k.vehicle.set_controlled(self.veh_id) # TODO KL try duplicating this?
 
         # Set query_env state to the same as env
         self.sync_envs(env)
@@ -84,6 +84,7 @@ class BayesianPredictController(BaseController):
             # TODO(@evinitsky) figure out what this is all about
             env.query_env.k.kernel_api.person.appendStage(ped_id,
                     ped_states[ped_id]['stage'])
+
         env.query_env.step(None)
         self.sync_envs(env)
 
@@ -145,7 +146,7 @@ class BayesianPredictController(BaseController):
             return 0, 0, {}
 
         # Different accelerations to iterate over
-        accels = [-4.5, 0, 2.6] # TODO:add as a param
+        accels = [-4.5, 2.6] # TODO:add as a param
 
         # save current state information
         states, ped_states, controllers = self.store_info(env)
@@ -156,10 +157,13 @@ class BayesianPredictController(BaseController):
 
         # Iterate through each acceleration
         for action_comb in combinations_with_replacement(accels, steps):
+            # print(list(combinations_with_replacement(accels, steps)))
+            # import ipdb; ipdb.set_trace()
             score_total = 0
             for a in action_comb:
 
                 # Forward step
+                # import ipdb; ipdb.set_trace()
                 env.query_env.k.vehicle.get_acc_controller(self.veh_id).set_accel(a)
                 env.query_env.step(None)
                 score = self.compute_reward(env)
@@ -201,7 +205,7 @@ class BayesianPredictController(BaseController):
             env.query_env.step(None)
 
         # make sure the query env has the right action
-        env.query_env.k.vehicle.get_acc_controller(self.veh_id).accel = best_action[0]
+        env.query_env.k.vehicle.get_acc_controller(self.veh_id).accel = best_action[0] # might need set accel? TODO(KL)
 
         return best_action, best_score, action_scores
 

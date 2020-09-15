@@ -93,13 +93,15 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
         mu = controller.get_action_with_ped(env, s_all_modified, ped=int_list, change_speed_mode=False, always_return_action=True)
         if mu is not None:
             controller.get_action_with_ped(env, s_all_modified, ped=int_list, change_speed_mode=False, always_return_action=True)
+        # print(action, mu, str_comb)
         sigma = noise_std
         # noise up your model
         
         if sigma > 0.0:
             # catching weird case for rulebasedintersection controller giving a none action
+
             if action == None:
-                # print("ACTION IS NONE")
+                print("ACTION IS NONE")
                 joint_likelihood_density = 1
             else:
 
@@ -132,7 +134,8 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
 
         M_filter += joint_likelihood_density * filtered_prior
         # print(f'M_filter += joint_likelihood_density * filtered_prior {M_filter} += {joint_likelihood_density} * {filtered_prior}')
-
+    # if action == -4.5:
+    #     import ipdb; ipdb.set_trace()
     # 5 p(e|a) joint posterior masses
     for str_comb in joint_ped_combos_str:
         # f(a|e)
@@ -193,6 +196,7 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
     for loc_ in range(num_locs):
         single_prior_str = f'o_{loc_} = 1'
         ped_vals.append(single_priors_filter[single_prior_str][-1])
+        
     return ped_vals, joint_priors
 
     # joint_priors = {}

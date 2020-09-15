@@ -181,7 +181,9 @@ def l2_obscured_example(render=None, pedestrians=False):
                 decel=7.5,  # avoid collisions at emergency stops
                 speed_mode="right_of_way",
             ),
-            acceleration_controller=(RuleBasedInferenceController, {"inference_noise":0.1}),
+            acceleration_controller=(RuleBasedInferenceController, {"inference_noise":0.0}),
+
+            # acceleration_controller=(RuleBasedInferenceController, {"inference_noise":0.1}),
             num_vehicles=1)
 
     vehicles.add(
