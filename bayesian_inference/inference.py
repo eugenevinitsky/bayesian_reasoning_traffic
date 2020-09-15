@@ -34,7 +34,7 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
         [None] * num_locs: dummy place holders for the 4 ped params
     joint_priors: dict[str:float]
         (single pedestrian location observation : probability)
-        ex: priors["o_3 = 1"] = 0.1
+        ex: priors["1 1 0 1"] = 0.0625
 
         (total of 2^4 pedestrian observation combinations and their 
         corresponding updated prior probabilities)
@@ -53,13 +53,15 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
         - Bayes' rule
         - the given prior probabilities
         - a filter matrix, F
-    single_posteriors: dict[str:float]
+    joint_priors (should be called 'posteriors', since we used priors to get these values): dict[str:float]
         (pedestrian observation combination : probability) to be used as priors for the next inference round
-        ex: priors["o_3 = 1"] = 0.1
+        ex: priors["1 1 0 1"] = 0.0625
 
         (total of 2^4 pedestrian observation combinations and their 
         corresponding updated prior probabilities)    
     """
+    print(joint_priors)
+
     s_all = copy(dummy_obs)
 
     flag_set = ("0", "1")
@@ -95,16 +97,31 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
             controller.get_action_with_ped(env, s_all_modified, ped=int_list, change_speed_mode=False, always_return_action=True)
         sigma = noise_std
         # noise up your model
+        
         if sigma > 0.0:
-            mu += np.random.normal(loc=0.0, scale=sigma)
-            # joint_likelihood_density = max(min(accel_pdf(mu, sigma, action), 10.0), 0.01)
-            joint_likelihood_density = accel_pdf(mu, sigma, action)
+            # catching weird case for rulebasedintersection controller giving a none action
+            if action == None:
+                joint_likelihood_density = 1
+            else:
+
+                mu += np.random.normal(loc=0.0, scale=sigma)
+                # joint_likelihood_density = max(min(accel_pdf(mu, sigma, action), 10.0), 0.01)
+                try:
+                    joint_likelihood_density = accel_pdf(mu, sigma, action)
+                except:
+                    import ipdb; ipdb.set_trace()
+                    joint_likelihood_density = accel_pdf(mu, sigma, action)
+                
+            if joint_likelihood_density == 0:
+                # sometimes sigma = 0.1, action = 4.5 and mu = 0 causes pdf = 0
+                joint_likelihood_density = 0.01
         else:
             if mu == action:
                 joint_likelihood_density = 1
             else:
                 # we don't want to set it to zero exactly or else it'll always be zero
                 joint_likelihood_density = 0.01
+
         joint_likelihood_densities[str_comb].append(joint_likelihood_density)
         # M
         # Get p(e)
@@ -114,6 +131,7 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
             import ipdb; ipdb.set_trace()
 
         M_filter += joint_likelihood_density * filtered_prior
+        # print(f'M_filter += joint_likelihood_density * filtered_prior {M_filter} += {joint_likelihood_density} * {filtered_prior}')
 
     # 5 p(e|a) joint posterior masses
     for str_comb in joint_ped_combos_str:
@@ -123,6 +141,7 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
         filtered_prior = joint_priors[str_comb]
 
         # p(e|a)
+        # print(f"joint_likelihood_density * filtered_prior / M_filter is {joint_likelihood_density} * {filtered_prior} / {M_filter}") TODO remove debugging prints
         joint_posterior_filtered = joint_likelihood_density * filtered_prior / M_filter
         joint_posteriors_filter[str_comb].append(joint_posterior_filtered)
 
