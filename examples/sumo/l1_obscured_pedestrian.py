@@ -5,8 +5,7 @@ actually arrives at the desired time so that the conflict occurs. """
 
 import argparse
 import os
-
-from flow.controllers import BayesianPredictController, RuleBasedInferenceController, FullStop
+from flow.controllers import GridRouter, RuleBasedInferenceController, RuleBasedIntersectionController
 from flow.core.experiment import Experiment
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.envs.multiagent import BayesianL2CooperativeEnv, BayesianL2CooperativeEnvWithQueryEnv
@@ -15,6 +14,7 @@ from flow.core.params import SumoCarFollowingParams, VehicleParams
 from flow.controllers import GridRouter, PreTrainedController
 from flow.networks import L2ObscuredNetwork
 from flow.core.params import PedestrianParams
+from flow.envs.multiagent.bayesian_0_no_grid_env import ADDITIONAL_ENV_PARAMS, Bayesian0NoGridEnv
 
 import ray
 
@@ -156,7 +156,6 @@ def l2_obscured_example(render=None, pedestrians=False):
              depart_pos='45')
 
     vehicles = VehicleParams()
-
     if args.pretrained:
         vehicles.add(
             veh_id="av",
@@ -181,7 +180,6 @@ def l2_obscured_example(render=None, pedestrians=False):
                 decel=7.5,  # avoid collisions at emergency stops
                 speed_mode="right_of_way",
             ),
-            acceleration_controller=(RuleBasedInferenceController, {"inference_noise":0.1}),
             num_vehicles=1)
 
     vehicles.add(
@@ -192,7 +190,7 @@ def l2_obscured_example(render=None, pedestrians=False):
             decel=7.5,  # avoid collisions at emergency stops
             speed_mode="right_of_way",
         ),
-        acceleration_controller=(BayesianPredictController, {}),
+        acceleration_controller=(RuleBasedIntersectionController, {0.1}),
         color='red',
         num_vehicles=1)
 
@@ -217,8 +215,9 @@ def l2_obscured_example(render=None, pedestrians=False):
         pedestrians=pedestrian_params,
         initial_config=initial_config)
 
-    env = BayesianL2CooperativeEnvWithQueryEnv(env_params, sim_params, network)
-    env.query_env = BayesianL2CooperativeEnv(env_params, sim_params, network)
+    # env = BayesianL2CooperativeEnvWithQueryEnv(env_params, sim_params, network)
+    # env.query_env = BayesianL2CooperativeEnv(env_params, sim_params, network)
+    env = Bayesian0NoGridEnv(env_params, sim_params, network)
 
     return Experiment(env)
 

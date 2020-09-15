@@ -60,8 +60,6 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
         (total of 2^4 pedestrian observation combinations and their 
         corresponding updated prior probabilities)    
     """
-    print(joint_priors)
-
     s_all = copy(dummy_obs)
 
     flag_set = ("0", "1")
@@ -101,6 +99,7 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
         if sigma > 0.0:
             # catching weird case for rulebasedintersection controller giving a none action
             if action == None:
+                # print("ACTION IS NONE")
                 joint_likelihood_density = 1
             else:
 
@@ -117,6 +116,7 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
                 joint_likelihood_density = 0.01
         else:
             if mu == action:
+                # print(f'mu == action')
                 joint_likelihood_density = 1
             else:
                 # we don't want to set it to zero exactly or else it'll always be zero

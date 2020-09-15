@@ -51,8 +51,10 @@ class BayesianPredictController(BaseController):
         env.query_env.step(None)
 
     def get_accel(self, env, ped_prob=1):
-
+        # import ipdb; ipdb.set_trace()
+        # TODO(KL) what's the point of this?
         if not isinstance(env.query_env.k.vehicle.get_acc_controller(self.veh_id), BayesianManualController):
+            print(f'veh_id is {self.veh_id}')
             env.query_env.k.vehicle.kernel_api.vehicle.setSpeedMode(self.veh_id, 0)
             env.query_env.k.vehicle.set_acc_controller(self.veh_id, (BayesianManualController, {}))
             env.query_env.k.vehicle.set_controlled(self.veh_id)
@@ -103,6 +105,7 @@ class BayesianPredictController(BaseController):
         if best_score < 0:
             print(f'best_score < 0')
         #     import ipdb; ipdb.set_trace()
+        print(f'best_action_sequence is {best_action_sequence}')
         return best_action_sequence[0]
 
     def store_info(self, env):
@@ -172,7 +175,7 @@ class BayesianPredictController(BaseController):
             # if steps == 3:
             #     print('score of action {} is {}'.format(a, score))
             #     print('speed of vehicle is {}'.format(env.query_env.k.vehicle.get_speed('temp_0')))
-
+            print(f'action_comb is {action_comb}, score_total is {score_total}')
             if score_total < 0 and action_comb == [-4.5, -4.5, -4.5, -4.5]:
                 import ipdb; ipdb.set_trace()
             # break ties by going slower earlier
@@ -199,6 +202,7 @@ class BayesianPredictController(BaseController):
 
         # make sure the query env has the right action
         env.query_env.k.vehicle.get_acc_controller(self.veh_id).accel = best_action[0]
+
         return best_action, best_score, action_scores
 
     def compute_reward(self, env):
@@ -266,7 +270,6 @@ class BayesianPredictController(BaseController):
 
         accel = self.get_accel(env)
         print('selected action of l2 (red) is ', accel)
-        print('stored accel of l2 (red) is ', self.accel)
 
         # if no acceleration is specified, let sumo take over for the current
         # time step
@@ -324,7 +327,6 @@ class BayesianManualController(BaseController):
 
     def get_accel(self, env):
         accel = self.accel
-        # TODO(@evinitsky) why is this here?
         self.accel = None
         return accel
 
