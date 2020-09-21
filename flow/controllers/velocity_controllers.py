@@ -5,6 +5,8 @@
 from flow.core.params import SumoCarFollowingParams
 from flow.controllers.base_controller import BaseController
 from bayesian_inference.inference import get_filtered_posteriors
+from bayesian_inference.inference import *
+
 import numpy as np
 
 
@@ -186,6 +188,7 @@ class RuleBasedIntersectionController(BaseController):
             if change_speed_mode:
                 env.k.vehicle.set_speed_mode(self.veh_id, 'right_of_way')
             # print('position is ', env.k.vehicle.get_position(self.veh_id))
+            print("HITTING NONE")
             return None
         else:
             if change_speed_mode:
@@ -267,8 +270,10 @@ class RuleBasedIntersectionController(BaseController):
         if len(env.k.vehicle.get_edge(self.veh_id)) == 0:
             return None
 
-        accel = self.get_accel(env)
-
+        accel = self.get_accel(env) # this goes into InferenceController's get acel though
+        # <bound method RuleBasedInferenceController.get_accel of <flow.controllers.velocity_controllers.RuleBasedInferenceController object at 0x7fa6d1a73d68>>
+        
+        # print(f"Rule based intersection controller's accel is {accel}")
         # if no acceleration is specified, let sumo take over for the current
         # time step
         if accel is None:
@@ -309,20 +314,26 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
         # we use this to track a RuleBasedController for every other controller in the scene
         # since the L1 controllers assume everything else is a L0 controller
         self.controller_dict = {}
-        self.priors = {}
+        self.priors_base_env = {}
+        self.prev_priors_base_env = {}
+        self.priors_query_env = {}
         self.accel = None
         self.inference_noise = inference_noise
 
     def get_accel(self, env):
-        """Drive up to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
+        """Drive 'up' to the intersection. Go if there are no pedestrians and you're first in the arrival order"""
+
         visible_vehicles, visible_pedestrians, visible_lanes = env.k.vehicle.get_viewable_objects(
             self.veh_id,
             env.k.pedestrian,
             env.k.network.kernel_api.lane,
             env.search_veh_radius)
+            
         ped_vals = env.four_way_ped_params(visible_pedestrians, visible_lanes, ground_truth=False)
         state = env.state_for_id(self.veh_id)
-        action = self.get_action_with_ped(env, state, ped=ped_vals)
+        action = self.get_action_with_ped(env, state, ped=ped_vals, always_return_action=True)
+        if str(env) == "<BayesianL2CooperativeEnvWithQueryEnv instance>":
+            self.prev_priors_base_env = self.priors_base_env.copy()
 
         for veh_id in visible_vehicles:
             if veh_id not in self.controller_dict and veh_id != self.veh_id:
@@ -342,60 +353,33 @@ class RuleBasedInferenceController(RuleBasedIntersectionController):
                 ped_params = env.four_way_ped_params(visible_pedestrians, visible_lanes)
                 # TODO fix magic numbers
                 dummy_obs[[10, 11, 12, 13]] = ped_params
-                # import ipdb; ipdb.set_trace()
                 controller = env.k.vehicle.get_acc_controller(veh_id)
                 if hasattr(controller, 'accel'):
                     acceleration = env.k.vehicle.get_acc_controller(veh_id).accel
                 else:
                     acceleration = env.k.vehicle.get_acc_controller(veh_id).get_accel(env)
-                # import ipdb; ipdb.set_trace()
-                # we pass a zero of states because it's just a dummy obs, only the ped part of it affects the behavior
-                # import ipdb; ipdb.set_trace()
 
-                updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
+                if str(env) == "<BayesianL2CooperativeEnvWithQueryEnv instance>":
+                    updated_ped_probs, self.priors_base_env[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
                                                                                  np.zeros(env.observation_space.shape[0]),
-                                                                                 self.priors.get(veh_id,
+                                                                                 self.priors_base_env.get(veh_id,
                                                                                                  {}),
                                                                                  veh_id,
                                                                                  noise_std=self.inference_noise)
-                print(updated_ped_probs)
-                if self.veh_id == "rl_0":
-                    print(f'updated ped probs is {updated_ped_probs}')
-                # except:
-                #     import ipdb; ipdb.set_trace()
-                #     updated_ped_probs, self.priors[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
-                #                                                 np.zeros(env.observation_space.shape[0]),
-                #                                                 self.priors.get(veh_id,
-                #                                                                 {}),
-                #                                                 veh_id,
-                #                                                 noise_std=self.inference_noise)
-                # note that I got this backwards, this is actually the probability of no peds, which
-                # is why this is a less than
-                # if hasattr(env, 'query_env'):
-                #     updated_ped_probs, _ = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
-                #                             np.zeros(env.observation_space.shape[0]),
-                #                             self.priors.get(veh_id,
-                #                                             {}),
-                #                             veh_id)
-                # the second condition is just so videos don't look stupid'
-                if np.any(np.array(updated_ped_probs) > 0.8) and env.k.vehicle.get_position(self.veh_id) > 20.0:
-                    # we use this to check if we got it correctly. We should uh, automate this.
-                    # TODO(@evinitsky) automate this
-                    # import ipdb; ipdb.set_trace()
-                    # if not hasattr(env, 'query_env'):
-                    #     if env.time_counter < 2000.0:
-                            # print('acceleration is', acceleration)
-                            # print(updated_ped_probs)
-                    get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
-                                            np.zeros(env.observation_space.shape[0]),
-                                            self.priors.get(veh_id,
-                                                            {}),
-                                            veh_id)
+                else:
+                    updated_ped_probs, self.priors_query_env[veh_id] = get_filtered_posteriors(env, self.controller_dict[veh_id], acceleration,
+                                                                                 np.zeros(env.observation_space.shape[0]),
+                                                                                 self.priors_query_env.get(veh_id,
+                                                                                                 {}),
+                                                                                 veh_id,
+                                                                                 noise_std=self.inference_noise)
+              
+                # this only works properly if there's only one car we're doing inference on
+                if updated_ped_probs[0] > 0.7 and env.k.vehicle.get_position(self.veh_id) > 25.0:
+
                     action = -4.5
-                    print(f'action set to -4.5 for {self.veh_id}')
-                print(action)
                 self.accel = action
-        
+
         return action
 
 
