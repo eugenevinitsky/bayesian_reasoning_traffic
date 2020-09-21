@@ -82,7 +82,6 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
 
     # 2 f(a|e) # 4 M
     M_filter = 0
-
     for str_comb, lst_comb in zip(joint_ped_combos_str, joint_ped_combos_int_list):
 
         s_all_modified = np.copy(
@@ -99,9 +98,8 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
         
         if sigma > 0.0:
             # catching weird case for rulebasedintersection controller giving a none action
-
             if action == None:
-                print("ACTION IS NONE")
+                # print("ACTION IS NONE")
                 joint_likelihood_density = 1
             else:
 
@@ -117,7 +115,10 @@ def get_filtered_posteriors(env, controller, action, dummy_obs, joint_priors, ag
                 # sometimes sigma = 0.1, action = 4.5 and mu = 0 causes pdf = 0
                 joint_likelihood_density = 0.01
         else:
-            if mu == action:
+            if action == None:
+                # print("ACTION IS NONE")
+                joint_likelihood_density = 1
+            elif mu == action:
                 # print(f'mu == action')
                 joint_likelihood_density = 1
             else:

@@ -26,6 +26,8 @@ class BayesianPredictController(BaseController):
                     veh_id,
                     env.k.vehicle.get_speed(veh_id))
 
+            # TODO(KL) may need to reset the priors of the QUERY env
+
         for ped_id in env.k.pedestrian.get_ids():
             x, y = env.k.pedestrian.get_xy(ped_id)
             edge = env.k.pedestrian.get_edge(ped_id)
@@ -48,13 +50,14 @@ class BayesianPredictController(BaseController):
                 # reset it because we would never know what the priors are
                 query_controller.priors = {} #copy(controller.priors)
 
+        # env.query_env.k.vehicle.get_acc_controller()
+
         env.query_env.step(None)
 
     def get_accel(self, env, ped_prob=1):
         # import ipdb; ipdb.set_trace()
         # TODO(KL) what's the point of this?
         if not isinstance(env.query_env.k.vehicle.get_acc_controller(self.veh_id), BayesianManualController):
-            print(f'veh_id is {self.veh_id}')
             env.query_env.k.vehicle.kernel_api.vehicle.setSpeedMode(self.veh_id, 0)
             env.query_env.k.vehicle.set_acc_controller(self.veh_id, (BayesianManualController, {}))
             # env.query_env.k.vehicle.set_controlled(self.veh_id) # TODO KL try duplicating this?
@@ -62,31 +65,32 @@ class BayesianPredictController(BaseController):
         # Set query_env state to the same as env
         self.sync_envs(env)
 
-        # Remove pedestrians from query_env
-        ped_states = {}
-        for ped_id in env.query_env.k.pedestrian.get_ids():
-            ped_state = {}
-            ped_state['edge_id'] = env.k.pedestrian.get_edge(ped_id)
-            ped_state['position'] = env.k.pedestrian.get_lane_position(ped_id)
-            ped_state['stage'] = env.k.pedestrian.kernel_api.person.getStage(ped_id)
-            ped_states[ped_id] = ped_state
-            env.query_env.k.pedestrian.remove(ped_id)
+        # # Remove pedestrians from query_env
+        # ped_states = {}
+        # for ped_id in env.query_env.k.pedestrian.get_ids():
+        #     ped_state = {}
+        #     ped_state['edge_id'] = env.k.pedestrian.get_edge(ped_id)
+        #     ped_state['position'] = env.k.pedestrian.get_lane_position(ped_id)
+        #     ped_state['stage'] = env.k.pedestrian.kernel_api.person.getStage(ped_id)
+        #     ped_states[ped_id] = ped_state
+        #     env.query_env.k.pedestrian.remove(ped_id)
 
-        # Look ahead with no pedestrians
-        _, _, action_scores_no_ped = self.look_ahead(env, self.look_ahead_len)
+        # # Look ahead with no pedestrians
+        # _, _, action_scores_no_ped = self.look_ahead(env, self.look_ahead_len)
 
-        # Add pedestrians back in to query_env and sync
-        for ped_id in ped_states:
-            env.query_env.k.kernel_api.person.add(
-                    ped_id,
-                    ped_states[ped_id]['edge_id'],
-                    ped_states[ped_id]['position'])
-            # TODO(@evinitsky) figure out what this is all about
-            env.query_env.k.kernel_api.person.appendStage(ped_id,
-                    ped_states[ped_id]['stage'])
+        # # Add pedestrians back in to query_env and sync
+        # for ped_id in ped_states:
+        #     env.query_env.k.kernel_api.person.add(
+        #             ped_id,
+        #             ped_states[ped_id]['edge_id'],
+        #             ped_states[ped_id]['position'])
+        #     # TODO(@evinitsky) figure out what this is all about 
+        # TODO @ euguene this is for p(look ahead score with ped) + (1-p)(look ahead score without ped)
+        #     env.query_env.k.kernel_api.person.appendStage(ped_id,
+        #             ped_states[ped_id]['stage'])
 
-        env.query_env.step(None)
-        self.sync_envs(env)
+        # env.query_env.step(None)
+        # self.sync_envs(env)
 
         # Perform recursive look ahead
         best_action_sequence, best_score, action_scores_ped = self.look_ahead(env, self.look_ahead_len)
@@ -103,10 +107,6 @@ class BayesianPredictController(BaseController):
 
         # store it for replay
         self.accel = best_action_sequence[0]
-        if best_score < 0:
-            print(f'best_score < 0')
-        #     import ipdb; ipdb.set_trace()
-        print(f'best_action_sequence is {best_action_sequence}')
         return best_action_sequence[0]
 
     def store_info(self, env):
@@ -163,25 +163,19 @@ class BayesianPredictController(BaseController):
             for a in action_comb:
 
                 # Forward step
+                # figure out who'se getting controlled ??
                 # import ipdb; ipdb.set_trace()
                 env.query_env.k.vehicle.get_acc_controller(self.veh_id).set_accel(a)
                 env.query_env.step(None)
                 score = self.compute_reward(env)
                 score_total += score
-                # import ipdb; ipdb.set_trace()
-                # _, score, _ = self.look_ahead(env, steps - 1)
-                # print('vehicle position in env is ', env.k.vehicle.get_position(self.veh_id))
-                # print('vehicle position in query env is ', env.query_env.k.vehicle.get_position(self.veh_id))
-                # print('examining action {} on step {}'.format(a, steps))
 
                 # Update if best accel so far
                 # action_scores[a] = score
             # if steps == 3:
             #     print('score of action {} is {}'.format(a, score))
             #     print('speed of vehicle is {}'.format(env.query_env.k.vehicle.get_speed('temp_0')))
-            print(f'action_comb is {action_comb}, score_total is {score_total}')
-            if score_total < 0 and action_comb == [-4.5, -4.5, -4.5, -4.5]:
-                import ipdb; ipdb.set_trace()
+            # print(f'action_comb is {action_comb}, score_total is {score_total}')
             # break ties by going slower earlier
             if (score_total == best_score and action_comb[0] < best_action[0]) or score_total > best_score:
                 best_score = score_total
@@ -273,7 +267,9 @@ class BayesianPredictController(BaseController):
             return None
 
         accel = self.get_accel(env)
-        print('selected action of l2 (red) is ', accel)
+        if str(env) == "<BayesianL2CooperativeEnvWithQueryEnv instance>":
+            # import ipdb; ipdb.seqt_trace()
+            print('selected action of temp_0 (red) is ', accel)
 
         # if no acceleration is specified, let sumo take over for the current
         # time step
